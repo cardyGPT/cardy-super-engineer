@@ -27,6 +27,7 @@ export interface ProjectDocument {
   fileUrl: string;
   fileType: string;
   uploadedAt: string;
+  content?: any; // Added to store parsed JSON data for data models
 }
 
 export interface Entity {

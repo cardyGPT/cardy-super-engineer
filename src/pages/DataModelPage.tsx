@@ -1,9 +1,9 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Database, FileUp } from "lucide-react";
+import { Database, FileUp, AlertTriangle } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -21,14 +21,16 @@ import {
 } from "@/components/ui/dialog";
 import DocumentUpload from "@/components/documents/DocumentUpload";
 import ERDiagramViewer from "@/components/data-model/ERDiagramViewer";
-import { ProjectDocument } from "@/types";
-import { sampleDataModel } from "@/lib/mock-data";
+import { DataModel } from "@/types";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const DataModelPage = () => {
-  const { projects, documents, setDataModel } = useProject();
+  const { projects, documents, getDocumentDataModel } = useProject();
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | undefined>(
     documents.find((doc) => doc.type === "data-model")?.id
   );
+  const [currentDataModel, setCurrentDataModel] = useState<DataModel | null>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const dataModelDocuments = documents.filter(
     (doc) => doc.type === "data-model"
@@ -38,6 +40,28 @@ const DataModelPage = () => {
     (doc) => doc.id === selectedDocumentId
   );
   
+  // Load the selected data model
+  useEffect(() => {
+    if (selectedDocumentId) {
+      try {
+        const model = getDocumentDataModel(selectedDocumentId);
+        if (model) {
+          setCurrentDataModel(model);
+          setError(null);
+        } else {
+          setError("Could not load data model. The file may be corrupted or in an incorrect format.");
+          setCurrentDataModel(null);
+        }
+      } catch (err) {
+        console.error("Error loading data model:", err);
+        setError("An error occurred while loading the data model.");
+        setCurrentDataModel(null);
+      }
+    } else {
+      setCurrentDataModel(null);
+    }
+  }, [selectedDocumentId, getDocumentDataModel]);
+  
   const getProjectName = (projectId: string) => {
     const project = projects.find((p) => p.id === projectId);
     return project ? project.name : "Unknown Project";
@@ -45,10 +69,6 @@ const DataModelPage = () => {
   
   const handleDocumentChange = (docId: string) => {
     setSelectedDocumentId(docId);
-    
-    // In a real app, we would fetch the document's content here
-    // For this prototype, we'll just use our sample data model
-    setDataModel(sampleDataModel);
   };
 
   return (
@@ -97,6 +117,16 @@ const DataModelPage = () => {
                   </div>
                   <DocumentUpload 
                     projectId={projects[0]?.id || ""}
+                    onUploadComplete={() => {
+                      // Refresh the selected document to the latest uploaded one
+                      setSelectedDocumentId(
+                        documents
+                          .filter(doc => doc.type === "data-model")
+                          .sort((a, b) => 
+                            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+                          )[0]?.id
+                      );
+                    }}
                   />
                 </div>
               </DialogContent>
@@ -184,12 +214,22 @@ const DataModelPage = () => {
             </div>
             
             <div className="h-full">
-              {selectedDocument ? (
-                <ERDiagramViewer dataModel={sampleDataModel} />
+              {error && (
+                <Alert variant="destructive" className="m-4">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              
+              {selectedDocument && currentDataModel ? (
+                <ERDiagramViewer dataModel={currentDataModel} />
               ) : (
                 <div className="h-full flex items-center justify-center">
                   <p className="text-gray-500">
-                    Select a data model to view its ER diagram
+                    {selectedDocument 
+                      ? "Loading data model..." 
+                      : "Select a data model to view its ER diagram"}
                   </p>
                 </div>
               )}

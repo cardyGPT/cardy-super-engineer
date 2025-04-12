@@ -12,7 +12,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, ZoomIn, ZoomOut, Filter } from "lucide-react";
+import { Search, ZoomIn, ZoomOut, Filter, Download, Share2 } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -29,7 +29,13 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   const [entityTypeFilter, setEntityTypeFilter] = useState<string>("all");
   const [zoom, setZoom] = useState(1);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
+  const [layoutMode, setLayoutMode] = useState<"grid" | "flow">("grid");
   const canvasRef = useRef<HTMLDivElement>(null);
+  
+  // Reset selected entity when data model changes
+  useEffect(() => {
+    setSelectedEntity(null);
+  }, [dataModel]);
   
   const filteredEntities = dataModel.entities.filter((entity) => {
     const matchesSearch = entity.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -66,6 +72,29 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     return dataModel.entities.filter(
       (entity) => relatedEntityIds.includes(entity.id) && entity.id !== entityId
     );
+  };
+  
+  // Generate exportable diagram data
+  const exportDiagram = () => {
+    const diagramData = {
+      entities: dataModel.entities,
+      relationships: dataModel.relationships,
+      metadata: {
+        exportedAt: new Date().toISOString(),
+        totalEntities: dataModel.entities.length,
+        totalRelationships: dataModel.relationships.length,
+      }
+    };
+    
+    const dataStr = JSON.stringify(diagramData, null, 2);
+    const dataUri = `data:application/json;charset=utf-8,${encodeURIComponent(dataStr)}`;
+    
+    const exportFileDefaultName = `er-diagram-export-${new Date().toISOString().slice(0, 10)}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
   };
 
   return (
@@ -113,6 +142,7 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
               size="icon"
               onClick={handleZoomOut}
               disabled={zoom <= 0.5}
+              title="Zoom out"
             >
               <ZoomOut className="h-4 w-4" />
             </Button>
@@ -124,8 +154,27 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
               size="icon"
               onClick={handleZoomIn}
               disabled={zoom >= 1.5}
+              title="Zoom in"
             >
               <ZoomIn className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setLayoutMode(layoutMode === "grid" ? "flow" : "grid")}
+              title={`Switch to ${layoutMode === "grid" ? "flow" : "grid"} layout`}
+            >
+              <Filter className="h-4 w-4" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={exportDiagram}
+              title="Export diagram"
+            >
+              <Download className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -136,80 +185,98 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
         ref={canvasRef}
       >
         <div 
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          className={`${layoutMode === "grid" 
+            ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
+            : "flex flex-wrap gap-4"}`}
           style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}
         >
-          {filteredEntities.map((entity) => (
-            <Card 
-              key={entity.id}
-              className={`cursor-pointer transition-all border-2 ${
-                selectedEntity?.id === entity.id
-                  ? "border-cardy-blue"
-                  : selectedEntity && getRelatedEntities(selectedEntity.id).some(e => e.id === entity.id)
-                  ? "border-cardy-green"
-                  : "border-transparent"
-              }`}
-              onClick={() => handleEntityClick(entity)}
-            >
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base font-semibold">
-                    {entity.name}
-                  </CardTitle>
-                  <Badge variant={entity.type === "entity" ? "default" : "outline"}>
-                    {entity.type === "entity" ? "Entity" : "Sub-Entity"}
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground">{entity.definition}</p>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="border rounded-md overflow-hidden">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="bg-muted text-muted-foreground">
-                        <th className="font-medium text-left p-1">Attribute</th>
-                        <th className="font-medium text-left p-1">Type</th>
-                        <th className="font-medium text-center p-1">Req</th>
-                        <th className="font-medium text-center p-1">Key</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {entity.attributes.map((attr) => (
-                        <tr key={attr.id} className="border-t">
-                          <td className="p-1 text-left font-medium">
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="cursor-help">{attr.name}</span>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  <p>{attr.description || "No description"}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          </td>
-                          <td className="p-1 text-left">{attr.type}</td>
-                          <td className="p-1 text-center">
-                            {attr.required ? "✓" : ""}
-                          </td>
-                          <td className="p-1 text-center">
-                            {attr.isPrimaryKey ? "PK" : ""}
-                            {attr.isForeignKey ? "FK" : ""}
-                          </td>
+          {filteredEntities.length === 0 ? (
+            <div className="col-span-full p-8 text-center text-gray-500">
+              No entities match your search criteria.
+            </div>
+          ) : (
+            filteredEntities.map((entity) => (
+              <Card 
+                key={entity.id}
+                className={`cursor-pointer transition-all border-2 ${
+                  selectedEntity?.id === entity.id
+                    ? "border-blue-500 shadow-md"
+                    : selectedEntity && getRelatedEntities(selectedEntity.id).some(e => e.id === entity.id)
+                    ? "border-green-500"
+                    : "border-transparent"
+                } ${layoutMode === "flow" ? "w-80" : ""}`}
+                onClick={() => handleEntityClick(entity)}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start justify-between">
+                    <CardTitle className="text-base font-semibold">
+                      {entity.name}
+                    </CardTitle>
+                    <Badge variant={entity.type === "entity" ? "default" : "outline"}>
+                      {entity.type === "entity" ? "Entity" : "Sub-Entity"}
+                    </Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{entity.definition}</p>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="border rounded-md overflow-hidden">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="bg-muted text-muted-foreground">
+                          <th className="font-medium text-left p-1">Attribute</th>
+                          <th className="font-medium text-left p-1">Type</th>
+                          <th className="font-medium text-center p-1">Req</th>
+                          <th className="font-medium text-center p-1">Key</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                      </thead>
+                      <tbody>
+                        {entity.attributes.map((attr) => (
+                          <tr key={attr.id} className="border-t">
+                            <td className="p-1 text-left font-medium">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="cursor-help">{attr.name}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent>
+                                    <p>{attr.description || "No description"}</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </td>
+                            <td className="p-1 text-left">{attr.type}</td>
+                            <td className="p-1 text-center">
+                              {attr.required ? "✓" : ""}
+                            </td>
+                            <td className="p-1 text-center">
+                              {attr.isPrimaryKey ? "PK" : ""}
+                              {attr.isForeignKey ? "FK" : ""}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
       </div>
       
       {selectedEntity && (
         <div className="bg-white p-4 border-t">
-          <h3 className="text-sm font-semibold mb-2">Relationships for {selectedEntity.name}</h3>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-semibold mb-2">Relationships for {selectedEntity.name}</h3>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSelectedEntity(null)}
+              className="h-8 px-2"
+            >
+              Close
+            </Button>
+          </div>
           {getEntityRelationships(selectedEntity.id).length > 0 ? (
             <div className="space-y-2">
               {getEntityRelationships(selectedEntity.id).map((rel) => {

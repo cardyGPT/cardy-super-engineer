@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
 import { projects, documents, sampleDataModel } from "@/lib/mock-data";
@@ -17,6 +16,7 @@ interface ProjectContextType {
   uploadDocument: (document: Partial<ProjectDocument>) => void;
   deleteDocument: (id: string) => void;
   setDataModel: (dataModel: DataModel) => void;
+  getDocumentDataModel: (documentId: string) => DataModel | null;
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
@@ -97,7 +97,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       setProjectList((prev) => prev.filter((project) => project.id !== id));
       
-      // Also delete associated documents
       setDocumentList((prev) => prev.filter((doc) => doc.projectId !== id));
       
       if (currentProject?.id === id) {
@@ -132,20 +131,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         fileUrl: documentData.fileUrl || "",
         fileType: documentData.fileType || "",
         uploadedAt: new Date().toISOString(),
+        content: documentData.content || null,
       };
       
       setDocumentList((prev) => [...prev, newDocument]);
       
-      toast({
-        title: "Document uploaded",
-        description: `Document ${newDocument.name} has been uploaded successfully.`,
-      });
-      
-      // If it's a data model, attempt to parse it
-      if (newDocument.type === "data-model" && newDocument.fileType === "application/json") {
-        // For development, we're just using the sample data model
-        // In a real app, we would fetch and parse the JSON file
-        setDataModel(sampleDataModel);
+      if (newDocument.type === "data-model" && newDocument.content) {
+        setDataModel(newDocument.content);
       }
       
       return newDocument;
@@ -184,6 +176,14 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
+  const getDocumentDataModel = (documentId: string): DataModel | null => {
+    const document = documentList.find(doc => doc.id === documentId);
+    if (document && document.type === "data-model" && document.content) {
+      return document.content;
+    }
+    return null;
+  };
+
   return (
     <ProjectContext.Provider
       value={{
@@ -199,6 +199,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         uploadDocument,
         deleteDocument,
         setDataModel,
+        getDocumentDataModel,
       }}
     >
       {children}

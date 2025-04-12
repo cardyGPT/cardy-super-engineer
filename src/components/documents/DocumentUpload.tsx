@@ -13,6 +13,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Upload } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface DocumentUploadProps {
   projectId: string;
@@ -31,6 +32,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
   const [docType, setDocType] = useState<DocumentType>("system-requirements");
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -48,20 +50,54 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       // and get back a URL. For now, we'll create a fake URL
       const fakeFileUrl = `/uploads/${file.name}`;
       
+      // For data models, parse the JSON content
+      let fileContent = null;
+      if (docType === "data-model" && file.type === "application/json") {
+        try {
+          const text = await file.text();
+          fileContent = JSON.parse(text);
+          
+          // Basic validation of data model structure
+          if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
+              !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
+            throw new Error("Invalid data model format");
+          }
+        } catch (error) {
+          toast({
+            title: "Error parsing JSON",
+            description: "The data model file is not valid JSON or has incorrect format.",
+            variant: "destructive",
+          });
+          setUploading(false);
+          return;
+        }
+      }
+      
       await uploadDocument({
         projectId,
         name: file.name,
         type: docType,
         fileUrl: fakeFileUrl,
         fileType: file.type,
+        content: fileContent,
       });
       
       setFile(null);
+      toast({
+        title: "Upload successful",
+        description: `${file.name} has been uploaded successfully.`,
+      });
+      
       if (onUploadComplete) {
         onUploadComplete();
       }
     } catch (error) {
       console.error("Error uploading document:", error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your document. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUploading(false);
     }
@@ -90,13 +126,20 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       
       <div className="space-y-2">
         <Label htmlFor="file">Select File</Label>
-        <Input
-          id="file"
-          type="file"
-          onChange={handleFileChange}
-          accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
-          className="cursor-pointer"
-        />
+        <div className="flex flex-col gap-1">
+          <Input
+            id="file"
+            type="file"
+            onChange={handleFileChange}
+            accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
+            className="cursor-pointer"
+          />
+          {docType === "data-model" && (
+            <p className="text-xs text-muted-foreground">
+              Upload a JSON file that follows the required structure with entities and relationships.
+            </p>
+          )}
+        </div>
       </div>
       
       <Button
