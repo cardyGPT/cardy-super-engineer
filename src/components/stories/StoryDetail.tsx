@@ -111,29 +111,38 @@ const StoryDetail: React.FC = () => {
         
         console.log(`Saving artifacts for story ${storyId}`);
         
-        const { data, error } = await supabase
-          .from('story_artifacts')
-          .upsert({
-            story_id: storyId,
-            project_id: projectId,
-            sprint_id: sprintId,
-            lld_content: lldContent,
-            code_content: codeContent,
-            test_content: testContent,
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'story_id'
-          });
+        let savedSuccessfully = true;
         
-        if (error) {
-          console.error("Error saving artifacts:", error);
+        if (lldContent) {
+          const { error: lldError } = await saveStoryArtifact('lld', lldContent, storyId, projectId, sprintId);
+          if (lldError) {
+            console.error("Error saving LLD:", lldError);
+            savedSuccessfully = false;
+          }
+        }
+        
+        if (codeContent) {
+          const { error: codeError } = await saveStoryArtifact('code', codeContent, storyId, projectId, sprintId);
+          if (codeError) {
+            console.error("Error saving code:", codeError);
+            savedSuccessfully = false;
+          }
+        }
+        
+        if (testContent) {
+          const { error: testError } = await saveStoryArtifact('tests', testContent, storyId, projectId, sprintId);
+          if (testError) {
+            console.error("Error saving tests:", testError);
+            savedSuccessfully = false;
+          }
+        }
+        
+        if (!savedSuccessfully) {
           toast({
             title: "Error",
-            description: "Failed to save generated content",
+            description: "Failed to save some generated content",
             variant: "destructive"
           });
-        } else {
-          console.log(`Successfully saved artifacts for story ${storyId}`);
         }
       } catch (err) {
         console.error("Error saving artifacts:", err);
@@ -249,19 +258,13 @@ const StoryDetail: React.FC = () => {
       const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
       const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
       
-      const { error: saveError } = await supabase
-        .from('story_artifacts')
-        .upsert({
-          story_id: storyId,
-          project_id: projectId,
-          sprint_id: sprintId,
-          lld_content: type === 'lld' ? responseContent : lldContent,
-          code_content: type === 'code' ? responseContent : codeContent,
-          test_content: type === 'tests' ? responseContent : testContent,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'story_id'
-        });
+      const { error: saveError } = await saveStoryArtifact(
+        type, 
+        responseContent, 
+        storyId, 
+        projectId, 
+        sprintId
+      );
       
       if (saveError) {
         console.error("Error saving to database:", saveError);
@@ -274,7 +277,7 @@ const StoryDetail: React.FC = () => {
         toast({
           title: "Content Generated",
           description: `${type.toUpperCase()} has been successfully generated and saved.`,
-          variant: "default"
+          variant: "success"
         });
       }
     } catch (error: any) {
@@ -428,6 +431,29 @@ const StoryDetail: React.FC = () => {
         description: error.message || "Failed to push content to Jira",
         variant: "destructive"
       });
+    }
+  };
+
+  const saveStoryArtifact = async (contentType: 'lld' | 'code' | 'tests', content: string, storyId: string, projectId: string | null, sprintId: string | null) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
+        body: {
+          storyId,
+          projectId,
+          sprintId,
+          contentType,
+          content
+        }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      return { data, error: null };
+    } catch (err) {
+      console.error(`Error saving ${contentType} content:`, err);
+      return { data: null, error: err };
     }
   };
 
