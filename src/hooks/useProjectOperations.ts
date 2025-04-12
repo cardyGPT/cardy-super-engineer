@@ -19,13 +19,24 @@ export const useProjectOperations = (
 ) => {
   const fetchProjects = useCallback(async () => {
     try {
+      setLoading(true);
       const { data: projects, error } = await supabase
         .from('projects')
         .select('*');
 
       if (error) throw error;
       
-      setProjects(projects);
+      // Map database fields to client-side model
+      const formattedProjects = projects.map(p => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        details: p.details || "",
+        createdAt: p.created_at,
+        updatedAt: p.updated_at
+      }));
+      
+      setProjects(formattedProjects);
 
       const { data: documents, error: docError } = await supabase
         .from('documents')
@@ -34,7 +45,7 @@ export const useProjectOperations = (
       if (docError) throw docError;
       
       // Documents will be set through context state
-      return { projects, documents };
+      return { projects: formattedProjects, documents };
     } catch (error) {
       console.error('Error fetching data:', error);
       toast({
@@ -50,13 +61,14 @@ export const useProjectOperations = (
   const addProject = async (projectData: Partial<Project>) => {
     setLoading(true);
     try {
-      // Fix: Use snake_case for column names to match the database
+      // Convert client model to database columns
       const newProject = {
         name: projectData.name || "",
         type: projectData.type || "Child Welfare",
         details: projectData.details || "",
-        // Don't include createdAt and updatedAt - the database will set these with default values
       };
+      
+      console.log("Creating project with data:", newProject);
       
       const { data, error } = await supabase
         .from('projects')
@@ -69,12 +81,23 @@ export const useProjectOperations = (
         throw error;
       }
       
-      setProjects((prev) => [...prev, data]);
+      // Map database response to client model
+      const formattedProject: Project = {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        details: data.details || "",
+        createdAt: data.created_at,
+        updatedAt: data.updated_at
+      };
+      
+      setProjects((prev) => [...prev, formattedProject]);
       toast({
         title: "Project created",
         description: `Project ${data.name} has been created successfully.`,
       });
-      return data;
+      
+      return formattedProject;
     } catch (error) {
       console.error("Error adding project:", error);
       toast({
@@ -90,12 +113,11 @@ export const useProjectOperations = (
   const updateProject = async (updatedProject: Project) => {
     setLoading(true);
     try {
-      // Fix: Only send fields that we want to update and match database column names
+      // Convert client model to database columns
       const updates = {
         name: updatedProject.name,
         type: updatedProject.type,
-        details: updatedProject.details,
-        // Don't include updated_at - let the database handle this
+        details: updatedProject.details || "",
       };
       
       const { error } = await supabase
@@ -108,7 +130,7 @@ export const useProjectOperations = (
       // Update local state
       setProjects((prev) =>
         prev.map((project) =>
-          project.id === updatedProject.id ? {...project, ...updates} : project
+          project.id === updatedProject.id ? updatedProject : project
         )
       );
       
@@ -131,15 +153,6 @@ export const useProjectOperations = (
   const deleteProject = async (id: string) => {
     setLoading(true);
     try {
-      // First delete associated documents
-      const { error: docsError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('projectId', id);
-      
-      if (docsError) throw docsError;
-      
-      // Then delete the project
       const { error } = await supabase
         .from('projects')
         .delete()

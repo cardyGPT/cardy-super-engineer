@@ -60,13 +60,13 @@ export const useDocumentOperations = (
         }
       }
       
-      const newDocument: Omit<ProjectDocument, 'id'> = {
-        projectId: documentData.projectId || "",
+      // Map client model to database columns
+      const newDocument = {
+        project_id: documentData.projectId || "",
         name: file.name,
         type: documentData.type || "system-requirements",
-        fileUrl: urlData.publicUrl,
-        fileType: file.type,
-        uploadedAt: new Date().toISOString(),
+        file_url: urlData.publicUrl,
+        file_type: file.type,
         content: fileContent,
       };
       
@@ -78,10 +78,22 @@ export const useDocumentOperations = (
       
       if (docError) throw docError;
       
-      setDocuments((prev) => [...prev, docData]);
+      // Map database response to client model
+      const formattedDocument: ProjectDocument = {
+        id: docData.id,
+        projectId: docData.project_id,
+        name: docData.name,
+        type: docData.type,
+        fileUrl: docData.file_url,
+        fileType: docData.file_type,
+        uploadedAt: docData.uploaded_at,
+        content: docData.content,
+      };
       
-      if (docData.type === "data-model" && docData.content) {
-        setDataModel(docData.content);
+      setDocuments((prev) => [...prev, formattedDocument]);
+      
+      if (formattedDocument.type === "data-model" && formattedDocument.content) {
+        setDataModel(formattedDocument.content);
       }
       
       toast({
@@ -89,7 +101,7 @@ export const useDocumentOperations = (
         description: `${file.name} has been uploaded successfully.`,
       });
       
-      return docData;
+      return formattedDocument;
     } catch (error) {
       console.error("Error uploading document:", error);
       toast({
@@ -115,8 +127,8 @@ export const useDocumentOperations = (
       if (fetchError) throw fetchError;
       
       // Delete the file from storage if we have a URL
-      if (doc.fileUrl) {
-        const fileName = doc.fileUrl.split('/').pop();
+      if (doc.file_url) {
+        const fileName = doc.file_url.split('/').pop();
         if (fileName) {
           const { error: storageError } = await supabase.storage
             .from('documents')

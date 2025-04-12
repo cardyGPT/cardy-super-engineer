@@ -44,8 +44,37 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Fetch initial data from Supabase
   useEffect(() => {
-    fetchProjects();
-  }, [fetchProjects]);
+    const loadData = async () => {
+      try {
+        const { documents } = await fetchProjects() || { documents: [] };
+        
+        // Map database fields to client model for documents
+        if (documents && documents.length > 0) {
+          const formattedDocs = documents.map((d: any) => ({
+            id: d.id,
+            projectId: d.project_id,
+            name: d.name,
+            type: d.type,
+            fileUrl: d.file_url,
+            fileType: d.file_type,
+            uploadedAt: d.uploaded_at,
+            content: d.content,
+          }));
+          
+          setDocumentList(formattedDocs);
+        }
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+        toast({
+          title: "Error",
+          description: "Failed to load initial data. Please refresh the page.",
+          variant: "destructive",
+        });
+      }
+    };
+    
+    loadData();
+  }, [fetchProjects, toast]);
 
   return (
     <ProjectContext.Provider
