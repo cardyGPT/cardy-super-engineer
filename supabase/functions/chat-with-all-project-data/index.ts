@@ -47,13 +47,8 @@ serve(async (req) => {
       }
       
       return {
-        type: "document",
-        document: {
-          id: doc.id,
-          name: doc.name,
-          type: doc.type,
-          content: content
-        }
+        type: "text",
+        text: `Document: ${doc.name}\nContent: ${content}`
       };
     }) || [];
     
@@ -86,17 +81,9 @@ serve(async (req) => {
       messages: [systemMessage, ...messages],
       temperature: 0.5,
       max_tokens: 2500,
-      tools: [
-        {
-          type: "retrieval"
-        }
-      ],
-      tool_choice: "auto",
-      tool_resources: {
-        retrieval: {
-          context: formattedDocuments
-        }
-      }
+      // Fix: Remove the tools parameter since we're not using function calling
+      // Instead include document content directly in the context
+      context: formattedDocuments.length > 0 ? { documents: formattedDocuments } : undefined
     });
     
     console.log("OpenAI response received");

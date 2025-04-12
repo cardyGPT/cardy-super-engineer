@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -130,12 +131,8 @@ const DataModelPage = () => {
         <div className="p-4 bg-muted border-b flex flex-col md:flex-row gap-4 md:items-center justify-between">
           <div className="flex items-center gap-4">
             {!isFullscreen && (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList>
-                  <TabsTrigger value="diagram">Cardy ER360</TabsTrigger>
-                  <TabsTrigger value="chat">Cardy Mind</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              // Removed the Tabs component and just use an h2 title
+              <h2 className="text-lg font-medium">Cardy ER360</h2>
             )}
           </div>
           
@@ -198,41 +195,23 @@ const DataModelPage = () => {
               </div>
             )
           ) : (
-            <Tabs value={activeTab} className="h-full">
-              <TabsContent value="diagram" className="h-full m-0 border-none">
-                {selectedDocument && currentDataModel ? (
-                  <ERDiagramFlow dataModel={currentDataModel} onEntitySelect={handleEntitySelect} />
-                ) : (
-                  <div className="h-full flex items-center justify-center flex-col gap-4">
-                    <p className="text-gray-500">
-                      {selectedDocument ? "Loading data model..." : "Select a data model to view its ER diagram"}
-                    </p>
-                    
-                    {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
-                        <Database className="h-4 w-4 mr-2" />
-                        Load First Data Model
-                      </Button>}
-                  </div>
-                )}
-              </TabsContent>
-              <TabsContent value="chat" className="h-full m-0 border-none">
-                {currentDataModel ? (
-                  <AIModelChat dataModel={currentDataModel} documents={projectDocuments} />
-                ) : (
-                  <div className="h-full flex items-center justify-center flex-col gap-4">
-                    <MessageSquare className="h-12 w-12 text-gray-300" />
-                    <p className="text-gray-500">
-                      Select a data model to chat with the AI about it and related project documents.
-                    </p>
-                    
-                    {dataModelDocuments.length > 0 && !selectedDocument && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
-                        <Database className="h-4 w-4 mr-2" />
-                        Load Data Model
-                      </Button>}
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
+            // Instead of Tabs, just show the ER Diagram directly
+            <div className="h-full">
+              {selectedDocument && currentDataModel ? (
+                <ERDiagramFlow dataModel={currentDataModel} onEntitySelect={handleEntitySelect} />
+              ) : (
+                <div className="h-full flex items-center justify-center flex-col gap-4">
+                  <p className="text-gray-500">
+                    {selectedDocument ? "Loading data model..." : "Select a data model to view its ER diagram"}
+                  </p>
+                  
+                  {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
+                      <Database className="h-4 w-4 mr-2" />
+                      Load First Data Model
+                    </Button>}
+                </div>
+              )}
+            </div>
           )}
         </div>
         
