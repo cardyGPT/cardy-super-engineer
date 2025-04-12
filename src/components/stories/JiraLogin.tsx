@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { JiraCredentials } from "@/types/jira";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 const JiraLogin: React.FC = () => {
   const { setCredentials } = useStories();
@@ -13,27 +15,54 @@ const JiraLogin: React.FC = () => {
   const [email, setEmail] = useState("");
   const [apiToken, setApiToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError(null);
     
     try {
-      // In a real app, we'd validate the credentials by making a test API call
-      // For now, we'll just accept any input
+      // Create credentials object
       const credentials: JiraCredentials = {
         domain: domain.trim(),
         email: email.trim(),
         apiToken: apiToken.trim()
       };
       
-      setTimeout(() => {
-        setCredentials(credentials);
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
-      console.error("Login error:", error);
+      // Validate credentials by making a test API call
+      const { data, error } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: 'myself',
+          credentials
+        }
+      });
+      
+      if (error || !data || data.error) {
+        console.error("Jira login error:", error || data?.error);
+        throw new Error(error?.message || data?.error || "Invalid Jira credentials");
+      }
+      
+      // Credentials are valid, save them
+      setCredentials(credentials);
+      
+      toast({
+        title: "Login Successful",
+        description: `Connected to Jira as ${data.displayName || email}`,
+      });
+      
       setIsLoading(false);
+    } catch (error: any) {
+      console.error("Login error:", error);
+      setLoginError(error.message || "Failed to connect to Jira");
+      setIsLoading(false);
+      
+      toast({
+        title: "Login Failed",
+        description: error.message || "Failed to connect to Jira",
+        variant: "destructive",
+      });
     }
   };
 
@@ -47,6 +76,12 @@ const JiraLogin: React.FC = () => {
       </CardHeader>
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
+          {loginError && (
+            <div className="bg-destructive/10 p-3 rounded-md text-destructive text-sm">
+              {loginError}
+            </div>
+          )}
+          
           <div className="space-y-2">
             <Label htmlFor="domain">Jira Domain</Label>
             <Input

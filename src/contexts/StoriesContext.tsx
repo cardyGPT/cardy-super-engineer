@@ -51,6 +51,38 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials]);
 
+  // Validate Jira credentials
+  const validateCredentials = async (): Promise<boolean> => {
+    if (!credentials) return false;
+    
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: 'myself',
+          credentials
+        }
+      });
+      
+      if (error || !data || data.error) {
+        console.error("Jira credential validation error:", error || data?.error);
+        setError(error?.message || data?.error || "Failed to validate Jira credentials");
+        setLoading(false);
+        return false;
+      }
+      
+      console.log("Jira credentials validated successfully");
+      setLoading(false);
+      return true;
+    } catch (err) {
+      console.error("Error validating Jira credentials:", err);
+      setError("Failed to validate Jira credentials");
+      setLoading(false);
+      return false;
+    }
+  };
+
   // Fetch tickets from Jira
   const fetchTickets = async () => {
     if (!credentials) {
@@ -62,69 +94,69 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setError(null);
 
     try {
-      // Mock API call for now - in a real app, we would call the Jira API
-      // This would normally be via a Supabase Edge Function to keep credentials secure
-      
-      // Simulate API response
-      setTimeout(() => {
-        const mockTickets: JiraTicket[] = [
-          {
-            id: "1",
-            key: "PROJ-123",
-            summary: "Implement user authentication",
-            description: "Create login and signup forms with email/password authentication",
-            acceptance_criteria: "- User can sign up\n- User can log in\n- Password reset functionality works",
-            status: "To Do",
-            assignee: "John Doe",
-            priority: "High",
-            story_points: 5,
-            labels: ["authentication", "frontend"],
-            epic: "User Management",
-            created_at: "2025-04-01T10:00:00Z",
-            updated_at: "2025-04-10T14:30:00Z",
-            domain: credentials.domain // Add domain from credentials
-          },
-          {
-            id: "2",
-            key: "PROJ-124",
-            summary: "Implement data model for products",
-            description: "Create database schema for products, categories, and inventory",
-            acceptance_criteria: "- Product model has name, price, description\n- Products belong to categories\n- Inventory tracks stock levels",
-            status: "In Progress",
-            assignee: "Jane Smith",
-            priority: "Medium",
-            story_points: 3,
-            labels: ["database", "backend"],
-            epic: "Inventory Management",
-            created_at: "2025-04-02T09:15:00Z",
-            updated_at: "2025-04-11T11:45:00Z",
-            domain: credentials.domain // Add domain from credentials
-          },
-          {
-            id: "3",
-            key: "PROJ-125",
-            summary: "Create REST API for user profiles",
-            description: "Implement CRUD operations for user profiles",
-            acceptance_criteria: "- Get user profile\n- Update user profile\n- Delete user profile\n- List all users (admin only)",
-            status: "To Do",
-            assignee: "John Doe",
-            priority: "Low",
-            story_points: 2,
-            labels: ["api", "backend"],
-            epic: "User Management",
-            created_at: "2025-04-03T14:20:00Z",
-            updated_at: "2025-04-10T16:10:00Z",
-            domain: credentials.domain // Add domain from credentials
+      // Make a JQL search request to Jira
+      const { data, error } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: 'search',
+          method: 'POST',
+          credentials,
+          data: {
+            jql: "project in (issuekey) ORDER BY updated DESC",
+            maxResults: 20,
+            fields: [
+              "summary",
+              "description",
+              "status",
+              "priority",
+              "assignee",
+              "labels",
+              "customfield_10016", // Story points - may vary depending on Jira configuration
+              "customfield_10014", // Epic link - may vary depending on Jira configuration
+              "created",
+              "updated"
+            ]
           }
-        ];
-        
-        setTickets(mockTickets);
-        setLoading(false);
-      }, 1000);
-    } catch (err) {
-      setError("Failed to fetch tickets");
+        }
+      });
+      
+      if (error || data.error) {
+        throw new Error(error?.message || data.error || "Failed to fetch tickets");
+      }
+      
+      // Transform Jira API response to our JiraTicket format
+      const jiraTickets: JiraTicket[] = data.issues.map((issue: any) => ({
+        id: issue.id,
+        key: issue.key,
+        summary: issue.fields.summary,
+        description: issue.fields.description || "",
+        status: issue.fields.status?.name,
+        assignee: issue.fields.assignee?.displayName,
+        priority: issue.fields.priority?.name,
+        story_points: issue.fields.customfield_10016,
+        labels: issue.fields.labels,
+        epic: issue.fields.customfield_10014,
+        created_at: issue.fields.created,
+        updated_at: issue.fields.updated,
+        domain: credentials.domain
+      }));
+      
+      setTickets(jiraTickets);
+      setLoading(false);
+      
+      toast({
+        title: "Success",
+        description: `Fetched ${jiraTickets.length} tickets from Jira`,
+      });
+    } catch (err: any) {
+      setError(err.message || "Failed to fetch tickets");
       setLoading(false);
       console.error("Error fetching Jira tickets:", err);
+      
+      toast({
+        title: "Error",
+        description: err.message || "Failed to fetch tickets from Jira",
+        variant: "destructive",
+      });
     }
   };
 
@@ -181,11 +213,45 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setError(null);
 
     try {
-      // Mock API call - in a real app, we would call the Jira API
-      // This would normally be via a Supabase Edge Function
+      // Add comment to Jira ticket
+      const { data, error } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: `issue/${ticketId}/comment`,
+          method: 'POST',
+          credentials,
+          data: {
+            body: {
+              type: "doc",
+              version: 1,
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: "Generated content from Cardy Project Compass:\n\n"
+                    }
+                  ]
+                },
+                {
+                  type: "codeBlock",
+                  attrs: { language: "none" },
+                  content: [
+                    {
+                      type: "text",
+                      text: content
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      });
       
-      // Simulate API response
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      if (error || data.error) {
+        throw new Error(error?.message || data.error || "Failed to push to Jira");
+      }
       
       toast({
         title: "Content Pushed",

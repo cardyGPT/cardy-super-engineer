@@ -18,17 +18,20 @@ api_url = "http://localhost"
 enabled = true
 port = 54324
 
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+
 [storage]
 enabled = true
 
-[functions.chat-with-data-model]
+[realtime]
+enabled = true
+
+[[functions]]
+name = "chat-with-jira"
 verify_jwt = false
 
-[functions.chat-with-documents]
-verify_jwt = false
-
-[functions.chat-with-all-project-data]
-verify_jwt = false
-
-[functions.chat-with-jira]
+[[functions]]
+name = "jira-api"
 verify_jwt = false
