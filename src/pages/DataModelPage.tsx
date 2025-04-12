@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import DocumentUpload from "@/components/documents/DocumentUpload";
-import ERDiagramViewer from "@/components/data-model/ERDiagramViewer";
+import ERDiagramFlow from "@/components/data-model/ERDiagramFlow";
 import AIModelChat from "@/components/data-model/AIModelChat";
-import { DataModel } from "@/types";
+import { DataModel, Entity } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,6 +26,7 @@ const DataModelPage = () => {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("diagram");
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const { toast } = useToast();
 
   // Filter to only show data model documents
@@ -65,6 +66,7 @@ const DataModelPage = () => {
 
   const handleDocumentChange = (docId: string) => {
     setSelectedDocumentId(docId);
+    setSelectedEntity(null);
   };
 
   const handleUploadComplete = () => {
@@ -89,6 +91,10 @@ const DataModelPage = () => {
 
   const exitFullscreen = () => {
     setIsFullscreen(false);
+  };
+
+  const handleEntitySelect = (entity: Entity | null) => {
+    setSelectedEntity(entity);
   };
 
   const renderContent = () => {
@@ -173,7 +179,7 @@ const DataModelPage = () => {
             selectedDocument && currentDataModel ? (
               <div className="h-full w-full flex flex-col">
                 <div className="flex-1 overflow-auto h-[calc(100vh-120px)]">
-                  <ERDiagramViewer dataModel={currentDataModel} />
+                  <ERDiagramFlow dataModel={currentDataModel} onEntitySelect={handleEntitySelect} />
                 </div>
                 <div className="absolute bottom-4 right-4">
                   <Button onClick={exitFullscreen} variant="outline" className="shadow-md">
@@ -198,7 +204,7 @@ const DataModelPage = () => {
             <Tabs value={activeTab} className="h-full">
               <TabsContent value="diagram" className="h-full m-0 border-none">
                 {selectedDocument && currentDataModel ? (
-                  <ERDiagramViewer dataModel={currentDataModel} />
+                  <ERDiagramFlow dataModel={currentDataModel} onEntitySelect={handleEntitySelect} />
                 ) : (
                   <div className="h-full flex items-center justify-center flex-col gap-4">
                     <p className="text-gray-500">
@@ -232,6 +238,103 @@ const DataModelPage = () => {
             </Tabs>
           )}
         </div>
+        
+        {selectedEntity && (
+          <div className="bg-white p-4 border-t">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-semibold mb-2">Selected Entity: {selectedEntity.name}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedEntity(null)}
+                className="h-8 px-2"
+              >
+                Close
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs font-medium mb-1">Definition</h4>
+                <p className="text-sm">{selectedEntity.definition || "No definition provided"}</p>
+                
+                <h4 className="text-xs font-medium mt-3 mb-1">Attributes</h4>
+                <div className="border rounded overflow-hidden">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-2 py-1 text-left">Name</th>
+                        <th className="px-2 py-1 text-left">Type</th>
+                        <th className="px-2 py-1 text-center">Required</th>
+                        <th className="px-2 py-1 text-center">Key</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedEntity.attributes.map(attr => (
+                        <tr key={attr.id} className="border-t">
+                          <td className="px-2 py-1 font-medium">{attr.name}</td>
+                          <td className="px-2 py-1">{attr.type}</td>
+                          <td className="px-2 py-1 text-center">{attr.required ? "✓" : ""}</td>
+                          <td className="px-2 py-1 text-center">
+                            {attr.isPrimaryKey ? "PK" : ""}
+                            {attr.isForeignKey ? "FK" : ""}
+                          </td>
+                        </tr>
+                      ))}
+                      {selectedEntity.attributes.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-2 py-3 text-center text-gray-500">
+                            No attributes defined
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div>
+                <h4 className="text-xs font-medium mb-1">Relationships</h4>
+                {currentDataModel && (
+                  <div className="space-y-2">
+                    {currentDataModel.relationships
+                      .filter(rel => rel.sourceEntityId === selectedEntity.id || rel.targetEntityId === selectedEntity.id)
+                      .map(rel => {
+                        const isSource = rel.sourceEntityId === selectedEntity.id;
+                        const otherEntityId = isSource ? rel.targetEntityId : rel.sourceEntityId;
+                        const otherEntity = currentDataModel.entities.find(e => e.id === otherEntityId);
+                        
+                        return (
+                          <div key={rel.id} className="border rounded p-2 text-sm">
+                            <div className="flex justify-between">
+                              <span className="font-medium">{rel.name || `Relation with ${otherEntity?.name || 'Unknown'}`}</span>
+                              <Badge variant="outline">
+                                {isSource ? `${rel.sourceCardinality}:${rel.targetCardinality}` : `${rel.targetCardinality}:${rel.sourceCardinality}`}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {isSource ? 'From' : 'To'} <span className="font-medium">{selectedEntity.name}</span>
+                              {' '}{isSource ? 'to' : 'from'}{' '}
+                              <span className="font-medium">{otherEntity?.name || otherEntityId}</span>
+                            </p>
+                            {rel.description && (
+                              <p className="text-xs mt-1">{rel.description}</p>
+                            )}
+                          </div>
+                        );
+                      })}
+                    
+                    {currentDataModel.relationships.filter(
+                      rel => rel.sourceEntityId === selectedEntity.id || rel.targetEntityId === selectedEntity.id
+                    ).length === 0 && (
+                      <p className="text-sm text-gray-500">No relationships defined for this entity</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };

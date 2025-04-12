@@ -5,6 +5,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Content-Type': 'application/json'
 };
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -30,7 +31,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'OpenAI API key is not configured' }),
         { 
           status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: corsHeaders
         }
       );
     }
@@ -54,7 +55,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'Invalid JSON in request body' }),
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: corsHeaders
         }
       );
     }
@@ -68,7 +69,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'Message is required' }),
         { 
           status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: corsHeaders
         }
       );
     }
@@ -143,7 +144,7 @@ Please provide a thorough and accurate answer based on this information.
         JSON.stringify({ error: 'Failed to get response from OpenAI API', details: errorText }),
         { 
           status: response.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: corsHeaders
         }
       );
     }
@@ -157,7 +158,7 @@ Please provide a thorough and accurate answer based on this information.
         JSON.stringify({ error: 'Invalid response from OpenAI' }),
         { 
           status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: corsHeaders
         }
       );
     }
@@ -169,9 +170,7 @@ Please provide a thorough and accurate answer based on this information.
     // Return the successful response
     return new Response(
       JSON.stringify({ response: aiResponse }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
+      { headers: corsHeaders }
     );
 
   } catch (error) {
@@ -180,7 +179,7 @@ Please provide a thorough and accurate answer based on this information.
       JSON.stringify({ error: error.message || 'Unexpected server error' }),
       { 
         status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: corsHeaders
       }
     );
   }
