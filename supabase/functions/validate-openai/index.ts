@@ -17,13 +17,25 @@ serve(async (req) => {
   }
 
   try {
-    const { apiKey } = await req.json();
+    // Get the API key from the request body or environment variables
+    let body = {};
+    let apiKey = Deno.env.get("OPENAI_API_KEY");
+    
+    try {
+      body = await req.json();
+      if (body && body.apiKey) {
+        apiKey = body.apiKey;
+      }
+    } catch (e) {
+      // If the request body is empty or not JSON, we'll use the env var only
+      console.log("No request body or not JSON, using env var only");
+    }
 
     if (!apiKey) {
       return new Response(
         JSON.stringify({ valid: false, message: 'API key is required' }),
         { 
-          status: 400, 
+          status: 200, 
           headers: corsHeaders 
         }
       );

@@ -60,23 +60,33 @@ const OpenAISettings: React.FC<OpenAISettingsProps> = ({ onConfigChange }) => {
         throw new Error("API key cannot be empty");
       }
 
-      // Test the API key
-      const { data, error } = await supabase.functions.invoke('validate-openai', {
-        body: { apiKey }
+      // Store the API key securely using Supabase edge function
+      const { data, error } = await supabase.functions.invoke('store-api-keys', {
+        body: { 
+          provider: 'openai',
+          apiKey 
+        }
       });
 
-      if (error || !data?.valid) {
-        throw new Error(error?.message || data?.error || "Invalid OpenAI API key");
+      if (error) {
+        throw new Error(error.message || "Failed to save API key");
       }
 
-      // Success - API key is valid
+      // Test the API key
+      const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-openai', {});
+
+      if (validationError || !validationData?.valid) {
+        throw new Error(validationError?.message || validationData?.error || "Invalid OpenAI API key");
+      }
+
+      // Success - API key is valid and saved
       setIsConnected(true);
       if (onConfigChange) onConfigChange(true);
       setApiKey(''); // Clear the input for security
 
       toast({
         title: "API Key Saved",
-        description: "Your OpenAI API key has been saved successfully",
+        description: "Your OpenAI API key has been securely saved",
         variant: "success",
       });
     } catch (error: any) {

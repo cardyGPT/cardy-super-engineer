@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,22 +7,16 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
 import { Mail, Save, Link, FileCheck, CheckCircle } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 const GSuiteSettingsPage: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem("gsuite_api_key") || "";
-  });
-  const [defaultDriveFolder, setDefaultDriveFolder] = useState<string>(() => {
-    return localStorage.getItem("gsuite_default_drive_folder") || "";
-  });
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
-    return localStorage.getItem("gsuite_auto_sync") === "true";
-  });
-  const [isConnected, setIsConnected] = useState<boolean>(() => {
-    return localStorage.getItem("gsuite_connected") === "true";
-  });
+  const [apiKey, setApiKey] = useState<string>("");
+  const [defaultDriveFolder, setDefaultDriveFolder] = useState<string>("");
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(false);
   const [connectionSuccess, setConnectionSuccess] = useState(false);
+  const [initializing, setInitializing] = useState(true);
   
   const { toast } = useToast();
 
@@ -40,43 +33,118 @@ const GSuiteSettingsPage: React.FC = () => {
     };
   }, [connectionSuccess]);
 
-  const handleSaveSettings = () => {
+  // Check GSuite settings on load
+  useEffect(() => {
+    const checkGSuiteSettings = async () => {
+      try {
+        // Check if GSuite API key is stored
+        const { data, error } = await supabase.functions.invoke('validate-gsuite', {});
+        
+        if (error) {
+          console.error("Error checking GSuite settings:", error);
+          return;
+        }
+        
+        if (data?.valid) {
+          setIsConnected(true);
+          
+          // Load settings
+          if (data.settings) {
+            setDefaultDriveFolder(data.settings.defaultDriveFolder || "");
+            setAutoSyncEnabled(data.settings.autoSync || false);
+          }
+          
+          toast({
+            title: "GSuite Connection",
+            description: "Your GSuite integration is configured and working",
+          });
+        }
+      } catch (err) {
+        console.error("Error checking GSuite settings:", err);
+      } finally {
+        setInitializing(false);
+      }
+    };
+    
+    checkGSuiteSettings();
+  }, [toast]);
+
+  const handleSaveSettings = async () => {
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.setItem("gsuite_api_key", apiKey);
-      localStorage.setItem("gsuite_default_drive_folder", defaultDriveFolder);
-      localStorage.setItem("gsuite_auto_sync", autoSyncEnabled.toString());
-      localStorage.setItem("gsuite_connected", "true");
+    try {
+      // Save API key securely
+      const { data: storedData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
+        body: { 
+          provider: 'gsuite',
+          apiKey
+        }
+      });
+      
+      if (storeError) {
+        throw new Error(storeError.message);
+      }
+      
+      // Save other settings
+      const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
+        body: {
+          defaultDriveFolder,
+          autoSync: autoSyncEnabled
+        }
+      });
+      
+      if (settingsError) {
+        throw new Error(settingsError.message);
+      }
       
       setIsConnected(true);
-      setIsLoading(false);
+      setApiKey("");  // Clear API key for security
       setConnectionSuccess(true);
       
       toast({
         title: "Connection Successful",
-        description: "Your GSuite integration settings have been saved and connected successfully.",
+        description: "Your GSuite integration settings have been saved securely.",
         variant: "success",
       });
-    }, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save GSuite settings",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     setIsLoading(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      localStorage.removeItem("gsuite_connected");
+    try {
+      const { error } = await supabase.functions.invoke('delete-gsuite-config', {});
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
       setIsConnected(false);
-      setIsLoading(false);
+      setDefaultDriveFolder("");
+      setAutoSyncEnabled(false);
       
       toast({
         title: "Disconnected",
         description: "Your GSuite account has been disconnected.",
         variant: "default",
       });
-    }, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to disconnect GSuite",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -95,7 +163,7 @@ const GSuiteSettingsPage: React.FC = () => {
         {connectionSuccess && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
             <CheckCircle className="h-5 w-5 mr-2" />
-            <span>Connection successful! Your GSuite account is now linked.</span>
+            <span>Connection successful! Your GSuite account is now linked securely.</span>
           </div>
         )}
         
@@ -119,6 +187,7 @@ const GSuiteSettingsPage: React.FC = () => {
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   type="password"
+                  disabled={initializing}
                 />
                 <p className="text-sm text-muted-foreground">
                   This API key must have access to Google Drive and Google Docs APIs
@@ -132,6 +201,7 @@ const GSuiteSettingsPage: React.FC = () => {
                   placeholder="Enter folder ID from Google Drive" 
                   value={defaultDriveFolder}
                   onChange={(e) => setDefaultDriveFolder(e.target.value)}
+                  disabled={initializing}
                 />
                 <p className="text-sm text-muted-foreground">
                   Documents will be saved to this folder by default
@@ -144,16 +214,17 @@ const GSuiteSettingsPage: React.FC = () => {
                   id="auto-sync" 
                   checked={autoSyncEnabled}
                   onCheckedChange={setAutoSyncEnabled}
+                  disabled={initializing}
                 />
               </div>
             </CardContent>
             <CardFooter className="flex justify-between">
               {isConnected ? (
                 <>
-                  <Button variant="outline" onClick={handleDisconnect} disabled={isLoading}>
+                  <Button variant="outline" onClick={handleDisconnect} disabled={isLoading || initializing}>
                     Disconnect
                   </Button>
-                  <Button onClick={handleSaveSettings} disabled={isLoading}>
+                  <Button onClick={handleSaveSettings} disabled={isLoading || initializing}>
                     {isLoading ? (
                       <span className="flex items-center gap-2">
                         <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
@@ -171,7 +242,7 @@ const GSuiteSettingsPage: React.FC = () => {
                 <Button 
                   className="w-full" 
                   onClick={handleSaveSettings} 
-                  disabled={!apiKey || isLoading}
+                  disabled={!apiKey || isLoading || initializing}
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
