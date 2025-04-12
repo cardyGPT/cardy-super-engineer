@@ -21,20 +21,31 @@ export const useDocumentOperations = (
   const uploadDocument = async (documentData: Partial<ProjectDocument>, file: File) => {
     setLoading(true);
     try {
+      console.log("Starting document upload process:", { documentData, fileName: file.name });
+      
       // First upload the file to storage
       const fileExt = file.name.split('.').pop();
-      const fileName = `${documentData.projectId}/${Date.now()}.${fileExt}`;
+      const fileName = `${Date.now()}_${file.name}`;
+      
+      console.log("Uploading file to storage:", fileName);
       
       const { data: fileData, error: uploadError } = await supabase.storage
         .from('documents')
         .upload(fileName, file);
       
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw uploadError;
+      }
+      
+      console.log("File uploaded successfully:", fileData);
       
       // Create a public URL for the file
       const { data: urlData } = await supabase.storage
         .from('documents')
         .getPublicUrl(fileName);
+      
+      console.log("Generated public URL:", urlData);
       
       let fileContent = null;
       
@@ -50,6 +61,7 @@ export const useDocumentOperations = (
             throw new Error("Invalid data model format");
           }
         } catch (parseError) {
+          console.error("JSON parsing error:", parseError);
           toast({
             title: "Error parsing JSON",
             description: "The data model file is not valid JSON or has incorrect format.",
@@ -70,13 +82,20 @@ export const useDocumentOperations = (
         content: fileContent,
       };
       
+      console.log("Inserting document record:", newDocument);
+      
       const { data: docData, error: docError } = await supabase
         .from('documents')
         .insert([newDocument])
         .select()
         .single();
       
-      if (docError) throw docError;
+      if (docError) {
+        console.error("Database insert error:", docError);
+        throw docError;
+      }
+      
+      console.log("Document inserted successfully:", docData);
       
       // Map database response to client model
       const formattedDocument: ProjectDocument = {

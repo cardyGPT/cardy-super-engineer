@@ -42,22 +42,43 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file) return;
+    if (!file) {
+      toast({
+        title: "No file selected",
+        description: "Please select a file to upload",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    console.log("Starting upload process with file:", file.name);
     setUploading(true);
+    
     try {
-      await uploadDocument({
+      const result = await uploadDocument({
         projectId,
         type: docType,
       }, file);
+      
+      console.log("Upload document result:", result);
       
       setFile(null);
       
       if (onUploadComplete) {
         onUploadComplete();
       }
+      
+      toast({
+        title: "Success",
+        description: "Document uploaded successfully",
+      });
     } catch (error) {
-      console.error("Error uploading document:", error);
+      console.error("Error in upload handler:", error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your document. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUploading(false);
     }

@@ -46,7 +46,16 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   useEffect(() => {
     const loadData = async () => {
       try {
-        const { documents } = await fetchProjects() || { documents: [] };
+        console.log("Loading initial data from Supabase");
+        const result = await fetchProjects();
+        
+        if (!result) {
+          console.log("No data returned from fetchProjects");
+          return;
+        }
+        
+        const { documents } = result;
+        console.log("Loaded documents:", documents);
         
         // Map database fields to client model for documents
         if (documents && documents.length > 0) {
@@ -61,6 +70,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
             content: d.content,
           }));
           
+          console.log("Formatted documents:", formattedDocs);
           setDocumentList(formattedDocs);
         }
       } catch (error) {
