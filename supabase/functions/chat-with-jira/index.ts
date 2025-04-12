@@ -26,7 +26,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'OpenAI API key is not configured' }),
         { 
           status: 500, 
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -51,7 +51,7 @@ serve(async (req) => {
         JSON.stringify({ error: 'Jira ticket and request are required' }),
         { 
           status: 400, 
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -142,7 +142,7 @@ Your response should be thorough and consider the data model constraints.`;
         JSON.stringify({ error: 'Failed to get response from OpenAI API', details: errorText }),
         { 
           status: response.status, 
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -156,7 +156,7 @@ Your response should be thorough and consider the data model constraints.`;
         JSON.stringify({ error: 'Invalid response from OpenAI' }),
         { 
           status: 500, 
-          headers: corsHeaders
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
@@ -167,7 +167,9 @@ Your response should be thorough and consider the data model constraints.`;
     // Return the successful response
     return new Response(
       JSON.stringify({ response: aiResponse }),
-      { headers: corsHeaders }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
 
   } catch (error) {
@@ -176,7 +178,7 @@ Your response should be thorough and consider the data model constraints.`;
       JSON.stringify({ error: error.message || 'Unexpected server error' }),
       { 
         status: 500, 
-        headers: corsHeaders
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }

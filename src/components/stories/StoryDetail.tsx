@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,8 +30,8 @@ const StoryDetail: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Helper function to safely handle potential object content
   const safeStringify = (content: any): string => {
     if (content === null || content === undefined) return "";
     
@@ -50,7 +49,6 @@ const StoryDetail: React.FC = () => {
     return String(content);
   };
 
-  // Load saved artifacts when the selected ticket changes
   useEffect(() => {
     setLldContent("");
     setCodeContent("");
@@ -64,21 +62,29 @@ const StoryDetail: React.FC = () => {
       setIsLoading(true);
       
       try {
+        console.log(`Loading artifacts for story ${selectedTicket.key}`);
         const { data, error } = await supabase
           .from('story_artifacts')
           .select('*')
           .eq('story_id', safeStringify(selectedTicket.key))
           .single();
         
-        if (error && error.code !== 'PGRST116') {
-          console.error("Error loading artifacts:", error);
-          return;
-        }
-        
-        if (data) {
+        if (error) {
+          if (error.code !== 'PGRST116') {
+            console.error("Error loading artifacts:", error);
+          } else {
+            console.log(`No existing artifacts found for story ${selectedTicket.key}`);
+          }
+        } else if (data) {
+          console.log(`Found existing artifacts for story ${selectedTicket.key}`);
           setLldContent(data.lld_content || "");
           setCodeContent(data.code_content || "");
           setTestContent(data.test_content || "");
+          
+          toast({
+            title: "Loaded saved content",
+            description: "Previously generated content has been loaded."
+          });
         }
       } catch (err) {
         console.error("Error loading artifacts:", err);
@@ -88,17 +94,21 @@ const StoryDetail: React.FC = () => {
     };
     
     loadArtifacts();
-  }, [selectedTicket]);
+  }, [selectedTicket, toast]);
 
-  // Save artifacts when content changes
   useEffect(() => {
     const saveArtifacts = async () => {
-      if (!selectedTicket) return;
+      if (!selectedTicket || isSaving) return;
+      if (!lldContent && !codeContent && !testContent) return;
+      
+      setIsSaving(true);
       
       try {
         const storyId = safeStringify(selectedTicket.key);
         const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
         const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
+        
+        console.log(`Saving artifacts for story ${storyId}`);
         
         const { data, error } = await supabase
           .from('story_artifacts')
@@ -108,30 +118,38 @@ const StoryDetail: React.FC = () => {
             sprint_id: sprintId,
             lld_content: lldContent,
             code_content: codeContent,
-            test_content: testContent
+            test_content: testContent,
+            updated_at: new Date().toISOString()
           }, {
             onConflict: 'story_id'
           });
         
         if (error) {
           console.error("Error saving artifacts:", error);
+          toast({
+            title: "Error",
+            description: "Failed to save generated content",
+            variant: "destructive"
+          });
+        } else {
+          console.log(`Successfully saved artifacts for story ${storyId}`);
         }
       } catch (err) {
         console.error("Error saving artifacts:", err);
+      } finally {
+        setIsSaving(false);
       }
     };
     
-    // Debounce the save operation to avoid too many database calls
     const timer = setTimeout(() => {
       if (selectedTicket && (lldContent || codeContent || testContent)) {
         saveArtifacts();
       }
-    }, 1000);
+    }, 2000);
     
     return () => clearTimeout(timer);
-  }, [selectedTicket, lldContent, codeContent, testContent]);
+  }, [selectedTicket, lldContent, codeContent, testContent, isSaving, toast]);
 
-  // Reset copied state after a delay
   useEffect(() => {
     const timeouts: number[] = [];
     
@@ -166,14 +184,12 @@ const StoryDetail: React.FC = () => {
     setGenerationError(null);
     
     try {
-      // Check if OpenAI API is configured
       const { data: openAIData, error: openAIError } = await supabase.functions.invoke('validate-openai', {});
       
       if (openAIError || !openAIData?.valid) {
         throw new Error("OpenAI API is not configured. Please set up your API key in Settings.");
       }
       
-      // Prepare the prompt based on the type
       let prompt = "";
       let systemPrompt = "";
       
@@ -188,7 +204,6 @@ const StoryDetail: React.FC = () => {
         prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations`;
       }
       
-      // Call the OpenAI API through our Edge Function
       const { data, error } = await supabase.functions.invoke('generate-content', {
         body: {
           prompt,
@@ -200,10 +215,8 @@ const StoryDetail: React.FC = () => {
       
       if (error) throw new Error(error.message || "Failed to generate content");
       
-      // Extract content from the response and ensure it's a string
       const responseContent = safeStringify(data.content);
       
-      // Update the appropriate state based on the type
       if (type === 'lld') {
         setLldContent(responseContent);
       } else if (type === 'code') {
@@ -212,12 +225,11 @@ const StoryDetail: React.FC = () => {
         setTestContent(responseContent);
       }
       
-      // Switch to the tab for the generated content
       setActiveTab(type);
       
       toast({
         title: "Content Generated",
-        description: `${type.toUpperCase()} has been successfully generated.`
+        description: `${type.toUpperCase()} has been successfully generated and saved.`
       });
     } catch (error: any) {
       console.error(`Error generating ${type}:`, error);
@@ -240,16 +252,13 @@ const StoryDetail: React.FC = () => {
     setGenerationError(null);
     
     try {
-      // Generate LLD
       await handleGenerateContent('lld');
-      // Generate Code
       await handleGenerateContent('code');
-      // Generate Tests
       await handleGenerateContent('tests');
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, and Test Cases have been successfully generated."
+        description: "LLD, Code, and Test Cases have been successfully generated and saved."
       });
     } catch (error: any) {
       console.error("Error generating all content:", error);
@@ -275,14 +284,12 @@ const StoryDetail: React.FC = () => {
       return;
     }
 
-    // Show loading toast
     toast({
       title: "Preparing Download",
       description: "Creating PDF document..."
     });
 
     try {
-      // Generate PDF and download
       const ticketKey = safeStringify(selectedTicket.key) || 'document';
       const timestamp = formatTimestampForFilename();
       const contentLabel = contentType === 'lld' ? 'LLD' : 
