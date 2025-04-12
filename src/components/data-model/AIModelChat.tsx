@@ -3,11 +3,12 @@ import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
-import { BrainCircuit, SendHorizontal, Bot, User, Loader2 } from "lucide-react";
+import { BrainCircuit, SendHorizontal, Bot, User, Loader2, AlertTriangle } from "lucide-react";
 import { DataModel, ProjectDocument } from "@/types";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { useProject } from "@/contexts/ProjectContext";
 
 interface AIModelChatProps {
   dataModel: DataModel;
@@ -27,8 +28,11 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [useDocuments, setUseDocuments] = useState(true);
+  const [useAllProjects, setUseAllProjects] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+  const { documents: allDocuments } = useProject();
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -42,6 +46,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
 
     const userMessage = input.trim();
     setInput("");
+    setError(null);
     
     // Add user message to chat
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
@@ -77,22 +82,29 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
 
       // Get content from other documents if using them
       let documentsContext = "";
-      if (useDocuments && documents.length > 0) {
-        const otherDocs = documents.filter(doc => 
-          doc.type !== "data-model" && doc.content
-        );
+      if (useDocuments) {
+        const docsToInclude = useAllProjects 
+          ? allDocuments.filter(doc => doc.type !== "data-model" && doc.content)
+          : documents.filter(doc => doc.type !== "data-model" && doc.content);
         
-        if (otherDocs.length > 0) {
+        if (docsToInclude.length > 0) {
           documentsContext = "Additional project documents:\n" + 
-            otherDocs.map(doc => 
+            docsToInclude.map(doc => 
               `Document: ${doc.name}\nContent: ${
                 typeof doc.content === 'string' 
-                  ? doc.content.substring(0, 1000) // Limit content size
-                  : JSON.stringify(doc.content).substring(0, 1000)
+                  ? doc.content.substring(0, 1500) // Limit content size
+                  : JSON.stringify(doc.content).substring(0, 1500)
               }`
             ).join("\n\n");
         }
       }
+
+      console.log("Calling AI with context:", {
+        messageLength: userMessage.length,
+        modelEntityCount: modelContext.entities.length,
+        hasDocumentsContext: Boolean(documentsContext),
+        useAllProjects
+      });
 
       // Call OpenAI API
       const response = await fetch('/api/chat-with-data-model', {
@@ -103,7 +115,8 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         body: JSON.stringify({
           message: userMessage,
           dataModel: modelContext,
-          documentsContext: documentsContext
+          documentsContext: documentsContext,
+          useAllProjects: useAllProjects
         }),
       });
 
@@ -116,15 +129,12 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
       setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
     } catch (error) {
       console.error('Error in AI chat:', error);
+      setError(error instanceof Error ? error.message : "Failed to get response from AI");
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to get response from AI",
         variant: "destructive"
       });
-      setMessages(prev => [...prev, { 
-        role: "assistant", 
-        content: "I'm sorry, I encountered an error processing your request. Please try again later." 
-      }]);
     } finally {
       setIsLoading(false);
     }
@@ -133,6 +143,13 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-2">
@@ -184,15 +201,32 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         <div ref={messagesEndRef} />
       </div>
       <div className="border-t p-4">
-        <div className="flex items-center mb-2">
-          <Switch 
-            id="use-documents" 
-            checked={useDocuments}
-            onCheckedChange={setUseDocuments}
-          />
-          <label htmlFor="use-documents" className="ml-2 text-sm text-muted-foreground">
-            Include other project documents in context
-          </label>
+        <div className="flex items-center gap-4 mb-2">
+          <div className="flex items-center">
+            <Switch 
+              id="use-documents" 
+              checked={useDocuments}
+              onCheckedChange={setUseDocuments}
+            />
+            <label htmlFor="use-documents" className="ml-2 text-sm text-muted-foreground">
+              Include project documents
+            </label>
+          </div>
+          
+          <div className="flex items-center">
+            <Switch 
+              id="use-all-projects" 
+              checked={useAllProjects}
+              onCheckedChange={setUseAllProjects}
+              disabled={!useDocuments}
+            />
+            <label 
+              htmlFor="use-all-projects" 
+              className={`ml-2 text-sm ${!useDocuments ? 'text-gray-400' : 'text-muted-foreground'}`}
+            >
+              Include all projects' documents
+            </label>
+          </div>
         </div>
         <form onSubmit={handleSubmit} className="flex space-x-2">
           <Textarea

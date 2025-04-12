@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, dataModel, documentsContext } = await req.json();
+    const { message, dataModel, documentsContext, useAllProjects } = await req.json();
 
     if (!openAIApiKey) {
       return new Response(
@@ -24,6 +24,14 @@ serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    console.log("Processing request with model data:", {
+      modelEntityCount: dataModel.entities.length,
+      modelRelationshipCount: dataModel.relationships.length,
+      hasDocumentsContext: Boolean(documentsContext),
+      useAllProjects: Boolean(useAllProjects),
+      message: message.substring(0, 100) + (message.length > 100 ? '...' : '')
+    });
 
     // Enhance system message to provide more comprehensive context
     const systemMessage = `You are an expert AI data modeling assistant. Your task is to provide detailed, insightful answers about the following data model while maintaining context from any additional project documents.
@@ -56,7 +64,8 @@ You should:
 1. Explain data model structure clearly
 2. Provide insights about relationships
 3. Suggest potential improvements or optimizations
-4. Answer questions about the data model comprehensively`;
+4. Answer questions about the data model comprehensively
+5. If you don't know the answer, simply say so rather than making up information`;
 
     // Call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -72,7 +81,7 @@ You should:
           { role: 'user', content: message }
         ],
         temperature: 0.7,
-        max_tokens: 1500,
+        max_tokens: 2000,
       }),
     });
 
@@ -90,6 +99,8 @@ You should:
     const data = await response.json();
     const aiResponse = data.choices[0].message.content;
 
+    console.log("Successfully generated response");
+    
     return new Response(
       JSON.stringify({ response: aiResponse }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
