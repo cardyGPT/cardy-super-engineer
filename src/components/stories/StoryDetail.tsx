@@ -187,7 +187,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Content Already Exists",
         description: `${type.toUpperCase()} has already been generated for this ticket. Edit or download the existing content.`,
-        variant: "info"
+        variant: "default"
       });
       return;
     }
@@ -262,13 +262,13 @@ const StoryDetail: React.FC = () => {
         toast({
           title: "Content Generated But Not Saved",
           description: "Content was generated but couldn't be saved to the database.",
-          variant: "warning"
+          variant: "destructive"
         });
       } else {
         toast({
           title: "Content Generated",
           description: `${type.toUpperCase()} has been successfully generated and saved.`,
-          variant: "success"
+          variant: "default"
         });
       }
     } catch (error: any) {
@@ -292,7 +292,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Content Already Exists",
         description: "All content has already been generated for this ticket.",
-        variant: "info"
+        variant: "default"
       });
       return;
     }
@@ -308,7 +308,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "All Content Generated",
         description: "LLD, Code, and Test Cases have been successfully generated and saved.",
-        variant: "success"
+        variant: "default"
       });
     } catch (error: any) {
       console.error("Error generating all content:", error);

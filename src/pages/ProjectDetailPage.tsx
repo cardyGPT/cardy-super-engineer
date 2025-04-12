@@ -13,9 +13,9 @@ import {
 import { format, isValid } from "date-fns";
 import { 
   Tabs, 
-  TabsContent, 
   TabsList, 
-  TabsTrigger 
+  TabsTrigger, 
+  TabsContent 
 } from "@/components/ui/tabs";
 import DocumentList from "@/components/documents/DocumentList";
 import DocumentUpload from "@/components/documents/DocumentUpload";
@@ -78,7 +78,7 @@ const ProjectDetailPage = () => {
     toast({
       title: "Project Deleted",
       description: `Project "${project.name}" has been successfully deleted.`,
-      variant: "success"
+      variant: "default"
     });
     navigate("/projects");
   };
@@ -88,7 +88,7 @@ const ProjectDetailPage = () => {
     toast({
       title: "Project Updated",
       description: `Project "${updatedProject.name}" has been successfully updated.`,
-      variant: "success"
+      variant: "default"
     });
   };
   
@@ -108,6 +108,24 @@ const ProjectDetailPage = () => {
       console.error("Error formatting date:", error);
       return "Unknown date";
     }
+  };
+
+  // When a document is successfully uploaded
+  const handleDocumentUploadSuccess = () => {
+    toast({
+      title: "Document Uploaded",
+      description: "Your document has been successfully uploaded to the project.",
+      variant: "default"
+    });
+  };
+
+  // When a data model is successfully uploaded
+  const handleDataModelUploadSuccess = () => {
+    toast({
+      title: "Data Model Uploaded",
+      description: "Your data model has been successfully uploaded.",
+      variant: "default"
+    });
   };
 
   return (
@@ -216,14 +234,7 @@ const ProjectDetailPage = () => {
                           </DialogDescription>
                         </DialogHeader>
                         <DocumentUpload 
-                          projectId={project.id}
-                          onSuccess={() => {
-                            toast({
-                              title: "Document Uploaded",
-                              description: "Your document has been successfully uploaded to the project.",
-                              variant: "success"
-                            });
-                          }}
+                          projectId={project.id} 
                         />
                       </DialogContent>
                     </Dialog>
@@ -308,13 +319,6 @@ const ProjectDetailPage = () => {
                       </DialogHeader>
                       <DocumentUpload
                         projectId={project.id}
-                        onSuccess={() => {
-                          toast({
-                            title: "Data Model Uploaded",
-                            description: "Your data model has been successfully uploaded.",
-                            variant: "success"
-                          });
-                        }}
                       />
                     </DialogContent>
                   </Dialog>

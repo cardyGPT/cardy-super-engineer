@@ -76,7 +76,7 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
         toast({
           title: 'Export successful',
           description: `Document "${docName}" has been created in Google Drive`,
-          variant: 'success',
+          variant: 'default', // Changed from 'success' to 'default'
         });
       } else {
         throw new Error(data.message || 'Export failed');
@@ -124,7 +124,7 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
         )}
         
         {isSuccess && documentUrl && (
-          <Alert variant="success" className="mb-4">
+          <Alert className="mb-4">
             <Check className="h-4 w-4 mr-2" />
             <AlertDescription>
               Document created successfully!{' '}
