@@ -6,10 +6,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { format } from "date-fns";
-import { RefreshCw, ExternalLink } from "lucide-react";
+import { RefreshCw, ExternalLink, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const StoryList: React.FC = () => {
-  const { tickets, loading, error, fetchTickets, setSelectedTicket, selectedTicket } = useStories();
+  const { tickets, loading, error, fetchTickets, setSelectedTicket, selectedTicket, selectedSprint } = useStories();
 
   useEffect(() => {
     // Initial load is handled by the context's effects cascade
@@ -26,6 +27,7 @@ const StoryList: React.FC = () => {
     fetchTickets();
   };
 
+  // When loading and no tickets, show skeleton
   if (loading && tickets.length === 0) {
     return (
       <div className="space-y-4">
@@ -60,11 +62,15 @@ const StoryList: React.FC = () => {
     );
   }
 
+  // When error, show error card
   if (error) {
     return (
       <Card className="border-destructive">
         <CardHeader>
-          <CardTitle>Error Loading Tickets</CardTitle>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5" />
+            Error Loading Tickets
+          </CardTitle>
           <CardDescription>{error}</CardDescription>
         </CardHeader>
         <CardFooter>
@@ -92,11 +98,29 @@ const StoryList: React.FC = () => {
       {tickets.length === 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>No Tickets Found</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" />
+              No Tickets Found
+            </CardTitle>
             <CardDescription>
-              No Jira tickets were found for your account. Create some tickets in Jira or check your connection.
+              {selectedSprint 
+                ? `No Jira tickets were found for the sprint "${selectedSprint.name}".`
+                : "No sprint selected. Please select a sprint to view tickets."}
             </CardDescription>
           </CardHeader>
+          <CardContent>
+            <Alert className="bg-muted">
+              <AlertTitle>Suggestions:</AlertTitle>
+              <AlertDescription>
+                <ul className="list-disc pl-5 mt-2 text-sm">
+                  <li>Check if the sprint contains any issues in Jira</li>
+                  <li>Verify your Jira connection settings</li>
+                  <li>Try selecting a different sprint</li>
+                  <li>You may need additional permissions to view these tickets</li>
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </CardContent>
         </Card>
       ) : (
         <div className="space-y-4">

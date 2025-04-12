@@ -105,7 +105,10 @@ serve(async (req) => {
         // Handle case where board ID might be invalid or there's a permission issue with sprints
         console.log(`Board sprint error: ${jiraApiUrl}`);
         return new Response(
-          JSON.stringify({ values: [] }), // Return empty sprint array
+          JSON.stringify({ 
+            values: [],
+            message: "No sprints found or board configuration issue. Please check your board setup in Jira." 
+          }),
           { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -117,7 +120,10 @@ serve(async (req) => {
       if (jiraResponse.status === 404 && endpoint === 'search') {
         console.log("Search returned no results, returning empty issues array");
         return new Response(
-          JSON.stringify({ issues: [] }),
+          JSON.stringify({ 
+            issues: [],
+            message: "No items found matching your search criteria." 
+          }),
           { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -154,7 +160,10 @@ serve(async (req) => {
           if (endpoint.includes('board') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
             console.log("Board not found or permission denied - returning empty results");
             return new Response(
-              JSON.stringify({ values: [] }),
+              JSON.stringify({ 
+                values: [],
+                message: "No boards found or you don't have permission to access this board."
+              }),
               { 
                 status: 200, 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -166,7 +175,10 @@ serve(async (req) => {
           if (endpoint.includes('sprint') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
             console.log("No sprints found or permission denied - returning empty results");
             return new Response(
-              JSON.stringify({ values: [] }),
+              JSON.stringify({ 
+                values: [],
+                message: "No sprints found for this board or you don't have permission to view them."
+              }),
               { 
                 status: 200, 
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -196,6 +208,13 @@ serve(async (req) => {
       
       // Get response data
       const responseData = await jiraResponse.json();
+      
+      // For empty results, add a message to help frontend display appropriate message
+      if (endpoint === 'search' && (!responseData.issues || responseData.issues.length === 0)) {
+        responseData.message = "No issues found for this sprint.";
+      } else if (endpoint.includes('sprint') && (!responseData.values || responseData.values.length === 0)) {
+        responseData.message = "No sprints found for this board.";
+      }
       
       // Return response with CORS headers
       return new Response(
