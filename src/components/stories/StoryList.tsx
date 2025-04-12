@@ -22,6 +22,28 @@ const StoryList: React.FC = () => {
     fetchTickets();
   };
 
+  // Helper function to safely convert content to string
+  const safeGetContent = (content: any): string => {
+    if (content === null || content === undefined) {
+      return "";
+    }
+    
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content:", e);
+        return "[Content format error]";
+      }
+    }
+    
+    return String(content || "");
+  };
+
   // When loading and no tickets, show skeleton
   if (loading && tickets.length === 0) {
     return (
@@ -60,18 +82,33 @@ const StoryList: React.FC = () => {
   // When error, show error card
   if (error) {
     return (
-      <Card className="border-destructive">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5" />
-            Error Loading Tickets
-          </CardTitle>
-          <CardDescription>{error}</CardDescription>
-        </CardHeader>
-        <CardFooter>
-          <Button onClick={handleRetryClick}>Try Again</Button>
-        </CardFooter>
-      </Card>
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-xl font-semibold">Jira Tickets</h2>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRetryClick} 
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Retrying...' : 'Retry'}
+          </Button>
+        </div>
+        
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5" />
+              Error Loading Tickets
+            </CardTitle>
+            <CardDescription>{safeGetContent(error)}</CardDescription>
+          </CardHeader>
+          <CardFooter>
+            <Button onClick={handleRetryClick}>Try Again</Button>
+          </CardFooter>
+        </Card>
+      </div>
     );
   }
 
@@ -99,7 +136,7 @@ const StoryList: React.FC = () => {
             </CardTitle>
             <CardDescription>
               {selectedSprint 
-                ? `No Jira tickets were found for the sprint "${selectedSprint.name}".`
+                ? `No Jira tickets were found for the sprint "${safeGetContent(selectedSprint.name)}".`
                 : "No sprint selected. Please select a sprint to view tickets."}
             </CardDescription>
           </CardHeader>
@@ -137,7 +174,7 @@ const StoryList: React.FC = () => {
                         'outline'
                       }
                     >
-                      {ticket.status}
+                      {safeGetContent(ticket.status)}
                     </Badge>
                   </div>
                   <Badge 
@@ -147,25 +184,25 @@ const StoryList: React.FC = () => {
                       'secondary'
                     }
                   >
-                    {ticket.priority || 'No Priority'}
+                    {safeGetContent(ticket.priority) || 'No Priority'}
                   </Badge>
                 </div>
-                <CardTitle className="text-lg">{ticket.summary}</CardTitle>
+                <CardTitle className="text-lg">{safeGetContent(ticket.summary)}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-500 line-clamp-2">{ticket.description || 'No description provided'}</p>
+                <p className="text-sm text-gray-500 line-clamp-2">{safeGetContent(ticket.description) || 'No description provided'}</p>
                 {ticket.labels && ticket.labels.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {ticket.labels.map((label) => (
                       <Badge key={label} variant="outline" className="text-xs">
-                        {label}
+                        {safeGetContent(label)}
                       </Badge>
                     ))}
                   </div>
                 )}
               </CardContent>
               <CardFooter className="pt-2 flex justify-between text-xs text-gray-500">
-                <div>Assignee: {ticket.assignee || 'Unassigned'}</div>
+                <div>Assignee: {safeGetContent(ticket.assignee) || 'Unassigned'}</div>
                 {ticket.updated_at && (
                   <div className="flex items-center">
                     Updated: {format(new Date(ticket.updated_at), 'MMM d, yyyy')}

@@ -64,7 +64,7 @@ const StoryDetail: React.FC = () => {
     }
     
     // Handle any other type
-    return String(content);
+    return String(content || "");
   };
 
   const handleGenerate = async (type: "lld" | "code" | "tests" | "all") => {
@@ -93,7 +93,7 @@ const StoryDetail: React.FC = () => {
         description: `Successfully generated ${type === 'all' ? 'all content' : type} content`,
         variant: "success"
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error generating content:", error);
       toast({
         title: "Generation Failed",
