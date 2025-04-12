@@ -33,18 +33,14 @@ serve(async (req) => {
       );
     }
     
-    // Enhance settings with metadata for validation purposes
-    const enhancedSettings = {
-      ...settings,
-      metadata: {
+    // Ensure settings has metadata for validation
+    if (!settings.metadata) {
+      settings.metadata = {
         lastUpdated: new Date().toISOString(),
         version: "1.0",
         status: "active"
-      }
-    };
-    
-    // Store settings securely as an environment variable
-    const settingsStr = JSON.stringify(enhancedSettings);
+      };
+    }
     
     // First verify we have an API key
     const apiKey = Deno.env.get('GSUITE_API_KEY');
@@ -64,16 +60,17 @@ serve(async (req) => {
       );
     }
     
-    // Set the environment variable
+    // Convert to string and store as environment variable
+    const settingsStr = JSON.stringify(settings);
     Deno.env.set('GSUITE_SETTINGS', settingsStr);
     
-    console.log("GSuite settings stored successfully:", enhancedSettings);
+    console.log("GSuite settings stored successfully:", settings);
     
     return new Response(
       JSON.stringify({ 
         success: true, 
         message: "GSuite settings stored successfully",
-        settings: enhancedSettings,
+        settings: settings,
         valid: true
       }),
       { 
