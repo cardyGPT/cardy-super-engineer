@@ -102,16 +102,16 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <ToggleGroup type="single" variant="outline" value={driveScope} onValueChange={(val) => val && setDriveScope(val)} className="justify-start">
-              <ToggleGroupItem value="drive.file" className="flex-1 text-xs">
+            <ToggleGroup type="single" value={driveScope} onValueChange={(val) => val && setDriveScope(val)} className="justify-start">
+              <ToggleGroupItem value="drive.file" variant="outline" size="default" className="flex-1 text-xs">
                 <FolderTree className="h-3 w-3 mr-1" />
                 Files only
               </ToggleGroupItem>
-              <ToggleGroupItem value="drive.readonly" className="flex-1 text-xs">
+              <ToggleGroupItem value="drive.readonly" variant="outline" size="default" className="flex-1 text-xs">
                 <Lock className="h-3 w-3 mr-1" />
                 Read only
               </ToggleGroupItem>
-              <ToggleGroupItem value="drive.full" className="flex-1 text-xs">
+              <ToggleGroupItem value="drive.full" variant="outline" size="default" className="flex-1 text-xs">
                 <Database className="h-3 w-3 mr-1" />
                 Full access
               </ToggleGroupItem>
@@ -132,12 +132,12 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
                 </Tooltip>
               </TooltipProvider>
             </div>
-            <ToggleGroup type="single" variant="outline" value={docsScope} onValueChange={(val) => val && setDocsScope(val)} className="justify-start">
-              <ToggleGroupItem value="docs.readonly" className="flex-1 text-xs">
+            <ToggleGroup type="single" value={docsScope} onValueChange={(val) => val && setDocsScope(val)} className="justify-start">
+              <ToggleGroupItem value="docs.readonly" variant="outline" size="default" className="flex-1 text-xs">
                 <Lock className="h-3 w-3 mr-1" />
                 Read only
               </ToggleGroupItem>
-              <ToggleGroupItem value="docs.full" className="flex-1 text-xs">
+              <ToggleGroupItem value="docs.full" variant="outline" size="default" className="flex-1 text-xs">
                 <FileText className="h-3 w-3 mr-1" />
                 Full access
               </ToggleGroupItem>
