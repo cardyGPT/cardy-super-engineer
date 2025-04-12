@@ -36,29 +36,17 @@ serve(async (req) => {
       );
     }
 
-    // Log request details for debugging
-    const requestText = await req.text();
-    console.log("Request body received:", requestText);
+    // Parse request body
+    const requestBody = await req.json();
     
-    let requestBody;
-    try {
-      requestBody = JSON.parse(requestText);
-      console.log("Parsed request data:", {
-        hasMessage: !!requestBody.message,
-        hasDataModel: !!requestBody.dataModel,
-        messageLength: requestBody.message?.length || 0,
-        entityCount: requestBody.dataModel?.entities?.length || 0
-      });
-    } catch (e) {
-      console.error("Error parsing request JSON:", e);
-      return new Response(
-        JSON.stringify({ error: 'Invalid JSON in request body' }),
-        { 
-          status: 400, 
-          headers: corsHeaders
-        }
-      );
-    }
+    // Log parsed request details for debugging
+    console.log("Request data received:", {
+      hasMessage: !!requestBody.message,
+      hasDataModel: !!requestBody.dataModel,
+      messageLength: requestBody.message?.length || 0,
+      entityCount: requestBody.dataModel?.entities?.length || 0,
+      documentCount: requestBody.documentsContext?.length || 0
+    });
 
     // Extract data from request
     const { message, dataModel, documentsContext } = requestBody;
@@ -85,34 +73,40 @@ serve(async (req) => {
       console.log(`Processing data model with ${entities.length} entities and ${relationships.length} relationships`);
     }
     
+    // Construct the prompt in a structured way that's easy for GPT to understand
     const fullPrompt = `
-I need information about this data model:
+# Data Model Analysis Request
 
-ENTITIES:
-${entities.map(e => `- ${e.name} (${e.type}): ${e.definition}
-  Attributes: ${e.attributes.map(a => `${a.name} (${a.type}${a.isPrimaryKey ? ', PK' : ''}${a.isForeignKey ? ', FK' : ''})`).join(', ')}
+I need you to help me understand and work with this data model:
+
+## ENTITIES (${entities.length})
+${entities.map(e => `
+### ${e.name} (${e.type || 'entity'})
+Definition: ${e.definition || 'No definition provided'}
+
+Attributes:
+${e.attributes.map(a => `- ${a.name} (${a.type}${a.isPrimaryKey ? ', PK' : ''}${a.isForeignKey ? ', FK' : ''}): ${a.description || 'No description'}`).join('\n')}
 `).join('\n')}
 
-RELATIONSHIPS:
+## RELATIONSHIPS (${relationships.length})
 ${relationships.map(r => {
   const sourceEntity = entities.find(e => e.id === r.sourceEntityId)?.name || r.sourceEntityId;
   const targetEntity = entities.find(e => e.id === r.targetEntityId)?.name || r.targetEntityId;
-  return `- ${sourceEntity} to ${targetEntity}: ${r.name || 'Relationship'} (${r.sourceCardinality || '1'}:${r.targetCardinality || '1'}) - ${r.description || 'No description'}`;
+  return `- ${sourceEntity} → ${targetEntity}: ${r.name || 'Relationship'} (${r.sourceCardinality || '1'}:${r.targetCardinality || '1'}) - ${r.description || 'No description'}`;
 }).join('\n')}
 
 ${documentsContext ? `
-RELATED DOCUMENTS:
+## RELATED DOCUMENTS
 ${documentsContext}
 ` : ''}
 
-User question: ${message}
+## USER QUESTION
+${message}
 
-Please provide a thorough and accurate answer based on this information.
-`;
+Please provide a complete and accurate answer to the above question based on the data model information provided. If creating diagrams or sample code, ensure they accurately reflect the data model structure.`;
 
     console.log("Sending request to OpenAI");
     console.log("Prompt length:", fullPrompt.length);
-    console.log("First 100 chars of prompt:", fullPrompt.substring(0, 100) + "...");
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -125,12 +119,12 @@ Please provide a thorough and accurate answer based on this information.
         messages: [
           { 
             role: 'system', 
-            content: 'You are a data model expert who helps users understand their database schemas, entity relationships, and how to query data effectively. Provide accurate, detailed responses based on the information given about the data model and its entities and relationships.'
+            content: 'You are a data model expert specialized in analyzing database schemas, entity relationships, and data structures. Provide thorough, accurate responses based on the data model provided. When appropriate, use ASCII diagrams to visualize relationships, and include helpful code examples like SQL queries that would work with the described data model.'
           },
           { role: 'user', content: fullPrompt }
         ],
-        max_tokens: 2000,
-        temperature: 0.5
+        max_tokens: 2500,
+        temperature: 0.2
       }),
     });
 
@@ -165,7 +159,6 @@ Please provide a thorough and accurate answer based on this information.
 
     const aiResponse = data.choices[0].message.content;
     console.log("AI Response generated, length:", aiResponse.length);
-    console.log("Response preview:", aiResponse.substring(0, 100) + "...");
 
     // Return the successful response
     return new Response(
