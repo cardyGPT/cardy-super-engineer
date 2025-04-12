@@ -19,10 +19,6 @@ export function Toaster() {
         return <CheckCircle className="h-4 w-4 mr-2 text-green-500" />;
       case "destructive":
         return <AlertCircle className="h-4 w-4 mr-2 text-red-500" />;
-      case "warning":
-        return <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />;
-      case "info":
-        return <InfoIcon className="h-4 w-4 mr-2 text-blue-500" />;
       default:
         return <InfoIcon className="h-4 w-4 mr-2 text-blue-500" />;
     }
@@ -31,14 +27,8 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, variant, ...props }) {
-        // Map non-standard variants to standard ones
-        let mappedVariant = variant;
-        if (variant === "warning" || variant === "info") {
-          mappedVariant = "default";
-        }
-
         return (
-          <Toast key={id} variant={mappedVariant} {...props}>
+          <Toast key={id} variant={variant} {...props}>
             <div className="grid gap-1">
               {title && (
                 <ToastTitle className="flex items-center">
