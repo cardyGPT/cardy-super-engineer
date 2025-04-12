@@ -1,5 +1,5 @@
 
-import { NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -8,7 +8,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
@@ -37,41 +36,41 @@ export function AppSidebar() {
           <SidebarMenu>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Projects">
-                <NavLink
+                <Link
                   to="/projects"
-                  className={({ isActive }) =>
-                    isActive ? "text-primary" : ""
+                  className={(props) =>
+                    window.location.pathname === "/projects" ? "text-primary" : ""
                   }
                 >
                   <LayoutDashboard className="h-5 w-5" />
                   <span>Projects</span>
-                </NavLink>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Documents">
-                <NavLink
+                <Link
                   to="/documents"
-                  className={({ isActive }) =>
-                    isActive ? "text-primary" : ""
+                  className={(props) =>
+                    window.location.pathname === "/documents" ? "text-primary" : ""
                   }
                 >
                   <FileText className="h-5 w-5" />
                   <span>Documents</span>
-                </NavLink>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="Data Models">
-                <NavLink
+                <Link
                   to="/data-models"
-                  className={({ isActive }) =>
-                    isActive ? "text-primary" : ""
+                  className={(props) =>
+                    window.location.pathname === "/data-models" ? "text-primary" : ""
                   }
                 >
                   <Database className="h-5 w-5" />
                   <span>Data Models</span>
-                </NavLink>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>

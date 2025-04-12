@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -13,6 +12,7 @@ import AIModelChat from "@/components/data-model/AIModelChat";
 import { DataModel, Entity } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 
 const DataModelPage = () => {
   const {
@@ -29,13 +29,11 @@ const DataModelPage = () => {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const { toast } = useToast();
 
-  // Filter to only show data model documents
   const dataModelDocuments = documents.filter(doc => doc.type === "data-model");
   console.log("Data model documents:", dataModelDocuments);
   const selectedDocument = dataModelDocuments.find(doc => doc.id === selectedDocumentId);
   const projectDocuments = documents.filter(doc => selectedDocument && doc.projectId === selectedDocument.projectId);
 
-  // Load the selected data model
   useEffect(() => {
     console.log("Selected document ID changed:", selectedDocumentId);
     if (selectedDocumentId) {
@@ -73,7 +71,6 @@ const DataModelPage = () => {
     console.log("Upload complete, refreshing data models...");
     setUploadDialogOpen(false);
 
-    // Find the most recently uploaded data model
     const latestDoc = documents.filter(doc => doc.type === "data-model").sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())[0];
     if (latestDoc) {
       console.log("Setting selected document to latest:", latestDoc.id);
