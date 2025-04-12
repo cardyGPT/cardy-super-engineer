@@ -1,7 +1,6 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
-import { toast } from "@/components/ui/toast"; 
+import { toast } from "@/hooks/use-toast"; 
 import { useProjectOperations } from "@/hooks/useProjectOperations";
 import { useDocumentOperations } from "@/hooks/useDocumentOperations";
 import { useDataModelOperations } from "@/hooks/useDataModelOperations";
@@ -31,7 +30,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [dataModel, setDataModel] = useState<DataModel | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Import hooks that contain the operations - pass the toast function directly
   const { fetchProjects, addProject, updateProject, deleteProject } = 
     useProjectOperations(projectList, setProjectList, setLoading, toast);
     
@@ -41,7 +39,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { getDocumentDataModel } = 
     useDataModelOperations(documentList);
 
-  // Fetch initial data from Supabase
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -56,7 +53,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const { documents } = result;
         console.log("Loaded documents:", documents);
         
-        // Map database fields to client model for documents
         if (documents && documents.length > 0) {
           const formattedDocs = documents.map((d: any) => ({
             id: d.id,
