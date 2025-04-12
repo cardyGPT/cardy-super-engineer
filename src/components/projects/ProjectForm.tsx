@@ -14,10 +14,12 @@ import {
   SelectValue
 } from "@/components/ui/select";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Loader2 } from "lucide-react";
 
 interface ProjectFormProps {
   initialData?: Project;
-  onSuccess?: () => void;
+  onSuccess?: (project: Partial<Project>) => void;
+  isSubmitting?: boolean;
 }
 
 const PROJECT_TYPES: ProjectType[] = [
@@ -26,8 +28,8 @@ const PROJECT_TYPES: ProjectType[] = [
   "Juvenile Justice"
 ];
 
-const ProjectForm = ({ initialData, onSuccess }: ProjectFormProps) => {
-  const { addProject, updateProject } = useProject();
+const ProjectForm = ({ initialData, onSuccess, isSubmitting = false }: ProjectFormProps) => {
+  const { updateProject } = useProject();
   const [formData, setFormData] = useState<Partial<Project>>(
     initialData || {
       name: "",
@@ -47,21 +49,17 @@ const ProjectForm = ({ initialData, onSuccess }: ProjectFormProps) => {
     setFormData((prev) => ({ ...prev, type: value as ProjectType }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!formData.name) {
       return; // Basic validation
     }
     
-    if (initialData) {
-      updateProject({ ...initialData, ...formData });
-    } else {
-      addProject(formData);
-    }
-    
-    if (onSuccess) {
-      onSuccess();
+    if (initialData && initialData.id) {
+      await updateProject({ ...initialData, ...formData });
+    } else if (onSuccess) {
+      onSuccess(formData);
     }
   };
 
@@ -76,6 +74,7 @@ const ProjectForm = ({ initialData, onSuccess }: ProjectFormProps) => {
           onChange={handleChange}
           placeholder="Enter project name"
           required
+          disabled={isSubmitting}
         />
       </div>
       
@@ -84,6 +83,7 @@ const ProjectForm = ({ initialData, onSuccess }: ProjectFormProps) => {
         <Select
           value={formData.type}
           onValueChange={handleSelectChange}
+          disabled={isSubmitting}
         >
           <SelectTrigger className="w-full">
             <SelectValue placeholder="Select project type" />
@@ -103,16 +103,28 @@ const ProjectForm = ({ initialData, onSuccess }: ProjectFormProps) => {
         <Textarea
           id="details"
           name="details"
-          value={formData.details}
+          value={formData.details || ""}
           onChange={handleChange}
           placeholder="Enter project details"
           rows={5}
+          disabled={isSubmitting}
         />
       </div>
       
       <DialogFooter>
-        <Button type="submit" className="w-full md:w-auto">
-          {initialData ? "Update Project" : "Create Project"}
+        <Button 
+          type="submit" 
+          className="w-full md:w-auto"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {initialData ? "Updating..." : "Creating..."}
+            </>
+          ) : (
+            initialData ? "Update Project" : "Create Project"
+          )}
         </Button>
       </DialogFooter>
     </form>

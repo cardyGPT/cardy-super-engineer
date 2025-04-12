@@ -25,10 +25,11 @@ const ProjectsPage = () => {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     // When projects are loaded from context, set loading to false
-    if (projects.length > 0 || !projectsLoading) {
+    if (!projectsLoading) {
       setIsLoading(false);
     }
   }, [projects, projectsLoading]);
@@ -44,6 +45,7 @@ const ProjectsPage = () => {
   };
 
   const handleCreateProject = async (formData: Partial<Project>) => {
+    setIsSubmitting(true);
     try {
       const newProject = await addProject(formData);
       if (newProject) {
@@ -60,6 +62,8 @@ const ProjectsPage = () => {
         description: "Failed to create project. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -103,7 +107,8 @@ const ProjectsPage = () => {
               </DialogHeader>
               <ProjectForm
                 initialData={editingProject || undefined}
-                onSuccess={handleDialogClose}
+                onSuccess={handleCreateProject}
+                isSubmitting={isSubmitting}
               />
             </DialogContent>
           </Dialog>
