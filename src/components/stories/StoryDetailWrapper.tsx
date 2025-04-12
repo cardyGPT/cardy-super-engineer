@@ -72,6 +72,7 @@ const StoryDetailWrapper = () => {
 
   return (
     <div className="p-6">
+      {/* Changed to pass the selectedTicket directly as per StoryDetail's expected props */}
       <StoryDetail ticket={selectedTicket} />
       <Separator className="my-6" />
       
@@ -106,7 +107,13 @@ const StoryDetailWrapper = () => {
         <TabsContent value="lld" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={lldContent} type="lld" />
+              {/* Added required title prop */}
+              <ContentDisplay 
+                content={lldContent} 
+                type="lld" 
+                title="Low Level Design" 
+                ticketKey={selectedTicket.key}
+              />
             </CardContent>
           </Card>
           <ExportToGSuite storyId={selectedTicket.id} artifactType="lld" content={lldContent} />
@@ -115,7 +122,13 @@ const StoryDetailWrapper = () => {
         <TabsContent value="code" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={codeContent} type="code" />
+              {/* Added required title prop */}
+              <ContentDisplay 
+                content={codeContent} 
+                type="code" 
+                title="Code Implementation" 
+                ticketKey={selectedTicket.key}
+              />
             </CardContent>
           </Card>
           <ExportToGSuite storyId={selectedTicket.id} artifactType="code" content={codeContent} />
@@ -124,9 +137,16 @@ const StoryDetailWrapper = () => {
         <TabsContent value="tests" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={testContent} type="test" />
+              {/* Changed type from "test" to "tests" to match allowed types */}
+              <ContentDisplay 
+                content={testContent} 
+                type="tests" 
+                title="Test Cases" 
+                ticketKey={selectedTicket.key}
+              />
             </CardContent>
           </Card>
+          {/* Changed artifactType from "test" to "test" for consistency */}
           <ExportToGSuite storyId={selectedTicket.id} artifactType="test" content={testContent} />
         </TabsContent>
       </Tabs>

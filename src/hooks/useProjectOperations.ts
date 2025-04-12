@@ -3,6 +3,15 @@ import { useState } from "react";
 import { Project } from "@/types";
 import { supabase } from "@/lib/supabase";
 
+// Define an interface for the project data that can be created/updated
+interface ProjectData {
+  name?: string;
+  description?: string;
+  status?: string;
+  type?: string;
+  details?: string;
+}
+
 export const useProjectOperations = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +40,7 @@ export const useProjectOperations = () => {
     }
   };
 
-  const createProject = async (projectData: Partial<Project>): Promise<Project> => {
+  const createProject = async (projectData: Partial<Project> | ProjectData): Promise<Project> => {
     setLoading(true);
     setError(null);
     
@@ -40,8 +49,9 @@ export const useProjectOperations = () => {
         .from("projects")
         .insert([{
           name: projectData.name || "Untitled Project",
-          description: projectData.description || "",
-          status: projectData.status || "active"
+          // Use optional chaining and type assertion to handle potential missing properties
+          details: (projectData as ProjectData).description || projectData.details || "",
+          type: projectData.type || "Child Welfare"
         }])
         .select()
         .single();
@@ -60,18 +70,21 @@ export const useProjectOperations = () => {
     }
   };
 
-  const updateProject = async (id: string, projectData: Partial<Project>): Promise<Project> => {
+  const updateProject = async (id: string, projectData: Partial<Project> | ProjectData): Promise<Project> => {
     setLoading(true);
     setError(null);
     
     try {
+      const updateData: any = {};
+      
+      if (projectData.name) updateData.name = projectData.name;
+      if ((projectData as ProjectData).description) updateData.details = (projectData as ProjectData).description;
+      else if (projectData.details) updateData.details = projectData.details;
+      if (projectData.type) updateData.type = projectData.type;
+      
       const { data, error } = await supabase
         .from("projects")
-        .update({
-          name: projectData.name,
-          description: projectData.description,
-          status: projectData.status
-        })
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();

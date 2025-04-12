@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectDocument } from "@/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ChatMessageList } from "@/components/data-model/chat/ChatMessageList";
+import ChatMessageList from "@/components/data-model/chat/ChatMessageList";
 
 type Message = {
   role: "user" | "assistant" | "system";
