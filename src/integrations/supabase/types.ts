@@ -9,7 +9,74 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      documents: {
+        Row: {
+          content: Json | null
+          file_type: string | null
+          file_url: string
+          id: string
+          name: string
+          project_id: string | null
+          type: string
+          uploaded_at: string
+        }
+        Insert: {
+          content?: Json | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          name: string
+          project_id?: string | null
+          type: string
+          uploaded_at?: string
+        }
+        Update: {
+          content?: Json | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          name?: string
+          project_id?: string | null
+          type?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          details: string | null
+          id: string
+          name: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          name: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          details?: string | null
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
