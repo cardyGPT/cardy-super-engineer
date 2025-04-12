@@ -31,13 +31,15 @@ export function Toaster() {
           <Toast key={id} variant={variant} {...props}>
             <div className="grid gap-1">
               {title && (
-                <ToastTitle className="flex items-center">
+                <ToastTitle className={`flex items-center ${variant === 'success' ? 'font-bold text-green-700' : ''}`}>
                   {getIconForVariant(variant || "default")}
                   {title}
                 </ToastTitle>
               )}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <ToastDescription className={variant === 'success' ? 'text-green-600 font-medium' : ''}>
+                  {description}
+                </ToastDescription>
               )}
             </div>
             {action}
