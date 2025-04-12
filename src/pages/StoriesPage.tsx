@@ -3,13 +3,12 @@ import React from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import JiraLogin from "@/components/stories/JiraLogin";
-import StoryList from "@/components/stories/StoryList";
-import StoryDetail from "@/components/stories/StoryDetail";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut, CheckCircle2 } from "lucide-react";
 
 const StoriesPage: React.FC = () => {
-  const { isAuthenticated, setCredentials, selectedTicket } = useStories();
+  const { isAuthenticated, setCredentials, credentials } = useStories();
 
   const handleLogout = () => {
     setCredentials(null);
@@ -19,7 +18,7 @@ const StoriesPage: React.FC = () => {
     <AppLayout>
       <div className="container mx-auto">
         <div className="mb-6 flex justify-between items-center">
-          <h1 className="text-3xl font-bold">Jira Stories</h1>
+          <h1 className="text-3xl font-bold">Jira Connection</h1>
           
           {isAuthenticated && (
             <Button variant="outline" onClick={handleLogout}>
@@ -32,13 +31,25 @@ const StoriesPage: React.FC = () => {
         {!isAuthenticated ? (
           <JiraLogin />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="md:col-span-1">
-              <StoryList />
-            </div>
-            <div className="md:col-span-2">
-              <StoryDetail />
-            </div>
+          <div className="mt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <CheckCircle2 className="text-green-500 mr-2 h-6 w-6" />
+                  Connection Successful
+                </CardTitle>
+                <CardDescription>
+                  Successfully connected to your Jira account
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p><strong>Domain:</strong> {credentials?.domain}</p>
+                  <p><strong>Email:</strong> {credentials?.email}</p>
+                  <p><strong>Status:</strong> Connected</p>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         )}
       </div>

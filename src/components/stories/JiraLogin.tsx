@@ -31,6 +31,8 @@ const JiraLogin: React.FC = () => {
         apiToken: apiToken.trim()
       };
       
+      console.log("Testing Jira connection with credentials:", { domain: credentials.domain, email: credentials.email });
+      
       // Validate credentials by making a test API call
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
@@ -38,6 +40,8 @@ const JiraLogin: React.FC = () => {
           credentials
         }
       });
+      
+      console.log("Jira API response:", data);
       
       if (error || !data || data.error) {
         console.error("Jira login error:", error || data?.error);
@@ -48,7 +52,7 @@ const JiraLogin: React.FC = () => {
       setCredentials(credentials);
       
       toast({
-        title: "Login Successful",
+        title: "Connection Successful",
         description: `Connected to Jira as ${data.displayName || email}`,
       });
       
@@ -59,7 +63,7 @@ const JiraLogin: React.FC = () => {
       setIsLoading(false);
       
       toast({
-        title: "Login Failed",
+        title: "Connection Failed",
         description: error.message || "Failed to connect to Jira",
         variant: "destructive",
       });
@@ -71,7 +75,7 @@ const JiraLogin: React.FC = () => {
       <CardHeader>
         <CardTitle>Connect to Jira</CardTitle>
         <CardDescription>
-          Enter your Jira credentials to fetch and manage tickets
+          Enter your Jira credentials to validate the connection
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleLogin}>
@@ -91,6 +95,9 @@ const JiraLogin: React.FC = () => {
               onChange={(e) => setDomain(e.target.value)}
               required
             />
+            <p className="text-xs text-muted-foreground">
+              This is usually your-company.atlassian.net (without https://)
+            </p>
           </div>
           
           <div className="space-y-2">
@@ -130,7 +137,7 @@ const JiraLogin: React.FC = () => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Connecting..." : "Connect to Jira"}
+            {isLoading ? "Testing Connection..." : "Test Jira Connection"}
           </Button>
         </CardFooter>
       </form>
