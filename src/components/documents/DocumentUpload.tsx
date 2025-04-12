@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Upload, AlertCircle } from "lucide-react";
+import { Upload, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -60,17 +60,18 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         return false;
       }
       
-      if (!content.entities || !Array.isArray(content.entities)) {
-        setValidationError("JSON must contain an 'entities' array");
-        return false;
+      // Allow different formats of JSON structure
+      // This will be normalized in the upload process
+      if (Array.isArray(content)) {
+        return true;
       }
       
-      if (!content.relationships || !Array.isArray(content.relationships)) {
-        setValidationError("JSON must contain a 'relationships' array");
-        return false;
+      if (content.entities && typeof content.entities === 'object') {
+        return true;
       }
       
-      return true;
+      setValidationError("JSON must contain entities data in a recognized format");
+      return false;
     } catch (error) {
       setValidationError("Unable to parse JSON file");
       return false;
@@ -106,14 +107,29 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         return;
       }
       
+      toast({
+        title: "Validating JSON",
+        description: "Checking data model format...",
+      });
+      
       const isValid = await validateDataModelFile(file);
       if (!isValid) {
+        toast({
+          title: "Validation failed",
+          description: validationError || "Invalid JSON format",
+          variant: "destructive",
+        });
         return;
       }
     }
 
     console.log("Starting upload process with file:", file.name, "for project:", projectId);
     setUploading(true);
+    
+    toast({
+      title: "Uploading document",
+      description: `Uploading ${file.name}...`,
+    });
     
     try {
       const result = await uploadDocument({
@@ -130,14 +146,27 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       }
       
       toast({
-        title: "Success",
-        description: "Document uploaded successfully",
+        title: "Upload successful",
+        description: `${file.name} has been uploaded successfully.`,
+        variant: "success",
       });
     } catch (error) {
       console.error("Error in upload handler:", error);
+      
+      let errorMessage = "There was an error uploading your document. Please try again.";
+      
+      if (error instanceof Error) {
+        // More specific error message if available
+        if (error.message.includes("storage")) {
+          errorMessage = "Storage error: Failed to store the file. Please try again.";
+        } else if (error.message.includes("format")) {
+          errorMessage = "Format error: The file format is not supported.";
+        }
+      }
+      
       toast({
         title: "Upload failed",
-        description: "There was an error uploading your document. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -178,10 +207,11 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
           onChange={handleFileChange}
           accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
           className="cursor-pointer"
+          disabled={uploading}
         />
         {docType === "data-model" && (
           <p className="text-xs text-muted-foreground">
-            JSON file must contain 'entities' and 'relationships' arrays.
+            Upload a JSON file containing your data model. Several formats are supported.
           </p>
         )}
       </div>
@@ -199,7 +229,15 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         disabled={!file || uploading || !!validationError}
         className="w-full"
       >
-        {uploading ? "Uploading..." : <><Upload className="mr-2 h-4 w-4" /> Upload Document</>}
+        {uploading ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...
+          </>
+        ) : (
+          <>
+            <Upload className="mr-2 h-4 w-4" /> Upload Document
+          </>
+        )}
       </Button>
     </form>
   );

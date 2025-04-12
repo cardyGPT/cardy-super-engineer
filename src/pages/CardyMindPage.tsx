@@ -43,6 +43,7 @@ const CardyMindPage = () => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [isIndexing, setIsIndexing] = useState(false);
   const [docProcessingStatus, setDocProcessingStatus] = useState<Record<string, boolean>>({});
+  const [isLoadingDocumentStatus, setIsLoadingDocumentStatus] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -190,6 +191,7 @@ const CardyMindPage = () => {
         toast({
           title: "Processing complete",
           description: "All documents have been processed successfully.",
+          variant: "success",
         });
       } else {
         toast({
@@ -214,13 +216,19 @@ const CardyMindPage = () => {
   const fetchDocumentProcessingStatus = async () => {
     if (!selectedProjectId) return;
     
+    setIsLoadingDocumentStatus(true);
     try {
+      toast({
+        title: "Loading document status",
+        description: "Checking document indexing status...",
+      });
+
       // Query project_chunks to check which documents have been processed
+      // Fixed: Removed .distinct() and using a different approach
       const { data, error } = await supabase
         .from('project_chunks')
         .select('document_id')
-        .eq('project_id', selectedProjectId)
-        .distinct();
+        .eq('project_id', selectedProjectId);
         
       if (error) throw error;
       
@@ -228,7 +236,8 @@ const CardyMindPage = () => {
       
       // Mark documents as processed if they have chunks
       if (data && data.length > 0) {
-        const processedDocIds = data.map(item => item.document_id);
+        // Get unique document IDs
+        const processedDocIds = [...new Set(data.map(item => item.document_id))];
         
         filteredDocuments.forEach(doc => {
           newStatus[doc.id] = processedDocIds.includes(doc.id);
@@ -236,8 +245,21 @@ const CardyMindPage = () => {
       }
       
       setDocProcessingStatus(newStatus);
+
+      toast({
+        title: "Status loaded",
+        description: "Document indexing status has been loaded.",
+        variant: "success",
+      });
     } catch (err) {
       console.error("Error fetching document processing status:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load document status. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingDocumentStatus(false);
     }
   };
   
@@ -448,36 +470,43 @@ const CardyMindPage = () => {
                     </div>
                     
                     <ScrollArea className="h-[280px] pr-4">
-                      <div className="space-y-2">
-                        {filteredDocuments.map(doc => (
-                          <div 
-                            key={doc.id} 
-                            className={`flex items-center p-2 rounded cursor-pointer ${
-                              selectedDocuments.includes(doc.id) ? "bg-muted" : "hover:bg-muted/50"
-                            }`}
-                            onClick={() => toggleDocumentSelection(doc.id)}
-                          >
-                            <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
-                            <div className="truncate flex-1 text-sm">
-                              {doc.name}
-                            </div>
-                            <div className="ml-1 flex-shrink-0">
-                              {docProcessingStatus[doc.id] === true ? (
-                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
-                                  Indexed
+                      {isLoadingDocumentStatus ? (
+                        <div className="flex justify-center items-center h-full">
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          <span className="text-sm text-muted-foreground">Loading document status...</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {filteredDocuments.map(doc => (
+                            <div 
+                              key={doc.id} 
+                              className={`flex items-center p-2 rounded cursor-pointer ${
+                                selectedDocuments.includes(doc.id) ? "bg-muted" : "hover:bg-muted/50"
+                              }`}
+                              onClick={() => toggleDocumentSelection(doc.id)}
+                            >
+                              <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
+                              <div className="truncate flex-1 text-sm">
+                                {doc.name}
+                              </div>
+                              <div className="ml-1 flex-shrink-0">
+                                {docProcessingStatus[doc.id] === true ? (
+                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                                    Indexed
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                                    Not Indexed
+                                  </Badge>
+                                )}
+                                <Badge variant="outline" className="ml-1 text-[10px]">
+                                  {doc.type}
                                 </Badge>
-                              ) : (
-                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
-                                  Not Indexed
-                                </Badge>
-                              )}
-                              <Badge variant="outline" className="ml-1 text-[10px]">
-                                {doc.type}
-                              </Badge>
+                              </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </ScrollArea>
                   </>
                 )}
