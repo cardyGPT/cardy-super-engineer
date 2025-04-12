@@ -5,7 +5,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2 } from "lucide-react";
+import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -14,10 +14,18 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectDocument } from "@/types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 type Message = {
   role: "user" | "assistant" | "system";
   content: string;
+  metadata?: {
+    contextSize?: number;
+    relevantDocuments?: Array<{
+      documentName: string;
+      similarity: number;
+    }>;
+  };
 };
 
 const CardyMindPage = () => {
@@ -77,21 +85,12 @@ const CardyMindPage = () => {
     setIsLoading(true);
     
     try {
-      // Get selected document details
-      const docsToProcess = documents.filter(doc => 
-        selectedDocuments.length === 0 || selectedDocuments.includes(doc.id)
-      );
-      
-      // If no specific documents are selected, use all documents from the project
-      const projectDocs = selectedDocuments.length === 0 && selectedProjectId 
-        ? documents.filter(doc => doc.projectId === selectedProjectId)
-        : docsToProcess;
-      
-      // Call Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('chat-with-all-project-data', {
+      // Call Supabase Edge Function with selected project and document IDs
+      const { data, error } = await supabase.functions.invoke('chat-with-documents', {
         body: {
-          documents: projectDocs,
-          messages: [...messages, userMessage].filter(m => m.role !== "system")
+          message: input,
+          projectId: selectedProjectId,
+          documentIds: selectedDocuments.length > 0 ? selectedDocuments : undefined
         }
       });
       
@@ -99,10 +98,14 @@ const CardyMindPage = () => {
         throw new Error(error.message);
       }
       
-      // Add assistant's response to messages
+      // Add assistant's response to messages with metadata
       setMessages(prev => [...prev, {
         role: "assistant",
-        content: data.response.content
+        content: data.response,
+        metadata: {
+          contextSize: data.contextSize,
+          relevantDocuments: data.relevantDocuments
+        }
       }]);
       
     } catch (err) {
@@ -152,7 +155,7 @@ const CardyMindPage = () => {
       ? filteredDocuments.filter(doc => selectedDocuments.includes(doc.id))
       : filteredDocuments;
     
-    const newStatus: Record<string, boolean> = {};
+    const newStatus: Record<string, boolean> = { ...docProcessingStatus };
     
     try {
       toast({
@@ -207,6 +210,43 @@ const CardyMindPage = () => {
     }
   };
 
+  // Fetch existing document processing status
+  const fetchDocumentProcessingStatus = async () => {
+    if (!selectedProjectId) return;
+    
+    try {
+      // Query project_chunks to check which documents have been processed
+      const { data, error } = await supabase
+        .from('project_chunks')
+        .select('document_id')
+        .eq('project_id', selectedProjectId)
+        .distinct();
+        
+      if (error) throw error;
+      
+      const newStatus: Record<string, boolean> = {};
+      
+      // Mark documents as processed if they have chunks
+      if (data && data.length > 0) {
+        const processedDocIds = data.map(item => item.document_id);
+        
+        filteredDocuments.forEach(doc => {
+          newStatus[doc.id] = processedDocIds.includes(doc.id);
+        });
+      }
+      
+      setDocProcessingStatus(newStatus);
+    } catch (err) {
+      console.error("Error fetching document processing status:", err);
+    }
+  };
+  
+  useEffect(() => {
+    if (selectedProjectId && filteredDocuments.length > 0) {
+      fetchDocumentProcessingStatus();
+    }
+  }, [selectedProjectId, filteredDocuments]);
+
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
@@ -238,12 +278,40 @@ const CardyMindPage = () => {
                             <AvatarImage src="/lovable-uploads/735e3178-c57b-4678-bb2e-a75e7a381498.png" />
                           )}
                         </Avatar>
-                        <div className={`px-4 py-2 rounded-lg ${
+                        <div className={`p-4 rounded-lg ${
                           message.role === "user" 
                             ? "bg-primary text-primary-foreground" 
                             : "bg-muted"
                         }`}>
                           <div className="whitespace-pre-wrap">{message.content}</div>
+                          
+                          {message.metadata?.relevantDocuments && message.metadata.relevantDocuments.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="flex items-center text-xs text-muted-foreground cursor-pointer">
+                                      <Info className="h-3 w-3 mr-1" />
+                                      <span>Based on {message.metadata.relevantDocuments.length} document sections</span>
+                                    </div>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-sm">
+                                    <p className="text-xs font-medium mb-1">Referenced Documents:</p>
+                                    <ul className="text-xs list-disc pl-4">
+                                      {message.metadata.relevantDocuments.map((doc, i) => (
+                                        <li key={i} className="mb-1">
+                                          {doc.documentName} 
+                                          <span className="ml-1 text-xs opacity-70">
+                                            (Relevance: {Math.round(doc.similarity * 100)}%)
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -305,7 +373,7 @@ const CardyMindPage = () => {
                       type="submit" 
                       size="icon" 
                       className="self-end" 
-                      disabled={!input.trim() || isLoading}
+                      disabled={!input.trim() || isLoading || !selectedProjectId}
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -342,7 +410,7 @@ const CardyMindPage = () => {
                 </div>
                 <CardDescription>
                   {selectedDocuments.length === 0 
-                    ? "Using all project documents"
+                    ? "Using all indexed project documents"
                     : `${selectedDocuments.length} documents selected`
                   }
                 </CardDescription>
@@ -394,9 +462,13 @@ const CardyMindPage = () => {
                               {doc.name}
                             </div>
                             <div className="ml-1 flex-shrink-0">
-                              {docProcessingStatus[doc.id] === true && (
+                              {docProcessingStatus[doc.id] === true ? (
                                 <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
                                   Indexed
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                                  Not Indexed
                                 </Badge>
                               )}
                               <Badge variant="outline" className="ml-1 text-[10px]">
@@ -416,7 +488,7 @@ const CardyMindPage = () => {
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>RAG-Powered Context</AlertTitle>
               <AlertDescription className="text-xs">
-                Cardy Mind uses Retrieval-Augmented Generation to analyze your documents and provide answers based on their content. Index your documents to enable intelligent document search.
+                Cardy Mind uses Retrieval-Augmented Generation to analyze your documents and provide answers based on their content. Index your documents first to enable intelligent document search.
               </AlertDescription>
             </Alert>
           </div>

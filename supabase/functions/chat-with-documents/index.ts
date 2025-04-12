@@ -1,13 +1,12 @@
 
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,17 +15,103 @@ serve(async (req) => {
   }
 
   try {
-    const { message, documentsContext } = await req.json();
+    const { message, projectId, documentIds = [] } = await req.json();
     
     console.log("Chat with documents request received:", {
       messageLength: message?.length || 0,
-      documentsCount: documentsContext ? documentsContext.split('---').length : 0,
+      projectId,
+      documentIds: documentIds.length
     });
     
     if (!message) {
       throw new Error('No message provided');
     }
+    
+    // Create Supabase client with the service role key
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Generate embedding for the query
+    const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${openAIApiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "text-embedding-ada-002",
+        input: message.replace(/\n/g, ' ')
+      }),
+    });
 
+    if (!embeddingResponse.ok) {
+      const error = await embeddingResponse.json();
+      throw new Error(`Error generating embeddings: ${error.error?.message || error.message || 'Unknown error'}`);
+    }
+
+    const { data: embeddingData } = await embeddingResponse.json();
+    const embedding = embeddingData[0].embedding;
+    
+    console.log("Generated embedding for query");
+    
+    // Set up filter for the similarity search
+    const filter: Record<string, any> = {};
+    if (projectId) {
+      filter.project_id = projectId;
+    }
+    
+    // Use vector similarity search function to find relevant document chunks
+    const { data: relevantChunks, error: searchError } = await supabase.rpc(
+      'match_documents',
+      {
+        query_embedding: embedding,
+        match_threshold: 0.5,  // Threshold for similarity
+        match_count: 10,       // Number of matches to return
+        filter: filter
+      }
+    );
+    
+    if (searchError) {
+      console.error("Error in similarity search:", searchError);
+      throw new Error(`Error retrieving relevant document chunks: ${searchError.message}`);
+    }
+    
+    console.log(`Retrieved ${relevantChunks?.length || 0} relevant document chunks`);
+    
+    // Filter by specific documents if provided
+    let filteredChunks = relevantChunks;
+    if (documentIds.length > 0) {
+      filteredChunks = relevantChunks.filter(chunk => 
+        documentIds.includes(chunk.document_id)
+      );
+      console.log(`Filtered to ${filteredChunks.length} chunks from selected documents`);
+    }
+    
+    // Build context from the relevant chunks
+    let documentsContext = '';
+    if (filteredChunks && filteredChunks.length > 0) {
+      // Group chunks by document for better context
+      const documentGroups = filteredChunks.reduce((groups, chunk) => {
+        const docName = chunk.document_name;
+        if (!groups[docName]) {
+          groups[docName] = [];
+        }
+        groups[docName].push(chunk);
+        return groups;
+      }, {});
+      
+      // Format each document's chunks
+      for (const [docName, chunks] of Object.entries(documentGroups)) {
+        documentsContext += `--- Document: ${docName} ---\n\n`;
+        // Sort chunks by their original order in the document
+        const sortedChunks = chunks.sort((a, b) => a.chunk_index - b.chunk_index);
+        
+        for (const chunk of sortedChunks) {
+          documentsContext += `${chunk.chunk_text}\n\n`;
+        }
+        documentsContext += '---\n\n';
+      }
+    }
+    
     const systemPrompt = `You are Cardy Mind, an AI assistant that helps users understand their project documents.
     Your goal is to provide accurate, helpful responses based on the document context provided.
     
@@ -48,7 +133,7 @@ serve(async (req) => {
     if (documentsContext) {
       messages.push({ 
         role: "system", 
-        content: `Here are the project documents to reference:\n\n${documentsContext}` 
+        content: `Here are the relevant project documents to reference:\n\n${documentsContext}` 
       });
     }
     
@@ -87,6 +172,11 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       response: data.choices[0].message.content,
       usage: data.usage,
+      contextSize: documentsContext.length,
+      relevantDocuments: filteredChunks ? filteredChunks.map(chunk => ({
+        documentName: chunk.document_name,
+        similarity: chunk.similarity
+      })) : []
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
