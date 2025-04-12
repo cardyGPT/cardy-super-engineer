@@ -4,7 +4,7 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  // Add request logging
+  // Add detailed request logging
   console.log(`GSuite validation function received ${req.method} request`);
   
   // Handle CORS preflight requests

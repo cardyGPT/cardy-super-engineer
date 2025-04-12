@@ -7,14 +7,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Code, FileText, TestTube, RefreshCw, Copy, Check, FileDown } from "lucide-react";
+import { AlertTriangle, Code, FileText, TestTube, RefreshCw, Copy, Check, FileDown, Upload, Download } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/lib/supabase";
 import { downloadAsPDF, formatTimestampForFilename } from "@/utils/exportUtils";
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeHighlight from 'rehype-highlight';
+import remarkGfm from 'remark-gfm';
+import 'highlight.js/styles/github.css';
 
 const StoryDetail: React.FC = () => {
-  const { selectedTicket } = useStories();
+  const { selectedTicket, pushToJira } = useStories();
   const [activeTab, setActiveTab] = useState("lld");
   const [lldContent, setLldContent] = useState("");
   const [codeContent, setCodeContent] = useState("");
@@ -25,6 +30,7 @@ const StoryDetail: React.FC = () => {
   const { toast } = useToast();
   const contentRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
 
   // Helper function to safely handle potential object content
   const safeStringify = (content: any): string => {
@@ -227,7 +233,39 @@ const StoryDetail: React.FC = () => {
     }
   };
 
-  const handleDownloadPDF = async (contentType: 'lld' | 'code' | 'tests') => {
+  const handleGenerateAll = async () => {
+    if (!selectedTicket) return;
+    
+    setIsGeneratingAll(true);
+    setGenerationError(null);
+    
+    try {
+      // Generate LLD
+      await handleGenerateContent('lld');
+      // Generate Code
+      await handleGenerateContent('code');
+      // Generate Tests
+      await handleGenerateContent('tests');
+      
+      toast({
+        title: "All Content Generated",
+        description: "LLD, Code, and Test Cases have been successfully generated."
+      });
+    } catch (error: any) {
+      console.error("Error generating all content:", error);
+      setGenerationError(error.message || "Failed to generate all content");
+      
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to generate all content",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGeneratingAll(false);
+    }
+  };
+
+  const handleDownloadPDF = async (contentType: 'lld' | 'code' | 'tests' | 'all') => {
     if (!contentRef.current || !selectedTicket) {
       toast({
         title: "Download Error",
@@ -248,7 +286,8 @@ const StoryDetail: React.FC = () => {
       const ticketKey = safeStringify(selectedTicket.key) || 'document';
       const timestamp = formatTimestampForFilename();
       const contentLabel = contentType === 'lld' ? 'LLD' : 
-                           contentType === 'code' ? 'Code' : 'Tests';
+                          contentType === 'code' ? 'Code' : 
+                          contentType === 'tests' ? 'Tests' : 'All';
       
       const fileName = `${ticketKey}_${contentLabel}_${timestamp}`;
       
@@ -267,6 +306,63 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Download Failed",
         description: "There was a problem creating your PDF. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePushToJira = async (contentType: 'lld' | 'code' | 'tests' | 'all') => {
+    if (!selectedTicket) {
+      toast({
+        title: "Error",
+        description: "No ticket selected to push content to",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    let content = "";
+    let contentTitle = "";
+    
+    if (contentType === 'lld') {
+      content = lldContent;
+      contentTitle = "Low Level Design";
+    } else if (contentType === 'code') {
+      content = codeContent;
+      contentTitle = "Implementation Code";
+    } else if (contentType === 'tests') {
+      content = testContent;
+      contentTitle = "Test Cases";
+    } else if (contentType === 'all') {
+      content = `# Generated Documentation for ${safeStringify(selectedTicket.key)}\n\n## Low Level Design\n\n${lldContent}\n\n## Implementation Code\n\n${codeContent}\n\n## Test Cases\n\n${testContent}`;
+      contentTitle = "All Documentation";
+    }
+    
+    if (!content.trim()) {
+      toast({
+        title: "Error",
+        description: `No ${contentTitle} content to push to Jira`,
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    try {
+      const success = await pushToJira(selectedTicket.id, content);
+      
+      if (success) {
+        toast({
+          title: "Content Pushed to Jira",
+          description: `${contentTitle} has been added to Jira ticket ${selectedTicket.key}`,
+          variant: "success"
+        });
+      } else {
+        throw new Error("Failed to push content to Jira");
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to push content to Jira",
         variant: "destructive"
       });
     }
@@ -320,7 +416,46 @@ const StoryDetail: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Generate Content</CardTitle>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <CardTitle>Generate Content</CardTitle>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                onClick={handleGenerateAll}
+                disabled={isGenerating || isGeneratingAll}
+              >
+                {isGeneratingAll ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
+                    Generating All...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                    Generate All
+                  </>
+                )}
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handleDownloadPDF('all')}
+              >
+                <Download className="h-4 w-4 mr-1" />
+                Download All
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={() => handlePushToJira('all')}
+              >
+                <Upload className="h-4 w-4 mr-1" />
+                Push All to Jira
+              </Button>
+            </div>
+          </div>
           <CardDescription>
             Use AI to generate LLD, code, and test cases based on the selected story
           </CardDescription>
@@ -376,14 +511,22 @@ const StoryDetail: React.FC = () => {
                         <FileDown className="h-4 w-4 mr-1" />
                         Download
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handlePushToJira('lld')}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Push to Jira
+                      </Button>
                     </>
                   )}
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('lld')}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isGeneratingAll}
                   >
-                    {isGenerating && activeTab === 'lld' ? (
+                    {(isGenerating && activeTab === 'lld') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
@@ -398,7 +541,7 @@ const StoryDetail: React.FC = () => {
                 </div>
               </div>
               
-              {isGenerating && activeTab === 'lld' ? (
+              {(isGenerating && activeTab === 'lld') || isGeneratingAll ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
@@ -413,12 +556,16 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <Textarea 
-                  value={lldContent} 
-                  onChange={(e) => setLldContent(e.target.value)}
-                  placeholder="Generate a Low Level Design document based on the selected story."
-                  className="min-h-[300px] font-mono text-sm"
-                />
+                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
+                  <div className="prose max-w-none dark:prose-invert">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                    >
+                      {lldContent || "Generate a Low Level Design document based on the selected story."}
+                    </ReactMarkdown>
+                  </div>
+                </div>
               )}
             </TabsContent>
             
@@ -448,14 +595,22 @@ const StoryDetail: React.FC = () => {
                         <FileDown className="h-4 w-4 mr-1" />
                         Download
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handlePushToJira('code')}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Push to Jira
+                      </Button>
                     </>
                   )}
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('code')}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isGeneratingAll}
                   >
-                    {isGenerating && activeTab === 'code' ? (
+                    {(isGenerating && activeTab === 'code') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
@@ -470,7 +625,7 @@ const StoryDetail: React.FC = () => {
                 </div>
               </div>
               
-              {isGenerating && activeTab === 'code' ? (
+              {(isGenerating && activeTab === 'code') || isGeneratingAll ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
@@ -485,12 +640,16 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <Textarea 
-                  value={codeContent} 
-                  onChange={(e) => setCodeContent(e.target.value)}
-                  placeholder="Generate code based on the selected story. Includes Angular.js frontend, Node.js backend, and PostgreSQL database scripts."
-                  className="min-h-[300px] font-mono text-sm"
-                />
+                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
+                  <div className="prose max-w-none dark:prose-invert">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                    >
+                      {codeContent || "Generate code based on the selected story. Includes Angular.js frontend, Node.js backend, and PostgreSQL database scripts."}
+                    </ReactMarkdown>
+                  </div>
+                </div>
               )}
             </TabsContent>
             
@@ -520,14 +679,22 @@ const StoryDetail: React.FC = () => {
                         <FileDown className="h-4 w-4 mr-1" />
                         Download
                       </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handlePushToJira('tests')}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Push to Jira
+                      </Button>
                     </>
                   )}
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('tests')}
-                    disabled={isGenerating}
+                    disabled={isGenerating || isGeneratingAll}
                   >
-                    {isGenerating && activeTab === 'tests' ? (
+                    {(isGenerating && activeTab === 'tests') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
@@ -542,7 +709,7 @@ const StoryDetail: React.FC = () => {
                 </div>
               </div>
               
-              {isGenerating && activeTab === 'tests' ? (
+              {(isGenerating && activeTab === 'tests') || isGeneratingAll ? (
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
@@ -557,12 +724,16 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <Textarea 
-                  value={testContent} 
-                  onChange={(e) => setTestContent(e.target.value)}
-                  placeholder="Generate test cases based on the selected story."
-                  className="min-h-[300px] font-mono text-sm"
-                />
+                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
+                  <div className="prose max-w-none dark:prose-invert">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                    >
+                      {testContent || "Generate test cases based on the selected story."}
+                    </ReactMarkdown>
+                  </div>
+                </div>
               )}
             </TabsContent>
           </Tabs>
