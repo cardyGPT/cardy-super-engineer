@@ -7,21 +7,24 @@ interface Toast {
   title?: string;
   description?: string;
   variant?: "default" | "destructive";
+  action?: React.ReactNode;
 }
 
 export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const toast = ({ title, description, variant = "default" }: {
+  const toast = ({ title, description, variant = "default", action }: {
     title?: string;
     description?: string;
     variant?: "default" | "destructive";
+    action?: React.ReactNode;
   }) => {
     const newToast = { 
       id: Date.now(), 
       title, 
       description, 
-      variant 
+      variant,
+      action
     };
     setToasts(prev => [...prev, newToast]);
   };
@@ -33,13 +36,14 @@ export function useToast() {
 }
 
 // Export a single toast function for direct use
-export const toast = ({ title, description, variant = "default" }: {
+export const toast = ({ title, description, variant = "default", action }: {
   title?: string;
   description?: string;
   variant?: "default" | "destructive";
+  action?: React.ReactNode;
 }) => {
   // This is a simplified version for direct import
   // The actual toast state is managed by the useToast hook
-  console.log("Toast:", { title, description, variant });
+  console.log("Toast:", { title, description, variant, action });
   // Implementation will be handled by the Toaster component
 };
