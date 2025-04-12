@@ -8,8 +8,6 @@ import {
   ArrowLeft, 
   Calendar,
   Edit, 
-  FileUp, 
-  Database,
   Trash2 
 } from "lucide-react";
 import { format, isValid } from "date-fns";
@@ -41,11 +39,13 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const ProjectDetailPage = () => {
   const { projectId } = useParams<{ projectId: string }>();
-  const { projects, documents, deleteProject } = useProject();
+  const { projects, documents, deleteProject, updateProject } = useProject();
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   const project = projects.find((p) => p.id === projectId);
   const projectDocuments = documents.filter((d) => d.projectId === projectId);
@@ -75,7 +75,21 @@ const ProjectDetailPage = () => {
   
   const handleDeleteProject = () => {
     deleteProject(project.id);
+    toast({
+      title: "Project Deleted",
+      description: `Project "${project.name}" has been successfully deleted.`,
+      variant: "success"
+    });
     navigate("/projects");
+  };
+  
+  const handleProjectUpdate = (updatedProject) => {
+    updateProject(updatedProject);
+    toast({
+      title: "Project Updated",
+      description: `Project "${updatedProject.name}" has been successfully updated.`,
+      variant: "success"
+    });
   };
   
   const hasDataModel = projectDocuments.some((doc) => doc.type === "data-model");
@@ -140,7 +154,7 @@ const ProjectDetailPage = () => {
                   </DialogHeader>
                   <ProjectForm
                     initialData={project}
-                    onSuccess={() => {}}
+                    onSuccess={handleProjectUpdate}
                   />
                 </DialogContent>
               </Dialog>
@@ -175,11 +189,9 @@ const ProjectDetailPage = () => {
         <Tabs defaultValue="documents" className="w-full">
           <TabsList className="mb-6">
             <TabsTrigger value="documents">
-              <FileUp className="h-4 w-4 mr-2" />
               Documents
             </TabsTrigger>
             <TabsTrigger value="data-model" disabled={!hasDataModel}>
-              <Database className="h-4 w-4 mr-2" />
               Data Model
             </TabsTrigger>
           </TabsList>
@@ -193,8 +205,7 @@ const ProjectDetailPage = () => {
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button size="sm">
-                          <FileUp className="h-4 w-4 mr-2" />
-                          Upload
+                          Upload Document
                         </Button>
                       </DialogTrigger>
                       <DialogContent>
@@ -204,7 +215,16 @@ const ProjectDetailPage = () => {
                             Select a document to upload to this project.
                           </DialogDescription>
                         </DialogHeader>
-                        <DocumentUpload projectId={project.id} />
+                        <DocumentUpload 
+                          projectId={project.id}
+                          onSuccess={() => {
+                            toast({
+                              title: "Document Uploaded",
+                              description: "Your document has been successfully uploaded to the project.",
+                              variant: "success"
+                            });
+                          }}
+                        />
                       </DialogContent>
                     </Dialog>
                   </div>
@@ -249,7 +269,6 @@ const ProjectDetailPage = () => {
                 <div className="p-6">
                   <div className="mb-4">
                     <Button onClick={() => navigate("/data-models")}>
-                      <Database className="h-4 w-4 mr-2" />
                       View Full ER Diagram
                     </Button>
                   </div>
@@ -277,7 +296,6 @@ const ProjectDetailPage = () => {
                   <Dialog>
                     <DialogTrigger asChild>
                       <Button>
-                        <FileUp className="h-4 w-4 mr-2" />
                         Upload Data Model
                       </Button>
                     </DialogTrigger>
@@ -290,6 +308,13 @@ const ProjectDetailPage = () => {
                       </DialogHeader>
                       <DocumentUpload
                         projectId={project.id}
+                        onSuccess={() => {
+                          toast({
+                            title: "Data Model Uploaded",
+                            description: "Your data model has been successfully uploaded.",
+                            variant: "success"
+                          });
+                        }}
                       />
                     </DialogContent>
                   </Dialog>

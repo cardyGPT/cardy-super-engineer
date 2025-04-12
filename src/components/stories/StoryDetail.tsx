@@ -83,7 +83,8 @@ const StoryDetail: React.FC = () => {
           
           toast({
             title: "Loaded saved content",
-            description: "Previously generated content has been loaded."
+            description: "Previously generated content has been loaded.",
+            variant: "success"
           });
         }
       } catch (err) {
@@ -180,6 +181,17 @@ const StoryDetail: React.FC = () => {
   const handleGenerateContent = async (type: 'lld' | 'code' | 'tests') => {
     if (!selectedTicket) return;
     
+    if ((type === 'lld' && lldContent) || 
+        (type === 'code' && codeContent) || 
+        (type === 'tests' && testContent)) {
+      toast({
+        title: "Content Already Exists",
+        description: `${type.toUpperCase()} has already been generated for this ticket. Edit or download the existing content.`,
+        variant: "info"
+      });
+      return;
+    }
+    
     setIsGenerating(true);
     setGenerationError(null);
     
@@ -227,10 +239,38 @@ const StoryDetail: React.FC = () => {
       
       setActiveTab(type);
       
-      toast({
-        title: "Content Generated",
-        description: `${type.toUpperCase()} has been successfully generated and saved.`
-      });
+      const storyId = safeStringify(selectedTicket.key);
+      const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
+      const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
+      
+      const { error: saveError } = await supabase
+        .from('story_artifacts')
+        .upsert({
+          story_id: storyId,
+          project_id: projectId,
+          sprint_id: sprintId,
+          lld_content: type === 'lld' ? responseContent : lldContent,
+          code_content: type === 'code' ? responseContent : codeContent,
+          test_content: type === 'tests' ? responseContent : testContent,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'story_id'
+        });
+      
+      if (saveError) {
+        console.error("Error saving to database:", saveError);
+        toast({
+          title: "Content Generated But Not Saved",
+          description: "Content was generated but couldn't be saved to the database.",
+          variant: "warning"
+        });
+      } else {
+        toast({
+          title: "Content Generated",
+          description: `${type.toUpperCase()} has been successfully generated and saved.`,
+          variant: "success"
+        });
+      }
     } catch (error: any) {
       console.error(`Error generating ${type}:`, error);
       setGenerationError(error.message || `Failed to generate ${type}`);
@@ -248,17 +288,27 @@ const StoryDetail: React.FC = () => {
   const handleGenerateAll = async () => {
     if (!selectedTicket) return;
     
+    if (lldContent && codeContent && testContent) {
+      toast({
+        title: "Content Already Exists",
+        description: "All content has already been generated for this ticket.",
+        variant: "info"
+      });
+      return;
+    }
+    
     setIsGeneratingAll(true);
     setGenerationError(null);
     
     try {
-      await handleGenerateContent('lld');
-      await handleGenerateContent('code');
-      await handleGenerateContent('tests');
+      if (!lldContent) await handleGenerateContent('lld');
+      if (!codeContent) await handleGenerateContent('code');
+      if (!testContent) await handleGenerateContent('tests');
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, and Test Cases have been successfully generated and saved."
+        description: "LLD, Code, and Test Cases have been successfully generated and saved.",
+        variant: "success"
       });
     } catch (error: any) {
       console.error("Error generating all content:", error);
@@ -531,12 +581,17 @@ const StoryDetail: React.FC = () => {
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('lld')}
-                    disabled={isGenerating || isGeneratingAll}
+                    disabled={isGenerating || isGeneratingAll || !!lldContent}
                   >
                     {(isGenerating && activeTab === 'lld') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
+                      </>
+                    ) : !!lldContent ? (
+                      <>
+                        <FileText className="h-4 w-4 mr-1" />
+                        Already Generated
                       </>
                     ) : (
                       <>
@@ -615,12 +670,17 @@ const StoryDetail: React.FC = () => {
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('code')}
-                    disabled={isGenerating || isGeneratingAll}
+                    disabled={isGenerating || isGeneratingAll || !!codeContent}
                   >
                     {(isGenerating && activeTab === 'code') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
+                      </>
+                    ) : !!codeContent ? (
+                      <>
+                        <Code className="h-4 w-4 mr-1" />
+                        Already Generated
                       </>
                     ) : (
                       <>
@@ -699,12 +759,17 @@ const StoryDetail: React.FC = () => {
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('tests')}
-                    disabled={isGenerating || isGeneratingAll}
+                    disabled={isGenerating || isGeneratingAll || !!testContent}
                   >
                     {(isGenerating && activeTab === 'tests') || isGeneratingAll ? (
                       <>
                         <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
                         Generating...
+                      </>
+                    ) : !!testContent ? (
+                      <>
+                        <TestTube className="h-4 w-4 mr-1" />
+                        Already Generated
                       </>
                     ) : (
                       <>
