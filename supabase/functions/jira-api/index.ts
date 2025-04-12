@@ -42,8 +42,13 @@ serve(async (req) => {
       );
     }
 
-    // Construct Jira API URL
-    const jiraApiUrl = `https://${credentials.domain}/rest/api/3/${endpoint}`;
+    // Clean up domain to prevent double https:// issues
+    const cleanDomain = credentials.domain
+      .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
+      .replace(/\/+$/, ''); // Remove trailing slashes
+    
+    // Construct Jira API URL properly
+    const jiraApiUrl = `https://${cleanDomain}/rest/api/3/${endpoint}`;
     console.log(`Calling Jira API: ${method || 'GET'} ${jiraApiUrl}`);
 
     // Create authorization header from email and API token
