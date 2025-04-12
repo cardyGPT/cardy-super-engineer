@@ -1,4 +1,3 @@
-
 import { useCallback } from "react";
 import { ProjectDocument, DataModel } from "@/types";
 import { supabase } from "@/lib/supabase";
@@ -132,6 +131,9 @@ export const useDocumentOperations = (
         setDataModel(formattedDocument.content);
       }
       
+      // Process the document to generate embeddings
+      processDocumentForEmbeddings(formattedDocument.id);
+      
       toast({
         title: "Upload successful",
         description: `${file.name} has been uploaded successfully.`,
@@ -147,6 +149,37 @@ export const useDocumentOperations = (
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const processDocumentForEmbeddings = async (documentId: string) => {
+    try {
+      console.log(`Processing document ${documentId} for embeddings`);
+      
+      const { data, error } = await supabase.functions.invoke('process-document', {
+        body: { documentId }
+      });
+      
+      if (error) {
+        console.error("Error processing document:", error);
+        toast({
+          title: "Processing warning",
+          description: "Document was uploaded but there was an issue processing it for search capabilities.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      console.log("Document processing result:", data);
+      
+      if (data.success) {
+        toast({
+          title: "Processing complete",
+          description: `${data.successfulChunks} document chunks have been indexed for search.`,
+        });
+      }
+    } catch (err) {
+      console.error("Error calling process-document function:", err);
     }
   };
 
@@ -286,6 +319,16 @@ export const useDocumentOperations = (
       
       if (fetchError) throw fetchError;
       
+      // Delete associated chunks from project_chunks table
+      const { error: chunksError } = await supabase
+        .from('project_chunks')
+        .delete()
+        .eq('document_id', id);
+        
+      if (chunksError) {
+        console.error("Error deleting document chunks:", chunksError);
+      }
+      
       // Delete the file from storage if we have a URL
       if (doc.file_url) {
         const fileName = doc.file_url.split('/').pop();
@@ -326,6 +369,7 @@ export const useDocumentOperations = (
 
   return {
     uploadDocument,
-    deleteDocument
+    deleteDocument,
+    processDocumentForEmbeddings
   };
 };

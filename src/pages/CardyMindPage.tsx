@@ -4,14 +4,12 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUp, Send, DownloadCloud, AlertTriangle, BrainCircuit, FileText, MessageCircle, Loader2 } from "lucide-react";
+import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -35,6 +33,8 @@ const CardyMindPage = () => {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [filteredDocuments, setFilteredDocuments] = useState<ProjectDocument[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [isIndexing, setIsIndexing] = useState(false);
+  const [docProcessingStatus, setDocProcessingStatus] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -144,6 +144,67 @@ const CardyMindPage = () => {
       role: "assistant",
       content: "I've cleared our conversation. How can I assist you with your documents today?"
     }]);
+  };
+
+  const processDocumentsForEmbeddings = async () => {
+    setIsIndexing(true);
+    const docsToProcess = selectedDocuments.length > 0 
+      ? filteredDocuments.filter(doc => selectedDocuments.includes(doc.id))
+      : filteredDocuments;
+    
+    const newStatus: Record<string, boolean> = {};
+    
+    try {
+      toast({
+        title: "Processing started",
+        description: `Processing ${docsToProcess.length} documents for search capabilities.`,
+      });
+      
+      for (const doc of docsToProcess) {
+        try {
+          const { data, error } = await supabase.functions.invoke('process-document', {
+            body: { documentId: doc.id }
+          });
+          
+          if (error) {
+            console.error(`Error processing document ${doc.name}:`, error);
+            newStatus[doc.id] = false;
+          } else {
+            console.log(`Document ${doc.name} processed:`, data);
+            newStatus[doc.id] = data.success;
+          }
+        } catch (err) {
+          console.error(`Error with document ${doc.name}:`, err);
+          newStatus[doc.id] = false;
+        }
+      }
+      
+      setDocProcessingStatus(newStatus);
+      
+      const successCount = Object.values(newStatus).filter(Boolean).length;
+      
+      if (successCount === docsToProcess.length) {
+        toast({
+          title: "Processing complete",
+          description: "All documents have been processed successfully.",
+        });
+      } else {
+        toast({
+          title: "Processing partially complete",
+          description: `${successCount} of ${docsToProcess.length} documents processed successfully.`,
+          variant: "destructive",
+        });
+      }
+    } catch (err) {
+      console.error("Error processing documents:", err);
+      toast({
+        title: "Processing failed",
+        description: "Failed to process documents for search capabilities.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsIndexing(false);
+    }
   };
 
   return (
@@ -258,7 +319,27 @@ const CardyMindPage = () => {
           <div className="w-full md:w-72 space-y-6">
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Document Selection</CardTitle>
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-sm">Document Selection</CardTitle>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={processDocumentsForEmbeddings}
+                    disabled={isIndexing || filteredDocuments.length === 0}
+                  >
+                    {isIndexing ? (
+                      <>
+                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                        Indexing...
+                      </>
+                    ) : (
+                      <>
+                        <FileUp className="h-3 w-3 mr-1" />
+                        Index Docs
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <CardDescription>
                   {selectedDocuments.length === 0 
                     ? "Using all project documents"
@@ -312,9 +393,16 @@ const CardyMindPage = () => {
                             <div className="truncate flex-1 text-sm">
                               {doc.name}
                             </div>
-                            <Badge variant="outline" className="ml-1 text-[10px]">
-                              {doc.type}
-                            </Badge>
+                            <div className="ml-1 flex-shrink-0">
+                              {docProcessingStatus[doc.id] === true && (
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                                  Indexed
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="ml-1 text-[10px]">
+                                {doc.type}
+                              </Badge>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -326,9 +414,9 @@ const CardyMindPage = () => {
             
             <Alert>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Notice</AlertTitle>
+              <AlertTitle>RAG-Powered Context</AlertTitle>
               <AlertDescription className="text-xs">
-                Cardy Mind can analyze document content and answer questions based on your project data.
+                Cardy Mind uses Retrieval-Augmented Generation to analyze your documents and provide answers based on their content. Index your documents to enable intelligent document search.
               </AlertDescription>
             </Alert>
           </div>

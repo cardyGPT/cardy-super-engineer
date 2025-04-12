@@ -1,102 +1,235 @@
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import OpenAI from "https://esm.sh/openai@4.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-// Initialize OpenAI client with API key from environment variable
-const openai = new OpenAI({
-  apiKey: Deno.env.get("OPENAI_API_KEY") || "",
-});
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL');
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+// Create a Supabase client with the service role key for admin access
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 serve(async (req) => {
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { documents, messages } = await req.json();
-    
-    console.log("Processing chat request with all project data");
-    console.log(`Number of documents: ${documents?.length || 0}`);
-    console.log(`Messages: ${JSON.stringify(messages)}`);
-    
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "Messages are required" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 }
-      );
+    // Validate necessary environment variables
+    if (!openAIApiKey) {
+      throw new Error('OPENAI_API_KEY is not configured');
     }
 
-    // Format documents for the API
-    const formattedDocuments = documents?.map((doc: any) => {
-      let content = "";
-      
-      if (typeof doc.content === "string") {
-        try {
-          // Try to parse JSON string to ensure it's properly formatted
-          const parsedContent = JSON.parse(doc.content);
-          content = JSON.stringify(parsedContent, null, 2);
-        } catch (e) {
-          // If it's not valid JSON, use the string directly
-          content = doc.content;
-        }
-      } else if (doc.content) {
-        // If content is already an object, stringify it
-        content = JSON.stringify(doc.content, null, 2);
-      }
-      
-      return {
-        type: "text",
-        text: `Document: ${doc.name}\nContent: ${content}`
-      };
-    }) || [];
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase credentials are not configured');
+    }
+
+    // Parse request data
+    const { messages, documents } = await req.json();
     
-    // Prepare system message with access to all project data
-    const systemMessage = {
-      role: "system",
-      content: `You are Cardy Mind, an AI assistant with full access to all project documents and data models. 
-      You help users analyze their documents and data models, answer questions, and provide insights.
-      Your responses should be clear, informative, and helpful.
-      When referencing specific documents or data models, mention them by name.
-      You have complete access to read and analyze all project documents and database structures.
-      
-      For data models:
-      - You can access all entities, their attributes, and relationships
-      - You can explain entity relationships and their cardinality
-      - You can suggest optimizations or identify potential issues
-      
-      For other documents:
-      - You can analyze content, extract key information
-      - You can compare information across multiple documents
-      - You can provide summaries or detailed explanations
-      
-      Always be thorough in your analysis and aim to provide meaningful insights
-      based on the project's complete documentation.`
-    };
+    console.log(`Chat request received with ${messages?.length || 0} messages and ${documents?.length || 0} documents`);
     
-    // Call OpenAI API with the documents included as context
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [systemMessage, ...messages],
-      temperature: 0.5,
-      max_tokens: 2500,
-      // Include document content directly in the context
-      context: formattedDocuments.length > 0 ? { documents: formattedDocuments } : undefined
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('Valid messages array is required');
+    }
+
+    // Get the user's latest message
+    const userMessage = messages[messages.length - 1].content;
+    
+    // Get project IDs from the provided documents
+    const projectIds = documents && documents.length > 0 
+      ? [...new Set(documents.map(doc => doc.projectId))]
+      : [];
+      
+    console.log(`Found ${projectIds.length} unique project IDs in the documents`);
+
+    // Retrieve relevant document chunks based on the user's query
+    const relevantChunks = await getRelevantChunks(userMessage, projectIds);
+    console.log(`Retrieved ${relevantChunks.length} relevant document chunks`);
+
+    // Build the context from the relevant chunks
+    const context = relevantChunks.map(chunk => 
+      `Document: ${chunk.document_name || 'Unknown'} (${chunk.document_type || 'Unknown'})\n${chunk.chunk_text}`
+    ).join('\n\n---\n\n');
+
+    // Prepare the messages for the OpenAI API
+    const systemPrompt = `You are Cardy Mind, an AI assistant that helps users understand and work with their project documents.
+    Your goal is to provide accurate, helpful responses based on the document context provided.
+    
+    When responding:
+    - Be concise but thorough
+    - Focus on the facts present in the documents
+    - Cite specific sections of documents when relevant
+    - Admit when you don't know something or when the information isn't in the provided documents
+    - Don't make up information that isn't present in the documents
+    
+    Remember, you are a professional assistant helping users understand their project documentation.`;
+
+    const apiMessages = [
+      { role: "system", content: systemPrompt },
+    ];
+    
+    // Add context from relevant document chunks if available
+    if (context) {
+      apiMessages.push({ 
+        role: "system", 
+        content: `Here are the most relevant sections from the project documents:\n\n${context}`
+      });
+    }
+    
+    // Add the conversation history, but limit to last few messages to save tokens
+    const conversationHistory = messages.slice(-5);
+    apiMessages.push(...conversationHistory);
+
+    console.log(`Sending ${apiMessages.length} messages to OpenAI`);
+
+    // Call the OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: apiMessages,
+        temperature: 0.3,
+        max_tokens: 2000,
+      }),
     });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error("OpenAI API error:", errorData);
+      throw new Error(`Error from OpenAI API: ${errorData.error?.message || 'Unknown error'}`);
+    }
+
+    const data = await response.json();
     
-    console.log("OpenAI response received");
-    
+    console.log("Response received from OpenAI:", {
+      promptTokens: data.usage?.prompt_tokens,
+      completionTokens: data.usage?.completion_tokens,
+      totalTokens: data.usage?.total_tokens,
+    });
+
     return new Response(
-      JSON.stringify({ response: response.choices[0].message }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({
+        response: data.choices[0].message,
+        usage: data.usage,
+        context: {
+          chunkCount: relevantChunks.length,
+          projects: projectIds
+        }
+      }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error("Error processing request:", error);
-    
+    console.error(`Error in chat-with-all-project-data function: ${error.message}`);
     return new Response(
-      JSON.stringify({ error: error.message || "An error occurred" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      JSON.stringify({
+        error: error.message || 'An error occurred while processing your request'
+      }),
+      { 
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
     );
   }
 });
+
+// Function to get embedding for the query
+async function getEmbedding(text: string): Promise<number[]> {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: text.replace(/\n/g, ' ').trim(),
+      }),
+    });
+
+    if (!response.ok) {
+      const errorResponse = await response.json();
+      throw new Error(`OpenAI API error: ${errorResponse.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (error) {
+    console.error(`Error getting embedding: ${error.message}`);
+    throw error;
+  }
+}
+
+// Function to get relevant document chunks based on the query
+async function getRelevantChunks(query: string, projectIds: string[], limit: number = 10): Promise<any[]> {
+  try {
+    // Get the embedding for the query
+    const queryEmbedding = await getEmbedding(query);
+    
+    // Query the database for similar chunks
+    let rpcQuery: any = {
+      query_embedding: queryEmbedding,
+      match_threshold: 0.5,
+      match_count: limit
+    };
+    
+    // If project IDs are provided, add them to the query
+    if (projectIds && projectIds.length > 0) {
+      rpcQuery.filter = { project_id: projectIds };
+    }
+    
+    // Use a SQL query with vector similarity search
+    const { data: chunks, error } = await supabase.rpc('match_documents', rpcQuery);
+    
+    if (error) {
+      console.error("Error in match_documents RPC:", error.message);
+      
+      // Fallback to a direct query if the RPC fails
+      let query = supabase
+        .from('project_chunks')
+        .select(`
+          id,
+          project_id,
+          document_id,
+          document_type,
+          chunk_text,
+          chunk_index,
+          documents(name)
+        `)
+        .limit(limit);
+        
+      if (projectIds && projectIds.length > 0) {
+        query = query.in('project_id', projectIds);
+      }
+      
+      const { data: fallbackChunks, error: fallbackError } = await query;
+      
+      if (fallbackError) {
+        throw new Error(`Error fetching chunks: ${fallbackError.message}`);
+      }
+      
+      console.log(`Fallback query returned ${fallbackChunks?.length || 0} chunks`);
+      
+      // Format the results to match the expected structure
+      return (fallbackChunks || []).map(chunk => ({
+        ...chunk,
+        document_name: chunk.documents?.name || 'Unknown document'
+      }));
+    }
+    
+    return chunks || [];
+    
+  } catch (error) {
+    console.error(`Error in getRelevantChunks: ${error.message}`);
+    return [];
+  }
+}
