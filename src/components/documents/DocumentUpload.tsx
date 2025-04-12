@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { DocumentType } from "@/types";
 import { useProject } from "@/contexts/ProjectContext";
@@ -148,7 +147,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       toast({
         title: "Upload successful",
         description: `${file.name} has been uploaded successfully.`,
-        variant: "success",
+        variant: "default", // Changed from "success"
       });
       
       // Close the dialog automatically after successful upload
