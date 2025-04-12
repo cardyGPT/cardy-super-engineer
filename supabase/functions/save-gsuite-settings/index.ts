@@ -3,9 +3,6 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
-const supabaseUrl = "https://gswwmieyrfdhrfwsgjnw.supabase.co";
-const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -16,58 +13,42 @@ serve(async (req) => {
   }
 
   try {
-    const { defaultDriveFolder, autoSync } = await req.json();
+    const settings = await req.json();
     
-    // Store settings as environment variables
-    const envVars: Record<string, string> = {};
-    
-    if (defaultDriveFolder !== undefined) {
-      envVars.GSUITE_DEFAULT_FOLDER = defaultDriveFolder;
+    // Validate request
+    if (!settings) {
+      return new Response(
+        JSON.stringify({ error: "Settings are required" }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
+        }
+      );
     }
     
-    if (autoSync !== undefined) {
-      envVars.GSUITE_AUTO_SYNC = autoSync.toString();
-    }
+    // Store settings securely as an environment variable
+    const settingsStr = JSON.stringify(settings);
     
-    // Set the environment variables
-    const secretsResponse = await fetch(
-      `${supabaseUrl}/functions/v1/config/secrets`,
-      {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${supabaseServiceKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(envVars)
-      }
-    );
+    // Set the environment variable
+    Deno.env.set('GSUITE_SETTINGS', settingsStr);
     
-    if (!secretsResponse.ok) {
-      const error = await secretsResponse.json();
-      console.error("Error saving GSuite settings:", error);
-      throw new Error("Failed to save GSuite settings");
-    }
+    console.log("GSuite settings stored successfully");
     
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'GSuite settings saved successfully' 
-      }),
+      JSON.stringify({ success: true, message: "GSuite settings stored successfully" }),
       { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200 
       }
     );
-  } catch (error) {
-    console.error('Error in save-gsuite-settings function:', error);
+  } catch (err) {
+    console.error("Error storing GSuite settings:", err);
+    
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: error.message || 'Error saving GSuite settings' 
-      }),
+      JSON.stringify({ error: err.message }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }

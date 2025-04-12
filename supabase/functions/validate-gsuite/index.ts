@@ -13,55 +13,86 @@ serve(async (req) => {
   }
 
   try {
-    // Get the API key from environment variables
-    const apiKey = Deno.env.get("GSUITE_API_KEY");
+    // Get the GSuite API key from environment variables
+    const gsuiteApiKey = Deno.env.get('GSUITE_API_KEY');
     
-    // If no API key is configured, return not valid
-    if (!apiKey) {
+    if (!gsuiteApiKey) {
+      console.log("GSuite API key not found in environment variables");
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          message: 'GSuite API key is not configured' 
+          message: "GSuite API key is not configured" 
         }),
         { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
         }
       );
     }
     
-    // Basic validation - in a real app, you'd verify the key with Google's API
-    const isValid = apiKey.length > 10;
-    
-    // Get the settings from environment variables
-    const settings = {
-      defaultDriveFolder: Deno.env.get("GSUITE_DEFAULT_FOLDER") || "",
-      autoSync: Deno.env.get("GSUITE_AUTO_SYNC") === "true"
-    };
-    
-    console.log("GSuite validation result:", { valid: isValid, settings });
-    
-    return new Response(
-      JSON.stringify({ 
-        valid: isValid, 
-        message: isValid ? 'GSuite API key is valid' : 'GSuite API key validation failed',
-        settings
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // Load GSuite settings, if they exist
+    let settings = null;
+    try {
+      const settingsStr = Deno.env.get('GSUITE_SETTINGS');
+      if (settingsStr) {
+        settings = JSON.parse(settingsStr);
       }
-    );
-  } catch (error) {
-    console.error('Error in validate-gsuite function:', error);
+    } catch (err) {
+      console.warn("Error parsing GSuite settings:", err);
+      // Continue with null settings
+    }
+    
+    // Test the API key by making a simple request to Google API
+    try {
+      // Simple test request to Drive API
+      const response = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${gsuiteApiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Invalid API key");
+      }
+      
+      console.log("GSuite API key is valid");
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: true,
+          settings
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
+        }
+      );
+    } catch (err) {
+      console.error("Error validating GSuite API key:", err);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: err.message || "Invalid API key",
+          settings
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
+        }
+      );
+    }
+  } catch (err) {
+    console.error("Server error:", err);
+    
     return new Response(
-      JSON.stringify({ 
-        valid: false, 
-        message: error.message || 'Error validating GSuite API key' 
-      }),
+      JSON.stringify({ error: err.message }),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }

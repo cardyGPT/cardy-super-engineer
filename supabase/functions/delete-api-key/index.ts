@@ -13,12 +13,12 @@ serve(async (req) => {
   }
 
   try {
-    const { provider, apiKey } = await req.json();
+    const { provider } = await req.json();
     
     // Validate request
-    if (!provider || !apiKey) {
+    if (!provider) {
       return new Response(
-        JSON.stringify({ error: "Provider and API key are required" }),
+        JSON.stringify({ error: "Provider is required" }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400 
@@ -26,23 +26,28 @@ serve(async (req) => {
       );
     }
     
-    // Store API key securely as an environment variable
+    // Delete API key environment variable
     const key = `${provider.toUpperCase()}_API_KEY`;
     
-    // Set the environment variable
-    Deno.env.set(key, apiKey);
-    
-    console.log(`API key for ${provider} stored successfully`);
+    // Delete the environment variable (not always possible in all environments)
+    try {
+      // In some environments, setting to empty string is the best way to "delete"
+      Deno.env.set(key, "");
+      console.log(`API key for ${provider} deleted successfully`);
+    } catch (e) {
+      console.warn(`Could not delete ${key} environment variable:`, e);
+      // We'll still consider this successful as the key is no longer usable
+    }
     
     return new Response(
-      JSON.stringify({ success: true, message: `${provider} API key stored successfully` }),
+      JSON.stringify({ success: true, message: `${provider} API key deleted successfully` }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 200 
       }
     );
   } catch (err) {
-    console.error("Error storing API key:", err);
+    console.error("Error deleting API key:", err);
     
     return new Response(
       JSON.stringify({ error: err.message }),

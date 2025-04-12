@@ -77,6 +77,42 @@ export type Database = {
         }
         Relationships: []
       }
+      story_artifacts: {
+        Row: {
+          code_content: string | null
+          created_at: string
+          id: string
+          lld_content: string | null
+          project_id: string | null
+          sprint_id: string | null
+          story_id: string
+          test_content: string | null
+          updated_at: string
+        }
+        Insert: {
+          code_content?: string | null
+          created_at?: string
+          id?: string
+          lld_content?: string | null
+          project_id?: string | null
+          sprint_id?: string | null
+          story_id: string
+          test_content?: string | null
+          updated_at?: string
+        }
+        Update: {
+          code_content?: string | null
+          created_at?: string
+          id?: string
+          lld_content?: string | null
+          project_id?: string | null
+          sprint_id?: string | null
+          story_id?: string
+          test_content?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

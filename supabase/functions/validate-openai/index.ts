@@ -4,12 +4,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  // Add request logging
-  console.log(`Edge function 'validate-openai' received ${req.method} request`);
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
     return new Response(null, { 
       headers: corsHeaders,
       status: 204
@@ -17,127 +13,69 @@ serve(async (req) => {
   }
 
   try {
-    // Get the API key from the request body or environment variables
-    let body = {};
-    let apiKey = Deno.env.get("OPENAI_API_KEY");
+    // Get the OpenAI API key from environment variables
+    const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     
-    try {
-      body = await req.json();
-      if (body && body.apiKey) {
-        apiKey = body.apiKey;
-      }
-    } catch (e) {
-      // If the request body is empty or not JSON, we'll use the env var only
-      console.log("No request body or not JSON, using env var only");
-    }
-
-    if (!apiKey) {
-      return new Response(
-        JSON.stringify({ valid: false, message: 'API key is required' }),
-        { 
-          status: 200, 
-          headers: corsHeaders 
-        }
-      );
-    }
-
-    // Test the API key with a minimal OpenAI API call
-    const modelsResponse = await fetch('https://api.openai.com/v1/models', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (modelsResponse.status !== 200) {
-      const error = await modelsResponse.json();
-      console.error("OpenAI API key validation failed:", error);
+    if (!openAIApiKey) {
+      console.log("OpenAI API key not found in environment variables");
       return new Response(
         JSON.stringify({ 
           valid: false, 
-          message: error.error?.message || 'Invalid API key',
-          status: modelsResponse.status
+          message: "OpenAI API key is not configured" 
         }),
         { 
-          status: 200, 
-          headers: corsHeaders 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
         }
       );
     }
-
-    // Get billing information
-    let billingInfo = null;
     
+    // Test the API key by making a simple request to OpenAI
     try {
-      const billingResponse = await fetch('https://api.openai.com/dashboard/billing/credit_grants', {
+      const response = await fetch('https://api.openai.com/v1/models', {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'Authorization': `Bearer ${openAIApiKey}`,
           'Content-Type': 'application/json',
         },
       });
       
-      if (billingResponse.status === 200) {
-        try {
-          billingInfo = await billingResponse.json();
-          console.log("Retrieved OpenAI billing info successfully");
-        } catch (err) {
-          console.error("Error parsing billing info:", err);
-        }
-      } else {
-        // Try alternative billing endpoint
-        const usageResponse = await fetch('https://api.openai.com/dashboard/billing/usage', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            start_date: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
-            end_date: new Date().toISOString().split('T')[0],
-          }),
-        });
-        
-        if (usageResponse.status === 200) {
-          const usageData = await usageResponse.json();
-          console.log("Retrieved OpenAI usage info:", usageData);
-          
-          // Construct billing info from usage data
-          billingInfo = {
-            total_granted: usageData.total_usage || 0,
-            total_used: usageData.total_usage || 0,
-            total_available: 0 // We can't determine available balance from usage data
-          };
-        } else {
-          console.log("Could not fetch billing info, status:", billingResponse.status);
-        }
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || "Invalid API key");
       }
+      
+      console.log("OpenAI API key is valid");
+      
+      return new Response(
+        JSON.stringify({ valid: true }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
+        }
+      );
     } catch (err) {
-      console.error("Error fetching billing info:", err);
+      console.error("Error validating OpenAI API key:", err);
+      
+      return new Response(
+        JSON.stringify({ 
+          valid: false, 
+          message: err.message || "Invalid API key" 
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 
+        }
+      );
     }
+  } catch (err) {
+    console.error("Server error:", err);
     
     return new Response(
-      JSON.stringify({ 
-        valid: true, 
-        message: 'API key is valid',
-        billing: billingInfo
-      }),
+      JSON.stringify({ error: err.message }),
       { 
-        status: 200, 
-        headers: corsHeaders 
-      }
-    );
-  } catch (error) {
-    console.error('Error in validate-openai function:', error);
-    return new Response(
-      JSON.stringify({ 
-        valid: false, 
-        message: error.message || 'Error validating OpenAI API key' 
-      }),
-      { 
-        status: 500, 
-        headers: corsHeaders 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }

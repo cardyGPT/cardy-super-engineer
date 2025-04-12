@@ -24,15 +24,106 @@ const StoryDetail: React.FC = () => {
   const [copiedState, setCopiedState] = useState<{[key: string]: boolean}>({});
   const { toast } = useToast();
   const contentRef = useRef<HTMLDivElement>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Reset state when selected ticket changes
+  // Helper function to safely handle potential object content
+  const safeStringify = (content: any): string => {
+    if (content === null || content === undefined) return "";
+    
+    if (typeof content === 'string') return content;
+    
+    if (typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content object:", e);
+        return "[Content formatting error]";
+      }
+    }
+    
+    return String(content);
+  };
+
+  // Load saved artifacts when the selected ticket changes
   useEffect(() => {
     setLldContent("");
     setCodeContent("");
     setTestContent("");
     setGenerationError(null);
     setActiveTab("lld");
+    
+    const loadArtifacts = async () => {
+      if (!selectedTicket) return;
+      
+      setIsLoading(true);
+      
+      try {
+        const { data, error } = await supabase
+          .from('story_artifacts')
+          .select('*')
+          .eq('story_id', safeStringify(selectedTicket.key))
+          .single();
+        
+        if (error && error.code !== 'PGRST116') {
+          console.error("Error loading artifacts:", error);
+          return;
+        }
+        
+        if (data) {
+          setLldContent(data.lld_content || "");
+          setCodeContent(data.code_content || "");
+          setTestContent(data.test_content || "");
+        }
+      } catch (err) {
+        console.error("Error loading artifacts:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    loadArtifacts();
   }, [selectedTicket]);
+
+  // Save artifacts when content changes
+  useEffect(() => {
+    const saveArtifacts = async () => {
+      if (!selectedTicket) return;
+      
+      try {
+        const storyId = safeStringify(selectedTicket.key);
+        const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
+        const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
+        
+        const { data, error } = await supabase
+          .from('story_artifacts')
+          .upsert({
+            story_id: storyId,
+            project_id: projectId,
+            sprint_id: sprintId,
+            lld_content: lldContent,
+            code_content: codeContent,
+            test_content: testContent
+          }, {
+            onConflict: 'story_id'
+          });
+        
+        if (error) {
+          console.error("Error saving artifacts:", error);
+        }
+      } catch (err) {
+        console.error("Error saving artifacts:", err);
+      }
+    };
+    
+    // Debounce the save operation to avoid too many database calls
+    const timer = setTimeout(() => {
+      if (selectedTicket && (lldContent || codeContent || testContent)) {
+        saveArtifacts();
+      }
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [selectedTicket, lldContent, codeContent, testContent]);
 
   // Reset copied state after a delay
   useEffect(() => {
@@ -58,27 +149,8 @@ const StoryDetail: React.FC = () => {
     
     toast({
       title: "Copied to clipboard",
-      description: `${type.toUpperCase()} content has been copied to your clipboard.`,
-      variant: "success",
+      description: `${type.toUpperCase()} content has been copied to your clipboard.`
     });
-  };
-
-  // Helper function to safely handle potential object content
-  const safeStringify = (content: any): string => {
-    if (content === null || content === undefined) return "";
-    
-    if (typeof content === 'string') return content;
-    
-    if (typeof content === 'object') {
-      try {
-        return JSON.stringify(content);
-      } catch (e) {
-        console.error("Error stringifying content object:", e);
-        return "[Content formatting error]";
-      }
-    }
-    
-    return String(content);
   };
 
   const handleGenerateContent = async (type: 'lld' | 'code' | 'tests') => {
@@ -139,8 +211,7 @@ const StoryDetail: React.FC = () => {
       
       toast({
         title: "Content Generated",
-        description: `${type.toUpperCase()} has been successfully generated.`,
-        variant: "success",
+        description: `${type.toUpperCase()} has been successfully generated.`
       });
     } catch (error: any) {
       console.error(`Error generating ${type}:`, error);
@@ -149,7 +220,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Generation Failed",
         description: error.message || `Failed to generate ${type}`,
-        variant: "destructive",
+        variant: "destructive"
       });
     } finally {
       setIsGenerating(false);
@@ -161,7 +232,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Download Error",
         description: "No content available to download",
-        variant: "destructive",
+        variant: "destructive"
       });
       return;
     }
@@ -169,7 +240,7 @@ const StoryDetail: React.FC = () => {
     // Show loading toast
     toast({
       title: "Preparing Download",
-      description: "Creating PDF document...",
+      description: "Creating PDF document..."
     });
 
     try {
@@ -186,8 +257,7 @@ const StoryDetail: React.FC = () => {
       if (result) {
         toast({
           title: "Download Complete",
-          description: `${contentLabel} document has been downloaded successfully.`,
-          variant: "success",
+          description: `${contentLabel} document has been downloaded successfully.`
         });
       } else {
         throw new Error("Failed to generate PDF");
@@ -197,7 +267,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Download Failed",
         description: "There was a problem creating your PDF. Please try again.",
-        variant: "destructive",
+        variant: "destructive"
       });
     }
   };
@@ -224,8 +294,8 @@ const StoryDetail: React.FC = () => {
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-xl">{selectedTicket.summary}</CardTitle>
-              <CardDescription className="mt-1">{selectedTicket.key} • {selectedTicket.status}</CardDescription>
+              <CardTitle className="text-xl">{safeStringify(selectedTicket.summary)}</CardTitle>
+              <CardDescription className="mt-1">{safeStringify(selectedTicket.key)} • {safeStringify(selectedTicket.status)}</CardDescription>
             </div>
           </div>
         </CardHeader>
@@ -233,14 +303,14 @@ const StoryDetail: React.FC = () => {
           <div className="prose prose-sm max-w-none">
             <h3 className="text-base font-medium mb-2">Description</h3>
             <div className="bg-muted p-3 rounded-md whitespace-pre-wrap text-sm">
-              {selectedTicket.description || "No description provided."}
+              {safeStringify(selectedTicket.description) || "No description provided."}
             </div>
             
             {selectedTicket.acceptance_criteria && (
               <>
                 <h3 className="text-base font-medium mt-4 mb-2">Acceptance Criteria</h3>
                 <div className="bg-muted p-3 rounded-md whitespace-pre-wrap text-sm">
-                  {selectedTicket.acceptance_criteria}
+                  {safeStringify(selectedTicket.acceptance_criteria)}
                 </div>
               </>
             )}
@@ -336,6 +406,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-5/6" />
                 </div>
+              ) : isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
               ) : (
                 <Textarea 
                   value={lldContent} 
@@ -401,6 +477,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-5/6" />
+                </div>
+              ) : isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
                 <Textarea 
@@ -468,6 +550,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-5/6" />
                 </div>
+              ) : isLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-3/4" />
+                </div>
               ) : (
                 <Textarea 
                   value={testContent} 
@@ -485,4 +573,3 @@ const StoryDetail: React.FC = () => {
 };
 
 export default StoryDetail;
-

@@ -1,248 +1,735 @@
 
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import JiraLogin from "@/components/stories/JiraLogin";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { 
-  Mail, 
-  Settings, 
-  Shield, 
-  CheckCircle, 
-  AlertTriangle, 
-  Lock, 
-  Key, 
-  FileText, 
-  Download
-} from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import OpenAISettings from "@/components/settings/OpenAISettings";
-import { useStories } from "@/contexts/StoriesContext";
+import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/components/ui/use-toast";
+import { Key, Mail, Save, Factory, Link2, CheckCircle, AlertTriangle, Github, FileText, Shield } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
 
-const SettingsPage = () => {
-  const [activeTab, setActiveTab] = useState("jira");
-  const { isAuthenticated: isJiraAuthenticated } = useStories();
-  const [isOpenAIConfigured, setIsOpenAIConfigured] = useState(false);
-  const [isGSuiteConfigured, setIsGSuiteConfigured] = useState(false);
+const SettingsPage: React.FC = () => {
+  // Jira Settings
+  const [jiraDomain, setJiraDomain] = useState<string>("");
+  const [jiraEmail, setJiraEmail] = useState<string>("");
+  const [jiraToken, setJiraToken] = useState<string>("");
+  const [jiraConnected, setJiraConnected] = useState<boolean>(false);
   
-  // Check if OpenAI API is configured on component mount
-  useEffect(() => {
-    const checkConfigurations = async () => {
-      try {
-        // Check OpenAI configuration
-        const openAIResponse = await supabase.functions.invoke('validate-openai', {});
-        if (!openAIResponse.error && openAIResponse.data?.valid) {
-          setIsOpenAIConfigured(true);
-        }
+  // OpenAI Settings
+  const [openAIKey, setOpenAIKey] = useState<string>("");
+  const [openAIConnected, setOpenAIConnected] = useState<boolean>(false);
+  
+  // GSuite Settings
+  const [gsuiteApiKey, setGsuiteApiKey] = useState<string>("");
+  const [gsuiteDriveFolder, setGsuiteDriveFolder] = useState<string>("");
+  const [gsuiteAutoSync, setGsuiteAutoSync] = useState<boolean>(false);
+  const [gsuiteConnected, setGsuiteConnected] = useState<boolean>(false);
+  
+  // General state
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
-        // Check GSuite configuration
-        const gsuiteResponse = await supabase.functions.invoke('validate-gsuite', {});
-        if (!gsuiteResponse.error && gsuiteResponse.data?.valid) {
-          setIsGSuiteConfigured(true);
+  // Load settings on component mount
+  useEffect(() => {
+    const loadSettings = async () => {
+      setIsLoading(true);
+      
+      try {
+        // Check Jira connection
+        const jiraCredentials = JSON.parse(localStorage.getItem("jira_credentials") || "null");
+        if (jiraCredentials) {
+          setJiraDomain(jiraCredentials.domain || "");
+          setJiraEmail(jiraCredentials.email || "");
+          setJiraToken(""); // Don't show the token for security
+          setJiraConnected(true);
+        }
+        
+        // Check OpenAI connection
+        const { data: openAIData, error: openAIError } = await supabase.functions.invoke('validate-openai', {});
+        
+        if (!openAIError && openAIData?.valid) {
+          setOpenAIConnected(true);
+        }
+        
+        // Check GSuite connection
+        const { data: gsuiteData, error: gsuiteError } = await supabase.functions.invoke('validate-gsuite', {});
+        
+        if (!gsuiteError && gsuiteData?.valid) {
+          setGsuiteConnected(true);
+          
+          if (gsuiteData.settings) {
+            setGsuiteDriveFolder(gsuiteData.settings.defaultDriveFolder || "");
+            setGsuiteAutoSync(gsuiteData.settings.autoSync || false);
+          }
         }
       } catch (err) {
-        console.error("Error checking API configurations:", err);
+        console.error("Error loading settings:", err);
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    checkConfigurations();
+    loadSettings();
   }, []);
+
+  const saveJiraSettings = async () => {
+    if (!jiraDomain || !jiraEmail || !jiraToken) {
+      toast({
+        title: "Validation Error",
+        description: "Please fill in all Jira connection fields",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    try {
+      // Normalize the domain (ensure it has https:// prefix)
+      let normalizedDomain = jiraDomain.trim();
+      if (!normalizedDomain.startsWith('http')) {
+        normalizedDomain = `https://${normalizedDomain}`;
+      }
+      
+      // Remove trailing slash if present
+      if (normalizedDomain.endsWith('/')) {
+        normalizedDomain = normalizedDomain.slice(0, -1);
+      }
+      
+      const credentials = {
+        domain: normalizedDomain,
+        email: jiraEmail.trim(),
+        token: jiraToken.trim()
+      };
+      
+      // Test the connection
+      const { data, error } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: 'myself',
+          credentials
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (!data || data.errorMessages) {
+        const errorMsg = data.errorMessages ? data.errorMessages.join(", ") : "Invalid credentials";
+        throw new Error(errorMsg);
+      }
+      
+      // If connection test passed, save credentials
+      localStorage.setItem("jira_credentials", JSON.stringify(credentials));
+      setJiraConnected(true);
+      
+      toast({
+        title: "Jira Connected",
+        description: `Successfully connected to Jira as ${data.displayName || data.name || jiraEmail}`
+      });
+      
+      return true;
+    } catch (err: any) {
+      console.error("Error saving Jira settings:", err);
+      
+      toast({
+        title: "Connection Error",
+        description: err.message || "Failed to connect to Jira",
+        variant: "destructive"
+      });
+      
+      return false;
+    }
+  };
+
+  const saveOpenAISettings = async () => {
+    if (!openAIKey) {
+      toast({
+        title: "Validation Error",
+        description: "Please enter your OpenAI API key",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    try {
+      const { data, error } = await supabase.functions.invoke('store-api-keys', {
+        body: { 
+          provider: 'openai',
+          apiKey: openAIKey.trim()
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Verify key is valid
+      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('validate-openai', {});
+      
+      if (verifyError || !verifyData?.valid) {
+        const errorMsg = verifyData?.message || verifyError?.message || "Invalid API key";
+        throw new Error(errorMsg);
+      }
+      
+      setOpenAIConnected(true);
+      setOpenAIKey(""); // Clear the key for security
+      
+      toast({
+        title: "OpenAI Connected",
+        description: "Successfully connected to OpenAI API"
+      });
+      
+      return true;
+    } catch (err: any) {
+      console.error("Error saving OpenAI settings:", err);
+      
+      toast({
+        title: "Connection Error",
+        description: err.message || "Failed to connect to OpenAI",
+        variant: "destructive"
+      });
+      
+      return false;
+    }
+  };
+
+  const saveGSuiteSettings = async () => {
+    try {
+      let success = true;
+      
+      // If API key provided, save it securely
+      if (gsuiteApiKey.trim()) {
+        const { data: storeData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
+          body: { 
+            provider: 'gsuite',
+            apiKey: gsuiteApiKey.trim()
+          }
+        });
+        
+        if (storeError) {
+          throw new Error(storeError.message);
+        }
+      }
+      
+      // Save other GSuite settings
+      const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
+        body: {
+          defaultDriveFolder: gsuiteDriveFolder.trim(),
+          autoSync: gsuiteAutoSync
+        }
+      });
+      
+      if (settingsError) {
+        throw new Error(settingsError.message);
+      }
+      
+      // Verify that the settings were saved correctly
+      const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-gsuite', {});
+      
+      if (validationError) {
+        throw new Error(validationError.message);
+      }
+      
+      setGsuiteConnected(validationData?.valid || false);
+      setGsuiteApiKey(""); // Clear API key for security
+      
+      if (validationData?.valid) {
+        toast({
+          title: "GSuite Connected",
+          description: "Successfully connected to GSuite API"
+        });
+      } else if (gsuiteApiKey.trim()) {
+        success = false;
+        throw new Error(validationData?.message || "Could not validate GSuite API key");
+      }
+      
+      return success;
+    } catch (err: any) {
+      console.error("Error saving GSuite settings:", err);
+      
+      toast({
+        title: "Connection Error",
+        description: err.message || "Failed to connect to GSuite",
+        variant: "destructive"
+      });
+      
+      return false;
+    }
+  };
+
+  const handleSaveSettings = async (tab: string) => {
+    setIsSaving(true);
+    
+    try {
+      let success = false;
+      
+      switch (tab) {
+        case "jira":
+          success = await saveJiraSettings();
+          break;
+        case "openai":
+          success = await saveOpenAISettings();
+          break;
+        case "gsuite":
+          success = await saveGSuiteSettings();
+          break;
+        default:
+          break;
+      }
+      
+      if (success) {
+        // If needed, perform any additional actions on success
+      }
+    } catch (err) {
+      console.error(`Error saving ${tab} settings:`, err);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const disconnectJira = () => {
+    localStorage.removeItem("jira_credentials");
+    setJiraDomain("");
+    setJiraEmail("");
+    setJiraToken("");
+    setJiraConnected(false);
+    
+    toast({
+      title: "Jira Disconnected",
+      description: "Successfully disconnected from Jira"
+    });
+  };
+
+  const disconnectOpenAI = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('delete-api-key', {
+        body: { provider: 'openai' }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setOpenAIConnected(false);
+      setOpenAIKey("");
+      
+      toast({
+        title: "OpenAI Disconnected",
+        description: "Successfully disconnected from OpenAI API"
+      });
+    } catch (err: any) {
+      console.error("Error disconnecting OpenAI:", err);
+      
+      toast({
+        title: "Error",
+        description: err.message || "Failed to disconnect OpenAI",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const disconnectGSuite = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('delete-gsuite-config', {});
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setGsuiteConnected(false);
+      setGsuiteApiKey("");
+      setGsuiteDriveFolder("");
+      setGsuiteAutoSync(false);
+      
+      toast({
+        title: "GSuite Disconnected",
+        description: "Successfully disconnected from GSuite"
+      });
+    } catch (err: any) {
+      console.error("Error disconnecting GSuite:", err);
+      
+      toast({
+        title: "Error",
+        description: err.message || "Failed to disconnect GSuite",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
         <h1 className="text-3xl font-bold mb-6">Settings</h1>
         
-        <div className="mb-8">
-          <Alert className="bg-blue-50 border border-blue-200">
-            <Shield className="h-5 w-5 text-blue-600" />
-            <AlertTitle className="text-blue-800">Security Best Practices</AlertTitle>
-            <AlertDescription className="text-blue-700">
-              <p className="mb-2">Your API keys and credentials are handled according to industry security standards:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>All API keys are stored as encrypted environment variables, never in client-side code</li>
-                <li>Communication with external services happens via secure Edge Functions</li>
-                <li>Keys are never exposed to the browser or included in application bundles</li>
-                <li>Secure HTTPS connections are used for all API communications</li>
-                <li>Regular security audits and updates are applied to our infrastructure</li>
-              </ul>
-            </AlertDescription>
-          </Alert>
-        </div>
-        
-        <Tabs defaultValue="jira" value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="mb-6 w-full md:w-auto flex">
-            <TabsTrigger value="jira" className="relative flex-1 md:flex-auto">
-              Jira Connection
-              {isJiraAuthenticated && (
-                <span className="absolute -top-1 -right-1">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+        <Tabs defaultValue="jira" className="space-y-6">
+          <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
+            <TabsTrigger value="jira" className="relative">
+              Jira
+              {jiraConnected && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-none absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="openai" className="relative flex-1 md:flex-auto">
-              OpenAI API
-              {isOpenAIConfigured && (
-                <span className="absolute -top-1 -right-1">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+            <TabsTrigger value="openai" className="relative">
+              OpenAI
+              {openAIConnected && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-none absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
               )}
             </TabsTrigger>
-            <TabsTrigger value="gsuite" className="relative flex-1 md:flex-auto">
-              GSuite Integration
-              {isGSuiteConfigured ? (
-                <span className="absolute -top-1 -right-1">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                </span>
-              ) : (
-                <span className="absolute -top-1 -right-1">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
+            <TabsTrigger value="gsuite" className="relative">
+              GSuite
+              {gsuiteConnected && (
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  <span className="animate-none absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
                 </span>
               )}
             </TabsTrigger>
           </TabsList>
           
-          <TabsContent value="jira" className="space-y-4">
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">Jira Connection</h2>
-              <JiraLogin />
-              
-              <div className="mt-6">
-                <h3 className="text-md font-medium mb-2 flex items-center">
-                  <Lock className="h-4 w-4 mr-2 text-green-600" />
-                  Security Information
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Your Jira credentials are securely handled:
-                </p>
-                <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-                  <li>Authentication tokens are securely stored as encrypted environment variables</li>
-                  <li>Tokens are never exposed to the client-side application</li>
-                  <li>All Jira API requests are proxied through secure Edge Functions</li>
-                  <li>Secure HTTPS connections are used for all communications with Jira</li>
-                </ul>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="openai" className="space-y-4">
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">OpenAI API Settings</h2>
-              <OpenAISettings onConfigChange={(configured) => setIsOpenAIConfigured(configured)} />
-              
-              <div className="mt-6">
-                <h3 className="text-md font-medium mb-2 flex items-center">
-                  <Key className="h-4 w-4 mr-2 text-green-600" />
-                  API Key Security
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Your OpenAI API key is protected:
-                </p>
-                <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-                  <li>API key is stored as an encrypted secret in our secure environment</li>
-                  <li>AI requests are processed through secure Edge Functions</li>
-                  <li>Your API key is never exposed to browser code or included in application bundles</li>
-                  <li>Usage is monitored for suspicious activity</li>
-                </ul>
-              </div>
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="gsuite" className="space-y-4">
-            <div className="p-6 bg-white rounded-lg shadow-sm">
-              <h2 className="text-xl font-semibold mb-4">GSuite Integration</h2>
-              <p className="text-gray-500 mb-4">
-                Connect your Google Workspace account to export content directly to Google Docs, Sheets, and more.
-              </p>
-              
-              {isGSuiteConfigured ? (
-                <Alert className="bg-green-50 border border-green-200 mb-4">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <AlertTitle className="text-green-800">Connected to GSuite</AlertTitle>
-                  <AlertDescription className="text-green-700">
-                    Your GSuite integration is configured and working properly.
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <Alert className="bg-amber-50 border border-amber-200 mb-4">
-                  <AlertTriangle className="h-5 w-5 text-amber-500" />
-                  <AlertTitle className="text-amber-800">GSuite Integration Not Configured</AlertTitle>
-                  <AlertDescription className="text-amber-700">
-                    Configure GSuite integration to enable document export features.
-                  </AlertDescription>
-                </Alert>
-              )}
-              
-              <Button asChild>
-                <Link to="/gsuite-settings">
-                  <Mail className="h-4 w-4 mr-2" />
-                  GSuite Settings
-                </Link>
-              </Button>
-              
-              <div className="mt-6">
-                <h3 className="text-md font-medium mb-2 flex items-center">
-                  <Shield className="h-4 w-4 mr-2 text-green-600" />
-                  Google API Security
-                </h3>
-                <p className="text-sm text-gray-600 mb-2">
-                  Your Google API credentials are secured:
-                </p>
-                <ul className="list-disc pl-5 text-sm text-gray-600 space-y-1">
-                  <li>API keys are stored as encrypted secrets in our secure environment</li>
-                  <li>Google API requests are processed through secure Edge Functions</li>
-                  <li>Your API key is never exposed to browser code</li>
-                  <li>Minimal required permissions are requested for each operation</li>
-                  <li>All requests use secure HTTPS connections</li>
-                </ul>
-              </div>
-            </div>
-            
+          <TabsContent value="jira">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
-                  <Download className="h-5 w-5 mr-2" />
-                  Document Export Options
+                  <Factory className="h-6 w-6 mr-2" />
+                  Jira Connection
+                  {jiraConnected && (
+                    <span className="ml-3 inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                    </span>
+                  )}
                 </CardTitle>
                 <CardDescription>
-                  Configure how you want to export your generated content
+                  Connect your Jira account to fetch and manage stories
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-md font-medium mb-2 flex items-center">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Available Export Formats
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      <Button variant="outline" className="justify-start">
-                        <svg className="h-4 w-4 mr-2 text-red-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" />
-                          <path d="M14 2V8H20" fill="white" />
-                          <path d="M16 13H8V15H16V13Z" fill="white" />
-                          <path d="M16 17H8V19H16V17Z" fill="white" />
-                          <path d="M10 9H8V11H10V9Z" fill="white" />
-                        </svg>
-                        PDF Download
-                      </Button>
-                      <Button variant="outline" className="justify-start">
-                        <svg className="h-4 w-4 mr-2 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.9 22 6 22H18C19.1 22 20 21.1 20 20V8L14 2Z" />
-                          <path d="M14 2V8H20" fill="white" />
-                          <path d="M16 13H8V15H16V13Z" fill="white" />
-                          <path d="M16 17H8V19H16V17Z" fill="white" />
-                          <path d="M10 9H8V11H10V9Z" fill="white" />
-                        </svg>
-                        Google Docs Export
-                      </Button>
-                    </div>
-                  </div>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="jira-domain">Jira Domain</Label>
+                  <Input 
+                    id="jira-domain" 
+                    placeholder="your-company.atlassian.net" 
+                    value={jiraDomain}
+                    onChange={(e) => setJiraDomain(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your Jira domain (e.g., your-company.atlassian.net)
+                  </p>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jira-email">Email</Label>
+                  <Input 
+                    id="jira-email" 
+                    type="email" 
+                    placeholder="your.email@company.com" 
+                    value={jiraEmail}
+                    onChange={(e) => setJiraEmail(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="jira-token">API Token</Label>
+                  <Input 
+                    id="jira-token" 
+                    type="password" 
+                    placeholder="Your Jira API token" 
+                    value={jiraToken}
+                    onChange={(e) => setJiraToken(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Generate an API token in your{" "}
+                    <a 
+                      href="https://id.atlassian.com/manage-profile/security/api-tokens" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      Atlassian account settings
+                    </a>
+                  </p>
+                </div>
+                
+                <Alert className="bg-blue-50 border border-blue-200">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800">Security Information</AlertTitle>
+                  <AlertDescription className="text-blue-700">
+                    <p className="mb-2">Your Jira credentials are secured using industry best practices:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>API tokens are stored in your browser's local storage</li>
+                      <li>API requests are processed through secure Edge Functions</li>
+                      <li>We never store your credentials on our servers</li>
+                      <li>Secure HTTPS connections are used for all API communications</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
               </CardContent>
+              <CardFooter className="flex justify-between">
+                {jiraConnected ? (
+                  <>
+                    <Button variant="outline" onClick={disconnectJira} disabled={isSaving || isLoading}>
+                      Disconnect
+                    </Button>
+                    <Button onClick={() => handleSaveSettings("jira")} disabled={isSaving || isLoading}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                          Saving...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Save className="h-4 w-4" />
+                          Update Connection
+                        </span>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleSaveSettings("jira")} 
+                    disabled={isSaving || isLoading}
+                  >
+                    {isSaving ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                        Connecting...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4" />
+                        Connect to Jira
+                      </span>
+                    )}
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="openai">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Github className="h-6 w-6 mr-2" />
+                  OpenAI API Connection
+                  {openAIConnected && (
+                    <span className="ml-3 inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Connect your OpenAI API key to generate content for your Jira stories
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="openai-key">OpenAI API Key</Label>
+                  <Input 
+                    id="openai-key" 
+                    type="password" 
+                    placeholder="sk-..." 
+                    value={openAIKey}
+                    onChange={(e) => setOpenAIKey(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Get your API key from the{" "}
+                    <a 
+                      href="https://platform.openai.com/api-keys" 
+                      target="_blank" 
+                      rel="noreferrer"
+                      className="text-blue-500 hover:text-blue-700"
+                    >
+                      OpenAI dashboard
+                    </a>
+                  </p>
+                </div>
+                
+                <Alert className="bg-blue-50 border border-blue-200">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800">Security Information</AlertTitle>
+                  <AlertDescription className="text-blue-700">
+                    <p className="mb-2">Your OpenAI API key is secured using industry best practices:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>API keys are stored as encrypted environment variables</li>
+                      <li>Keys are never exposed to browser code or included in application bundles</li>
+                      <li>All API requests are processed through secure Edge Functions</li>
+                      <li>Secure HTTPS connections are used for all API communications</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                {openAIConnected ? (
+                  <>
+                    <Button variant="outline" onClick={disconnectOpenAI} disabled={isSaving || isLoading}>
+                      Disconnect
+                    </Button>
+                    <Button onClick={() => handleSaveSettings("openai")} disabled={isSaving || isLoading}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                          Saving...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Save className="h-4 w-4" />
+                          Update API Key
+                        </span>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleSaveSettings("openai")} 
+                    disabled={isSaving || isLoading}
+                  >
+                    {isSaving ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                        Connecting...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4" />
+                        Connect OpenAI API
+                      </span>
+                    )}
+                  </Button>
+                )}
+              </CardFooter>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="gsuite">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Mail className="h-6 w-6 mr-2" />
+                  Google Workspace Connection
+                  {gsuiteConnected && (
+                    <span className="ml-3 inline-flex items-center bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Connected
+                    </span>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  Connect your Google Workspace account to export content to Google Docs
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="gsuite-key">Google API Key</Label>
+                  <Input 
+                    id="gsuite-key" 
+                    type="password" 
+                    placeholder="Your Google API key" 
+                    value={gsuiteApiKey}
+                    onChange={(e) => setGsuiteApiKey(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This API key must have access to Google Drive and Google Docs APIs
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="drive-folder">Default Drive Folder ID (optional)</Label>
+                  <Input 
+                    id="drive-folder" 
+                    placeholder="Enter folder ID from Google Drive" 
+                    value={gsuiteDriveFolder}
+                    onChange={(e) => setGsuiteDriveFolder(e.target.value)}
+                    disabled={isLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Documents will be saved to this folder by default
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between space-x-2">
+                  <Label htmlFor="auto-sync" className="flex-1">Auto-sync with Google Drive</Label>
+                  <Switch 
+                    id="auto-sync" 
+                    checked={gsuiteAutoSync}
+                    onCheckedChange={setGsuiteAutoSync}
+                    disabled={isLoading}
+                  />
+                </div>
+                
+                <Alert className="bg-blue-50 border border-blue-200">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800">Security Information</AlertTitle>
+                  <AlertDescription className="text-blue-700">
+                    <p className="mb-2">Your Google API credentials are secured using industry best practices:</p>
+                    <ul className="list-disc pl-5 space-y-1">
+                      <li>API keys are stored as encrypted environment variables</li>
+                      <li>Keys are never exposed to browser code or included in application bundles</li>
+                      <li>All Google API requests are processed through secure Edge Functions</li>
+                      <li>Secure HTTPS connections are used for all API communications</li>
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+              <CardFooter className="flex justify-between">
+                {gsuiteConnected ? (
+                  <>
+                    <Button variant="outline" onClick={disconnectGSuite} disabled={isSaving || isLoading}>
+                      Disconnect
+                    </Button>
+                    <Button onClick={() => handleSaveSettings("gsuite")} disabled={isSaving || isLoading}>
+                      {isSaving ? (
+                        <span className="flex items-center gap-2">
+                          <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                          Saving...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <Save className="h-4 w-4" />
+                          Save Settings
+                        </span>
+                      )}
+                    </Button>
+                  </>
+                ) : (
+                  <Button 
+                    className="w-full" 
+                    onClick={() => handleSaveSettings("gsuite")} 
+                    disabled={isSaving || isLoading}
+                  >
+                    {isSaving ? (
+                      <span className="flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                        Connecting...
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-2">
+                        <Link2 className="h-4 w-4" />
+                        Connect to GSuite
+                      </span>
+                    )}
+                  </Button>
+                )}
+              </CardFooter>
             </Card>
           </TabsContent>
         </Tabs>
