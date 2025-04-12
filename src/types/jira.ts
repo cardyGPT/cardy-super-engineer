@@ -1,4 +1,3 @@
-
 export interface JiraTicket {
   id: string;
   key: string;
@@ -14,6 +13,8 @@ export interface JiraTicket {
   created_at?: string;
   updated_at?: string;
   domain?: string;
+  projectId?: string;
+  sprintId?: string;
 }
 
 export interface JiraProject {

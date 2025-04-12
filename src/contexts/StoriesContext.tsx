@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
 import { JiraCredentials, StoriesContextType, JiraTicket, JiraProject, JiraSprint, JiraGenerationRequest, JiraGenerationResponse } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
@@ -418,7 +417,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           labels: issue.fields?.labels || [],
           created_at: issue.fields?.created,
           updated_at: issue.fields?.updated,
-          domain: credentials.domain
+          domain: credentials.domain,
+          projectId: selectedProject?.id || null,
+          sprintId: sprintToUse
         }));
         
         setTickets(formattedTickets);
@@ -467,7 +468,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }, 300);
     }
-  }, [credentials, selectedSprint, toast, tickets.length]);
+  }, [credentials, selectedSprint, toast, tickets.length, selectedProject]);
 
   useEffect(() => {
     emptySprintsProjectsRef.current.clear();
@@ -543,7 +544,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [selectedProject, sprints, selectedSprint]);
 
-  // Helper function to safely convert any content to string
   const safeStringify = (content: any): string => {
     if (typeof content === 'string') {
       return content;
@@ -588,7 +588,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (data) {
         console.log("Content generation successful");
         
-        // Ensure all response data is converted to strings
         let responseStr = typeof data.response === 'string' ? 
           data.response : safeStringify(data.response);
         
@@ -628,7 +627,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       console.log(`Pushing content to Jira ticket ${ticketId}...`);
       
-      // Ensure content is a string before sending to Jira
       const safeContent = typeof content === 'string' ? content : safeStringify(content);
       
       const { data, error: apiError } = await supabase.functions.invoke('jira-api', {
