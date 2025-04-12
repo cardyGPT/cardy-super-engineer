@@ -1,5 +1,5 @@
 
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
   SidebarContent,
@@ -22,6 +22,7 @@ import {
 
 export function AppSidebar() {
   const { state } = useSidebar();
+  const location = useLocation();
   
   return (
     <>
@@ -38,9 +39,7 @@ export function AppSidebar() {
               <SidebarMenuButton asChild tooltip="Projects">
                 <Link
                   to="/projects"
-                  className={(props) =>
-                    window.location.pathname === "/projects" ? "text-primary" : ""
-                  }
+                  className={location.pathname === "/projects" ? "text-primary" : ""}
                 >
                   <LayoutDashboard className="h-5 w-5" />
                   <span>Projects</span>
@@ -51,9 +50,7 @@ export function AppSidebar() {
               <SidebarMenuButton asChild tooltip="Documents">
                 <Link
                   to="/documents"
-                  className={(props) =>
-                    window.location.pathname === "/documents" ? "text-primary" : ""
-                  }
+                  className={location.pathname === "/documents" ? "text-primary" : ""}
                 >
                   <FileText className="h-5 w-5" />
                   <span>Documents</span>
@@ -64,9 +61,7 @@ export function AppSidebar() {
               <SidebarMenuButton asChild tooltip="Data Models">
                 <Link
                   to="/data-models"
-                  className={(props) =>
-                    window.location.pathname === "/data-models" ? "text-primary" : ""
-                  }
+                  className={location.pathname === "/data-models" ? "text-primary" : ""}
                 >
                   <Database className="h-5 w-5" />
                   <span>Data Models</span>
