@@ -72,8 +72,8 @@ const StoryDetailWrapper = () => {
 
   return (
     <div className="p-6">
-      {/* Changed to pass the selectedTicket directly as per StoryDetail's expected props */}
-      <StoryDetail ticket={selectedTicket} />
+      {/* Remove the ticket prop since StoryDetail doesn't accept it */}
+      <StoryDetail />
       <Separator className="my-6" />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-8">
@@ -107,7 +107,6 @@ const StoryDetailWrapper = () => {
         <TabsContent value="lld" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              {/* Added required title prop */}
               <ContentDisplay 
                 content={lldContent} 
                 type="lld" 
@@ -122,7 +121,6 @@ const StoryDetailWrapper = () => {
         <TabsContent value="code" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              {/* Added required title prop */}
               <ContentDisplay 
                 content={codeContent} 
                 type="code" 
@@ -137,7 +135,6 @@ const StoryDetailWrapper = () => {
         <TabsContent value="tests" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              {/* Changed type from "test" to "tests" to match allowed types */}
               <ContentDisplay 
                 content={testContent} 
                 type="tests" 
@@ -146,7 +143,6 @@ const StoryDetailWrapper = () => {
               />
             </CardContent>
           </Card>
-          {/* Changed artifactType from "test" to "test" for consistency */}
           <ExportToGSuite storyId={selectedTicket.id} artifactType="test" content={testContent} />
         </TabsContent>
       </Tabs>
