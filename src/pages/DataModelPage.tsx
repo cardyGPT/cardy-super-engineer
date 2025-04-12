@@ -171,8 +171,8 @@ const DataModelPage = () => {
           
           {isFullscreen ? (
             selectedDocument && currentDataModel ? (
-              <div className="h-full flex flex-col">
-                <div className="flex-1 overflow-auto">
+              <div className="h-full w-full flex flex-col">
+                <div className="flex-1 overflow-auto h-[calc(100vh-120px)]">
                   <ERDiagramViewer dataModel={currentDataModel} />
                 </div>
                 <div className="absolute bottom-4 right-4">

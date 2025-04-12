@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, dataModel, documentsContext, useAllProjects } = await req.json();
+    const { message, dataModel, documentsContext, useAllProjects, projectsContext, projectTypesContext, selectedDocuments } = await req.json();
 
     if (!openAIApiKey) {
       console.error("OpenAI API key is missing");
@@ -34,12 +34,20 @@ serve(async (req) => {
       modelRelationshipCount: normalizedDataModel.relationships.length,
       hasDocumentsContext: Boolean(documentsContext),
       useAllProjects: Boolean(useAllProjects),
+      hasProjectsContext: Boolean(projectsContext),
+      hasProjectTypesContext: Boolean(projectTypesContext),
+      hasSelectedDocuments: Boolean(selectedDocuments),
       messageLength: message.length
     });
 
     // Prepare entities and relationships sections
     const entitiesSection = prepareEntitiesSection(normalizedDataModel.entities);
     const relationshipsSection = prepareRelationshipsSection(normalizedDataModel);
+
+    // Prepare context sections for projects, project types, and selected documents
+    const projectsSection = projectsContext ? `Selected Projects: ${projectsContext.join(", ")}` : "";
+    const projectTypesSection = projectTypesContext ? `Selected Project Types: ${projectTypesContext.join(", ")}` : "";
+    const selectedDocsSection = selectedDocuments ? `Selected Documents: ${selectedDocuments.join(", ")}` : "";
 
     // Enhanced system message to provide more comprehensive context and better directions
     const systemMessage = `You are an expert AI assistant called Cardy Mind. Your task is to answer questions about data models and project documentation with precision and clarity.
@@ -54,6 +62,10 @@ ${relationshipsSection}
 
 ${documentsContext ? `\nProject Documentation Context:\n${documentsContext}` : ''}
 
+${projectsSection ? `\n${projectsSection}` : ''}
+${projectTypesSection ? `\n${projectTypesSection}` : ''}
+${selectedDocsSection ? `\n${selectedDocsSection}` : ''}
+
 GUIDELINES:
 1. ALWAYS respond to questions directly and concisely
 2. For data model questions, explain relationships between entities clearly
@@ -62,6 +74,7 @@ GUIDELINES:
 5. For entity counts, relationship types, or other structural questions, provide specific numbers and details
 6. Be helpful and informative even for simple questions
 7. Use examples where appropriate to illustrate concepts
+8. When project, type or document filters are selected, focus your answers on that specific context
 
 IMPORTANT: Your purpose is to help users understand their data model and project documentation. Always assume you have the information required to answer questions about the provided data model or documents.`;
 

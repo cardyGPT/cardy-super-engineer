@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { DataModel, Entity, Relationship } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -43,6 +44,24 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   useEffect(() => {
     setSelectedEntity(null);
   }, [dataModel]);
+
+  // Added this effect to recalculate the relationship lines when toggle is changed
+  useEffect(() => {
+    if (showRelationshipLines && selectedEntity) {
+      // Force a re-render by updating a ref
+      const timer = setTimeout(() => {
+        // This forces a redraw of the SVG lines
+        if (canvasRef.current) {
+          const current = canvasRef.current.style.opacity;
+          canvasRef.current.style.opacity = '0.99';
+          setTimeout(() => {
+            if (canvasRef.current) canvasRef.current.style.opacity = current;
+          }, 10);
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [showRelationshipLines, selectedEntity]);
   
   const filteredEntities = dataModel.entities.filter((entity) => {
     const matchesSearch = entity.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -203,6 +222,21 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     return sourceEntity && targetEntity && sourceEntity.type !== targetEntity.type;
   };
 
+  // Added function to calculate element positions more reliably
+  const calculateElementPosition = (element: HTMLElement | null, container: HTMLElement | null) => {
+    if (!element || !container) return { x: 0, y: 0, width: 0, height: 0 };
+    
+    const elementRect = element.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    
+    return {
+      x: (elementRect.left + elementRect.width / 2) - containerRect.left,
+      y: (elementRect.top + elementRect.height / 2) - containerRect.top,
+      width: elementRect.width,
+      height: elementRect.height
+    };
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="bg-white sticky top-0 z-10 p-4 border-b">
@@ -285,23 +319,39 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
               </label>
             </div>
             
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={exportDiagram}
-              title="Export diagram"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={exportDiagram}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Export diagram</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setShowHelp(!showHelp)}
-              title="Help"
-            >
-              <Info className="h-4 w-4" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setShowHelp(!showHelp)}
+                  >
+                    <Info className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Help</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
         
@@ -351,27 +401,22 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     const targetEl = document.getElementById(`entity-${targetEntity.id}`);
                     
                     if (!sourceEl || !targetEl) return null;
+
+                    // Use the new positioning calculation function
+                    const sourcePos = calculateElementPosition(sourceEl, canvasRef.current);
+                    const targetPos = calculateElementPosition(targetEl, canvasRef.current);
                     
-                    const sourceRect = sourceEl.getBoundingClientRect();
-                    const targetRect = targetEl.getBoundingClientRect();
-                    const containerRect = canvasRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
-                    
-                    const sourceX = (sourceRect.left + sourceRect.width / 2) - containerRect.left;
-                    const sourceY = (sourceRect.top + sourceRect.height / 2) - containerRect.top;
-                    const targetX = (targetRect.left + targetRect.width / 2) - containerRect.left;
-                    const targetY = (targetRect.top + targetRect.height / 2) - containerRect.top;
-                    
-                    const scaledSourceX = sourceX / zoom;
-                    const scaledSourceY = sourceY / zoom;
-                    const scaledTargetX = targetX / zoom;
-                    const scaledTargetY = targetY / zoom;
+                    // Calculate positions with proper scaling
+                    const scaledSourceX = sourcePos.x / zoom;
+                    const scaledSourceY = sourcePos.y / zoom;
+                    const scaledTargetX = targetPos.x / zoom;
+                    const scaledTargetY = targetPos.y / zoom;
                     
                     const lineColor = getRelationshipLineColor(rel, selectedEntity.id);
                     const lineStyle = getRelationshipLineStyle(sourceEntity.type, targetEntity.type);
                     
                     const angle = Math.atan2(scaledTargetY - scaledSourceY, scaledTargetX - scaledSourceX);
                     const arrowLength = 10;
-                    const arrowWidth = 6;
                     
                     const arrowDist = 20;
                     const arrowX = scaledTargetX - arrowDist * Math.cos(angle);
