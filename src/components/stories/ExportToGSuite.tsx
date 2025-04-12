@@ -11,7 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface ExportToGSuiteProps {
   storyId: string;
-  artifactType: 'lld' | 'code' | 'test';
+  artifactType: 'lld' | 'code' | 'test' | 'all';
   content: string;
 }
 
@@ -26,7 +26,8 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
   const generateDefaultDocName = () => {
     const date = new Date().toISOString().split('T')[0];
     const type = artifactType === 'lld' ? 'Design' : 
-                artifactType === 'code' ? 'Code' : 'Test Cases';
+                artifactType === 'code' ? 'Code' : 
+                artifactType === 'test' ? 'Test Cases' : 'Complete Doc';
     
     return `Story-${storyId}-${type}-${date}`;
   };
@@ -109,22 +110,22 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-base flex items-center">
-          <FileText className="h-5 w-5 mr-2 text-blue-600" />
+      <CardHeader className="py-3">
+        <CardTitle className="text-sm flex items-center">
+          <FileText className="h-4 w-4 mr-2 text-blue-600" />
           Export to Google Docs
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="py-2">
         {error && (
-          <Alert variant="destructive" className="mb-4">
+          <Alert variant="destructive" className="mb-4 py-2">
             <AlertCircle className="h-4 w-4 mr-2" />
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         
         {isSuccess && documentUrl && (
-          <Alert className="mb-4">
+          <Alert variant="success" className="mb-4 py-2">
             <Check className="h-4 w-4 mr-2" />
             <AlertDescription>
               Document created successfully!{' '}
@@ -139,23 +140,24 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
         )}
         
         <div className="space-y-2">
-          <Label htmlFor="doc-name">Document Name</Label>
+          <Label htmlFor="doc-name" className="text-xs">Document Name</Label>
           <Input 
             id="doc-name" 
             value={docName} 
             onChange={e => setDocName(e.target.value)}
             placeholder={generateDefaultDocName()}
-            className="w-full"
+            className="w-full text-sm h-8"
             disabled={isExporting}
           />
           <p className="text-xs text-gray-500">
-            Enter a name for your Google Doc or leave blank to use the default name
+            Enter a name for your Google Doc or use the default
           </p>
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end">
+      <CardFooter className="flex justify-end pt-1 pb-3">
         <Button 
           variant="default" 
+          size="sm"
           onClick={handleExport}
           disabled={isExporting || !content || content.trim() === ''}
           className="flex items-center"

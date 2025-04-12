@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Upload, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Dialog, DialogClose } from "@/components/ui/dialog";
 
 interface DocumentUploadProps {
   projectId: string;
@@ -35,6 +36,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
   const [uploading, setUploading] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const { toast } = useToast();
+  const [uploadSuccess, setUploadSuccess] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValidationError(null);
@@ -81,6 +83,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError(null);
+    setUploadSuccess(false);
     
     if (!file) {
       toast({
@@ -140,16 +143,27 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       console.log("Upload document result:", result);
       
       setFile(null);
-      
-      if (onUploadComplete) {
-        onUploadComplete();
-      }
+      setUploadSuccess(true);
       
       toast({
         title: "Upload successful",
         description: `${file.name} has been uploaded successfully.`,
         variant: "success",
       });
+      
+      // Close the dialog automatically after successful upload
+      if (onUploadComplete) {
+        onUploadComplete();
+      }
+      
+      // Auto close dialog after 1.5 seconds
+      setTimeout(() => {
+        const closeButton = document.querySelector('[data-dialog-close]') as HTMLElement;
+        if (closeButton) {
+          closeButton.click();
+        }
+      }, 1500);
+      
     } catch (error) {
       console.error("Error in upload handler:", error);
       
@@ -210,7 +224,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
           disabled={uploading}
         />
         {docType === "data-model" && (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-gray-500">
             Upload a JSON file containing your data model. Several formats are supported.
           </p>
         )}
@@ -221,6 +235,14 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
           <AlertCircle className="h-4 w-4" />
           <AlertTitle>Validation Error</AlertTitle>
           <AlertDescription>{validationError}</AlertDescription>
+        </Alert>
+      )}
+      
+      {uploadSuccess && (
+        <Alert variant="success">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Success</AlertTitle>
+          <AlertDescription>Document uploaded successfully!</AlertDescription>
         </Alert>
       )}
       

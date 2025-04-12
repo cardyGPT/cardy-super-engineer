@@ -2,7 +2,7 @@
 import { Project } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, FileUp, Database } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useProject } from "@/contexts/ProjectContext";
 import { useNavigate } from "react-router-dom";
@@ -30,14 +30,6 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
   
   const handleView = () => {
     navigate(`/projects/${project.id}`);
-  };
-  
-  const handleUploadDocuments = () => {
-    navigate(`/projects/${project.id}/documents`);
-  };
-  
-  const handleViewDataModel = () => {
-    navigate(`/projects/${project.id}/data-model`);
   };
   
   const handleDelete = () => {
@@ -84,13 +76,7 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
             <Edit className="h-4 w-4 mr-1" /> Edit
           </Button>
         </div>
-        <div className="flex gap-2">
-          <Button size="sm" variant="outline" onClick={handleUploadDocuments}>
-            <FileUp className="h-4 w-4 mr-1" /> Docs
-          </Button>
-          <Button size="sm" variant="outline" onClick={handleViewDataModel}>
-            <Database className="h-4 w-4 mr-1" /> Data
-          </Button>
+        <div>
           <AlertDialog>
             <AlertDialogTrigger asChild>
               <Button size="sm" variant="destructive">
