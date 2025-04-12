@@ -63,7 +63,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials]);
 
-  // Fetch projects from Jira
+  // Fetch only active projects from Jira
   const fetchProjects = useCallback(async () => {
     if (!credentials) return;
     
@@ -73,19 +73,23 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setError(null);
     
     try {
-      console.log("Fetching Jira projects...");
+      console.log("Fetching active Jira projects...");
       
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
           endpoint: 'project',
-          credentials
+          credentials,
+          params: {
+            expand: 'lead,description',
+            status: 'active' // Only fetch active projects
+          }
         }
       });
       
       if (error) throw new Error(error.message);
       
       if (data) {
-        console.log(`Received ${data.length} projects from Jira`);
+        console.log(`Received ${data.length} active projects from Jira`);
         
         const formattedProjects: JiraProject[] = data.map((project: any) => ({
           id: project.id,
@@ -102,7 +106,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           setSelectedProject(formattedProjects[0]);
         }
       } else {
-        console.log("No projects found in Jira response");
+        console.log("No active projects found in Jira response");
         setProjects([]);
       }
     } catch (err: any) {
@@ -119,7 +123,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials, toast, loading, selectedProject]);
 
-  // Fetch sprints for a project
+  // Fetch only active sprints for a project
   const fetchSprints = useCallback(async (projectId?: string) => {
     if (!credentials) return;
     if (!projectId && !selectedProject) return;
@@ -131,7 +135,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setError(null);
     
     try {
-      console.log(`Fetching sprints for project ${projectToUse}...`);
+      console.log(`Fetching active sprints for project ${projectToUse}...`);
       
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
@@ -146,13 +150,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         // Get the first board for the project
         const boardId = data.values[0].id;
         
-        // Get sprints for this board
+        // Get only active sprints for this board
         const sprintsResponse = await supabase.functions.invoke('jira-api', {
           body: {
             endpoint: `agile/1.0/board/${boardId}/sprint`,
             credentials,
             params: {
-              state: 'active,future'
+              state: 'active' // Only get active sprints
             }
           }
         });
@@ -160,7 +164,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         if (sprintsResponse.error) throw new Error(sprintsResponse.error.message);
         
         if (sprintsResponse.data && sprintsResponse.data.values) {
-          console.log(`Received ${sprintsResponse.data.values.length} sprints for project ${projectToUse}`);
+          console.log(`Received ${sprintsResponse.data.values.length} active sprints for project ${projectToUse}`);
           
           const formattedSprints: JiraSprint[] = sprintsResponse.data.values.map((sprint: any) => ({
             id: sprint.id,
@@ -176,18 +180,24 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             [projectToUse]: formattedSprints
           }));
           
-          // If there are active sprints, select the first active one
-          const activeSprints = formattedSprints.filter(s => s.state === 'active');
-          if (activeSprints.length > 0 && (!selectedSprint || selectedSprint.id !== activeSprints[0].id)) {
-            setSelectedSprint(activeSprints[0]);
+          // If there are active sprints, select the first one
+          if (formattedSprints.length > 0 && (!selectedSprint || selectedSprint.id !== formattedSprints[0].id)) {
+            setSelectedSprint(formattedSprints[0]);
+          } else if (formattedSprints.length === 0) {
+            // Clear the selected sprint if there are no active sprints
+            setSelectedSprint(null);
+            // Clear tickets if there are no active sprints
+            setTickets([]);
           }
         } else {
-          console.log("No sprints found for this project");
+          console.log("No active sprints found for this project");
           setSprints(prev => ({
             ...prev,
             [projectToUse]: []
           }));
           setSelectedSprint(null);
+          // Clear tickets if there are no active sprints
+          setTickets([]);
         }
       } else {
         console.log("No boards found for this project");
@@ -196,6 +206,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           [projectToUse]: []
         }));
         setSelectedSprint(null);
+        // Clear tickets if there are no boards
+        setTickets([]);
       }
     } catch (err: any) {
       console.error("Error fetching sprints:", err);
@@ -209,7 +221,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     } finally {
       setLoading(false);
     }
-  }, [credentials, selectedProject, toast]);
+  }, [credentials, selectedProject, selectedSprint, toast]);
 
   // Fetch tickets from Jira for a specific sprint
   const fetchTickets = useCallback(async (sprintId?: string) => {
@@ -274,12 +286,12 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials, selectedSprint, toast]);
 
-  // Effect to fetch projects when credentials change
+  // Only fetch projects once on initial authentication
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && projects.length === 0) {
       fetchProjects();
     }
-  }, [isAuthenticated, fetchProjects]);
+  }, [isAuthenticated, fetchProjects, projects.length]);
 
   // Effect to fetch sprints when selected project changes
   useEffect(() => {

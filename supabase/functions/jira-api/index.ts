@@ -45,10 +45,16 @@ serve(async (req) => {
     // Clean up domain to prevent double https:// issues
     const cleanDomain = credentials.domain
       .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
-      .replace(/\/+$/, ''); // Remove trailing slashes
+      .replace(/\/+$/, '')         // Remove trailing slashes
+      .replace(/\.atlassian\.net\.atlassian\.net$/, '.atlassian.net'); // Fix double domain suffix
     
     // Construct Jira API URL properly
     let jiraApiUrl = `https://${cleanDomain}/rest/api/3/${endpoint}`;
+    
+    // Handle agile endpoints correctly
+    if (endpoint.startsWith('agile/')) {
+      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // Remove 'api/3/' for agile endpoints
+    }
     
     // Add URL parameters if provided
     if (params) {
@@ -84,6 +90,45 @@ serve(async (req) => {
 
       // Log response status
       console.log(`Jira API response status: ${jiraResponse.status}`);
+      
+      // For non-200 responses, try to get meaningful error messages
+      if (!jiraResponse.ok) {
+        let errorMessage = `Jira API returned status ${jiraResponse.status}`;
+        try {
+          // Try to parse error as JSON
+          const errorData = await jiraResponse.json();
+          if (errorData.errorMessages && errorData.errorMessages.length > 0) {
+            errorMessage = errorData.errorMessages.join('. ');
+          } else if (errorData.errors) {
+            // Join all error keys and messages
+            const errorParts = [];
+            for (const key in errorData.errors) {
+              errorParts.push(`${key}: ${errorData.errors[key]}`);
+            }
+            errorMessage = errorParts.join('. ');
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          }
+        } catch (e) {
+          // If we can't parse JSON, try to get text
+          try {
+            const errorText = await jiraResponse.text();
+            if (errorText && errorText.length < 200) {
+              errorMessage = errorText;
+            }
+          } catch (_) {
+            // If that fails too, just use the status-based message
+          }
+        }
+        
+        return new Response(
+          JSON.stringify({ error: errorMessage }),
+          { 
+            status: jiraResponse.status, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
       
       // Get response data
       const responseData = await jiraResponse.json();

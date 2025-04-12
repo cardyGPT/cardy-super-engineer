@@ -12,8 +12,9 @@ const StoryList: React.FC = () => {
   const { tickets, loading, error, fetchTickets, setSelectedTicket, selectedTicket } = useStories();
 
   useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
+    // Initial load is handled by the context's effects cascade
+    // (projects -> sprints -> tickets)
+  }, []);
 
   // Create a proper click handler that doesn't pass parameters
   const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -155,7 +156,9 @@ const StoryList: React.FC = () => {
                       className="h-6 w-6 ml-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(`https://${ticket.domain || ticket.key.split('-')[0].toLowerCase()}.atlassian.net/browse/${ticket.key}`, '_blank');
+                        // Fix the URL format to prevent double domain
+                        const cleanDomain = ticket.domain ? ticket.domain.replace(/^https?:\/\//i, '') : '';
+                        window.open(`https://${cleanDomain}/browse/${ticket.key}`, '_blank');
                       }}
                     >
                       <ExternalLink className="h-3 w-3" />
