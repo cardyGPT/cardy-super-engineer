@@ -10,15 +10,20 @@ const corsHeaders = {
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
 
 serve(async (req) => {
-  console.log("Edge function 'chat-with-data-model' received request:", req.method);
-
+  // Add request logging
+  console.log(`Edge function 'chat-with-data-model' received ${req.method} request`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log("Handling CORS preflight request");
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    });
   }
 
   try {
+    // Validate OpenAI API key
     if (!openAIApiKey) {
       console.error("OpenAI API key is missing");
       return new Response(
@@ -30,26 +35,56 @@ serve(async (req) => {
       );
     }
 
-    console.log("Parsing request body");
-    const requestBody = await req.json();
-    console.log("Request body structure:", Object.keys(requestBody));
+    // Log request details for debugging
+    const requestText = await req.text();
+    console.log("Request body received:", requestText);
     
-    // Debug logs for key structure
-    console.log("Has message:", !!requestBody.message);
-    console.log("Has dataModel:", !!requestBody.dataModel);
-    console.log("Has documentsContext:", !!requestBody.documentsContext);
+    let requestBody;
+    try {
+      requestBody = JSON.parse(requestText);
+      console.log("Parsed request data:", {
+        hasMessage: !!requestBody.message,
+        hasDataModel: !!requestBody.dataModel,
+        messageLength: requestBody.message?.length || 0,
+        entityCount: requestBody.dataModel?.entities?.length || 0
+      });
+    } catch (e) {
+      console.error("Error parsing request JSON:", e);
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
+
+    // Extract data from request
+    const { message, dataModel, documentsContext } = requestBody;
+    
+    if (!message) {
+      console.error("Missing required field: message");
+      return new Response(
+        JSON.stringify({ error: 'Message is required' }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
+    }
 
     // Build a comprehensive prompt with the data model and any documents
-    let fullPrompt = requestBody.message || "";
+    let entities = [];
+    let relationships = [];
     
-    // Add data model context if available
-    if (requestBody.dataModel) {
-      const entities = requestBody.dataModel.entities || [];
-      const relationships = requestBody.dataModel.relationships || [];
+    if (dataModel) {
+      entities = dataModel.entities || [];
+      relationships = dataModel.relationships || [];
       
       console.log(`Processing data model with ${entities.length} entities and ${relationships.length} relationships`);
-      
-      fullPrompt = `
+    }
+    
+    const fullPrompt = `
 I need information about this data model:
 
 ENTITIES:
@@ -64,20 +99,19 @@ ${relationships.map(r => {
   return `- ${sourceEntity} to ${targetEntity}: ${r.name || 'Relationship'} (${r.sourceCardinality || '1'}:${r.targetCardinality || '1'}) - ${r.description || 'No description'}`;
 }).join('\n')}
 
-${requestBody.documentsContext ? `
+${documentsContext ? `
 RELATED DOCUMENTS:
-${requestBody.documentsContext}
+${documentsContext}
 ` : ''}
 
-User question: ${requestBody.message}
+User question: ${message}
 
 Please provide a thorough and accurate answer based on this information.
 `;
-    }
 
-    console.log("Sending prompt to OpenAI");
+    console.log("Sending request to OpenAI");
     console.log("Prompt length:", fullPrompt.length);
-    console.log("First 200 chars of prompt:", fullPrompt.substring(0, 200) + "...");
+    console.log("First 100 chars of prompt:", fullPrompt.substring(0, 100) + "...");
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -86,11 +120,11 @@ Please provide a thorough and accurate answer based on this information.
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',  // Using a stable, available model
+        model: 'gpt-4o',
         messages: [
           { 
             role: 'system', 
-            content: 'You are a data model expert who helps users understand their database schemas, entity relationships, and how to query data effectively. Provide accurate, detailed responses based on the information given about the data model and its entities and relationships. If something is unclear or missing from the data model, acknowledge that limitation.'
+            content: 'You are a data model expert who helps users understand their database schemas, entity relationships, and how to query data effectively. Provide accurate, detailed responses based on the information given about the data model and its entities and relationships.'
           },
           { role: 'user', content: fullPrompt }
         ],
@@ -99,6 +133,9 @@ Please provide a thorough and accurate answer based on this information.
       }),
     });
 
+    // Log the response status
+    console.log("OpenAI API response status:", response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error("OpenAI API error:", errorText);
@@ -112,20 +149,29 @@ Please provide a thorough and accurate answer based on this information.
     }
 
     const data = await response.json();
-    console.log("OpenAI response received, status:", response.status);
+    console.log("OpenAI response received successfully");
     
     if (!data.choices || !data.choices[0]?.message?.content) {
-      console.error("Invalid response format from OpenAI:", data);
-      throw new Error('Invalid response from OpenAI');
+      console.error("Invalid response format from OpenAI:", JSON.stringify(data).substring(0, 200));
+      return new Response(
+        JSON.stringify({ error: 'Invalid response from OpenAI' }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     const aiResponse = data.choices[0].message.content;
-    console.log("AI Response generated successfully, length:", aiResponse.length);
-    console.log("AI Response first 100 chars:", aiResponse.substring(0, 100) + "...");
+    console.log("AI Response generated, length:", aiResponse.length);
+    console.log("Response preview:", aiResponse.substring(0, 100) + "...");
 
+    // Return the successful response
     return new Response(
       JSON.stringify({ response: aiResponse }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     );
 
   } catch (error) {
