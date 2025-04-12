@@ -8,6 +8,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const CardyMindPage: React.FC = () => {
   const { projects, documents } = useProject();
@@ -23,6 +24,7 @@ const CardyMindPage: React.FC = () => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const { toast } = useToast();
   const [usedDocuments, setUsedDocuments] = useState<string[]>([]);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,16 +35,22 @@ const CardyMindPage: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepare the documents context based on the selected project
+      // Prepare the documents context based on the selected project and documents
       let documentsContext = "";
       let includedDocNames: string[] = [];
       
+      // Filter documents based on selection criteria
       const projectDocs = selectedProject 
         ? documents.filter(doc => doc.projectId === selectedProject && doc.type !== "data-model" && doc.content)
         : documents.filter(doc => doc.type !== "data-model" && doc.content);
       
-      if (projectDocs.length > 0) {
-        documentsContext = projectDocs.map(doc => {
+      // Further filter by selected documents if any are selected
+      const filteredDocs = selectedDocuments.length > 0
+        ? projectDocs.filter(doc => selectedDocuments.includes(doc.id))
+        : projectDocs;
+      
+      if (filteredDocs.length > 0) {
+        documentsContext = filteredDocs.map(doc => {
           includedDocNames.push(doc.name);
           return `Document: ${doc.name}\nContent: ${
             typeof doc.content === 'string' 
@@ -54,14 +62,16 @@ const CardyMindPage: React.FC = () => {
       
       setUsedDocuments(includedDocNames);
 
-      console.log("Calling AI with context:", {
+      console.log("Calling API with context:", {
         messageLength: userInput.length,
         hasDocumentsContext: Boolean(documentsContext),
         documentNames: includedDocNames,
-        selectedProject
+        selectedProject,
+        selectedDocuments
       });
 
-      const response = await fetch('/api/chat-with-documents', {
+      // Instead of making a direct fetch to /api/, use the Supabase function URL
+      const response = await fetch('https://gswwmieyrfdhrfwsgjnw.supabase.co/functions/v1/chat-with-documents', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -69,7 +79,8 @@ const CardyMindPage: React.FC = () => {
         body: JSON.stringify({
           message: userInput,
           documentsContext: documentsContext,
-          projectId: selectedProject
+          projectId: selectedProject,
+          documentIds: selectedDocuments.length > 0 ? selectedDocuments : undefined
         }),
       });
 
@@ -106,10 +117,45 @@ const CardyMindPage: React.FC = () => {
   const handleSelectProject = (projectId: string) => {
     setSelectedProject(projectId);
     setIsDropdownOpen(false);
+    // Clear selected documents when changing projects
+    setSelectedDocuments([]);
   };
 
   const handleClearProject = () => {
     setSelectedProject(null);
+    // Clear selected documents when clearing project
+    setSelectedDocuments([]);
+  };
+
+  // Handle document selection
+  const handleDocumentToggle = (docId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedDocuments(prev => [...prev, docId]);
+    } else {
+      setSelectedDocuments(prev => prev.filter(id => id !== docId));
+    }
+  };
+
+  // Select all documents
+  const handleSelectAllDocuments = () => {
+    const projectDocs = selectedProject 
+      ? documents.filter(doc => doc.projectId === selectedProject && doc.type !== "data-model")
+      : documents.filter(doc => doc.type !== "data-model");
+    
+    setSelectedDocuments(projectDocs.map(doc => doc.id));
+  };
+
+  // Clear all selected documents
+  const handleClearAllDocuments = () => {
+    setSelectedDocuments([]);
+  };
+
+  // Clear all chat messages except the initial greeting
+  const handleClearChat = () => {
+    setMessages([{
+      role: "assistant",
+      content: "Hello! I'm Cardy Mind, ready to help you with any questions about your project documents. How can I assist you today?"
+    }]);
   };
 
   return (
@@ -130,13 +176,18 @@ const CardyMindPage: React.FC = () => {
             <div className="lg:col-span-2">
               <Card className="h-full">
                 <CardContent className="p-6">
-                  <div className="mb-4">
-                    <h2 className="text-lg font-semibold mb-2">Conversation</h2>
-                    {selectedProjectName && (
-                      <div className="text-sm text-muted-foreground mb-4">
-                        Selected Project: {selectedProjectName}
-                      </div>
-                    )}
+                  <div className="mb-4 flex justify-between items-center">
+                    <div>
+                      <h2 className="text-lg font-semibold mb-2">Conversation</h2>
+                      {selectedProjectName && (
+                        <div className="text-sm text-muted-foreground mb-4">
+                          Selected Project: {selectedProjectName}
+                        </div>
+                      )}
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleClearChat}>
+                      Clear Chat
+                    </Button>
                   </div>
                   
                   <div className="space-y-4 mb-4 max-h-[400px] overflow-y-auto">
@@ -238,20 +289,45 @@ const CardyMindPage: React.FC = () => {
                   </div>
                   
                   <div className="flex space-x-2 mb-2">
-                    <Button size="sm" variant="outline" className="text-xs">Select All</Button>
-                    <Button size="sm" variant="outline" className="text-xs">Clear</Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-xs"
+                      onClick={handleSelectAllDocuments}
+                    >
+                      Select All
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      className="text-xs"
+                      onClick={handleClearAllDocuments}
+                    >
+                      Clear
+                    </Button>
                   </div>
                   
                   <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                    {documents.map(doc => (
-                      <div key={doc.id} className="flex items-center space-x-2 p-2 border rounded text-sm">
-                        <FileText className="h-4 w-4 flex-shrink-0" />
-                        <span className="truncate flex-1">{doc.name}</span>
-                        <div className="flex items-center bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs">
-                          <Check className="h-3 w-3 mr-1" />
-                          <span>Indexed</span>
+                    {documents
+                      .filter(doc => !selectedProject || doc.projectId === selectedProject)
+                      .filter(doc => doc.type !== "data-model")
+                      .map(doc => (
+                        <div key={doc.id} className="flex items-center space-x-2 p-2 border rounded text-sm">
+                          <Checkbox 
+                            id={`doc-${doc.id}`}
+                            checked={selectedDocuments.includes(doc.id)}
+                            onCheckedChange={(checked) => 
+                              handleDocumentToggle(doc.id, checked as boolean)
+                            }
+                            className="mr-2"
+                          />
+                          <FileText className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate flex-1">{doc.name}</span>
+                          <div className="flex items-center bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs">
+                            <Check className="h-3 w-3 mr-1" />
+                            <span>Indexed</span>
+                          </div>
                         </div>
-                      </div>
                     ))}
                   </div>
                 </CardContent>
