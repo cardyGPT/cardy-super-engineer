@@ -30,6 +30,43 @@ serve(async (req) => {
     // Create Supabase client with the service role key
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
+    // First, check if all referenced documents have been processed
+    if (documentIds.length > 0) {
+      const { data: processedDocs, error: checkError } = await supabase
+        .from('project_chunks')
+        .select('document_id')
+        .in('document_id', documentIds);
+      
+      if (checkError) {
+        console.error("Error checking processed documents:", checkError);
+      } else {
+        // Get unique document IDs that have been processed
+        const processedDocIds = [...new Set(processedDocs?.map(d => d.document_id) || [])];
+        
+        // Check if any documents haven't been processed
+        const unprocessedDocs = documentIds.filter(id => !processedDocIds.includes(id));
+        
+        if (unprocessedDocs.length > 0) {
+          console.log(`Processing unprocessed documents: ${unprocessedDocs.join(', ')}`);
+          
+          // Process unprocessed documents
+          for (const docId of unprocessedDocs) {
+            try {
+              await supabase.functions.invoke('process-document', {
+                body: { documentId: docId }
+              });
+              console.log(`Triggered processing for document: ${docId}`);
+            } catch (e) {
+              console.error(`Failed to process document ${docId}:`, e);
+            }
+          }
+          
+          // Give some time for processing to complete
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+      }
+    }
+    
     // Generate embedding for the query
     const embeddingResponse = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
@@ -65,7 +102,7 @@ serve(async (req) => {
       {
         query_embedding: embedding,
         match_threshold: 0.5,  // Threshold for similarity
-        match_count: 10,       // Number of matches to return
+        match_count: 20,       // Increased number of matches to return
         filter: filter
       }
     );
@@ -86,6 +123,41 @@ serve(async (req) => {
       console.log(`Filtered to ${filteredChunks.length} chunks from selected documents`);
     }
     
+    // If no chunks were found, check if there are any chunks at all for the selected documents
+    if (filteredChunks.length === 0 && documentIds.length > 0) {
+      // Query for any chunks from the selected documents, regardless of relevance
+      const { data: anyChunks, error: anyChunksError } = await supabase
+        .from('project_chunks')
+        .select('id, project_id, document_id, document_type, chunk_text, chunk_index')
+        .in('document_id', documentIds)
+        .limit(10);
+        
+      if (!anyChunksError && anyChunks && anyChunks.length > 0) {
+        console.log(`Found ${anyChunks.length} chunks from selected documents without vector search`);
+        
+        // Get document names
+        const { data: docNames, error: docNamesError } = await supabase
+          .from('documents')
+          .select('id, name')
+          .in('id', anyChunks.map(chunk => chunk.document_id));
+          
+        if (!docNamesError && docNames) {
+          // Create a map of document IDs to names
+          const docNameMap = docNames.reduce((map, doc) => {
+            map[doc.id] = doc.name;
+            return map;
+          }, {});
+          
+          // Add document names and a neutral similarity score
+          filteredChunks = anyChunks.map(chunk => ({
+            ...chunk,
+            document_name: docNameMap[chunk.document_id] || 'Unknown Document',
+            similarity: 0.7  // Neutral score
+          }));
+        }
+      }
+    }
+    
     // Build context from the relevant chunks
     let documentsContext = '';
     if (filteredChunks && filteredChunks.length > 0) {
@@ -101,14 +173,14 @@ serve(async (req) => {
       
       // Format each document's chunks
       for (const [docName, chunks] of Object.entries(documentGroups)) {
-        documentsContext += `--- Document: ${docName} ---\n\n`;
+        documentsContext += `=== Document: ${docName} ===\n\n`;
         // Sort chunks by their original order in the document
         const sortedChunks = chunks.sort((a, b) => a.chunk_index - b.chunk_index);
         
         for (const chunk of sortedChunks) {
           documentsContext += `${chunk.chunk_text}\n\n`;
         }
-        documentsContext += '---\n\n';
+        documentsContext += '===\n\n';
       }
     }
     
@@ -118,9 +190,11 @@ serve(async (req) => {
     When responding:
     - Be concise but thorough
     - Focus on the facts present in the documents
-    - Cite specific sections of documents when relevant
-    - Admit when you don't know something or when the information isn't in the provided documents
-    - Don't make up information that isn't present in the documents
+    - Cite specific sections or document names when referencing information
+    - When asked about specific documents like "BSITFFS.pdf", provide information from that document if available
+    - If the document content is available, extract and summarize the key points
+    - If you don't know something or the information isn't in the provided documents, admit that
+    - Never make up information that isn't present in the documents
     
     Remember, you are a professional assistant helping users understand their project documentation.`;
 
@@ -133,7 +207,22 @@ serve(async (req) => {
     if (documentsContext) {
       messages.push({ 
         role: "system", 
-        content: `Here are the relevant project documents to reference:\n\n${documentsContext}` 
+        content: `Here are the relevant sections from your project documents to reference:\n\n${documentsContext}` 
+      });
+    } else {
+      messages.push({
+        role: "system",
+        content: "Warning: No relevant document content was found for this query. Please ensure documents are properly indexed or try refining your question."
+      });
+    }
+    
+    // If we're asking about a specific document, add a special instruction
+    const documentMentions = message.match(/\b[A-Za-z0-9_-]+\.(pdf|doc|docx|json|txt)\b/gi);
+    if (documentMentions?.length > 0) {
+      const mentionedDocs = documentMentions.join(', ');
+      messages.push({
+        role: "system",
+        content: `The user is asking specifically about document(s): ${mentionedDocs}. If you have content from these documents, focus your answer on that content.`
       });
     }
     
@@ -149,7 +238,7 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',  // Using a more capable model for better document analysis
         messages: messages,
         temperature: 0.3,
         max_tokens: 1500,

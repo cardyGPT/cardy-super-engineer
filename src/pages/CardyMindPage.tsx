@@ -5,7 +5,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info } from "lucide-react";
+import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info, RefreshCw } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -44,6 +44,7 @@ const CardyMindPage = () => {
   const [isIndexing, setIsIndexing] = useState(false);
   const [docProcessingStatus, setDocProcessingStatus] = useState<Record<string, boolean>>({});
   const [isLoadingDocumentStatus, setIsLoadingDocumentStatus] = useState(false);
+  const [processingError, setProcessingError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -86,6 +87,23 @@ const CardyMindPage = () => {
     setIsLoading(true);
     
     try {
+      // Check if the selected documents have been processed
+      if (selectedDocuments.length > 0) {
+        const unprocessedDocs = selectedDocuments.filter(id => !docProcessingStatus[id]);
+        if (unprocessedDocs.length > 0) {
+          // Show a toast message that we're processing unindexed documents
+          toast({
+            title: "Processing documents",
+            description: `Processing ${unprocessedDocs.length} unindexed documents first...`,
+          });
+          
+          // Trigger document processing for unindexed documents
+          await Promise.all(unprocessedDocs.map(docId => 
+            processIndividualDocument(docId, false)
+          ));
+        }
+      }
+      
       // Call Supabase Edge Function with selected project and document IDs
       const { data, error } = await supabase.functions.invoke('chat-with-documents', {
         body: {
@@ -150,8 +168,61 @@ const CardyMindPage = () => {
     }]);
   };
 
+  const processIndividualDocument = async (docId: string, showToast = true) => {
+    try {
+      if (showToast) {
+        toast({
+          title: "Processing document",
+          description: "Indexing document for search capabilities...",
+        });
+      }
+      
+      const doc = documents.find(d => d.id === docId);
+      
+      const { data, error } = await supabase.functions.invoke('process-document', {
+        body: { documentId: docId }
+      });
+      
+      if (error) {
+        console.error(`Error processing document ${doc?.name || docId}:`, error);
+        if (showToast) {
+          toast({
+            title: "Processing failed",
+            description: `Failed to process document: ${error.message}`,
+            variant: "destructive",
+          });
+        }
+        return false;
+      }
+      
+      // Update status locally
+      setDocProcessingStatus(prev => ({ ...prev, [docId]: true }));
+      
+      if (showToast) {
+        toast({
+          title: "Processing complete",
+          description: `Document has been indexed successfully with ${data.successfulChunks} chunks.`,
+          variant: "success",
+        });
+      }
+      
+      return true;
+    } catch (err) {
+      console.error(`Error with document ${docId}:`, err);
+      if (showToast) {
+        toast({
+          title: "Processing error",
+          description: err instanceof Error ? err.message : "Unknown error occurred",
+          variant: "destructive",
+        });
+      }
+      return false;
+    }
+  };
+
   const processDocumentsForEmbeddings = async () => {
     setIsIndexing(true);
+    setProcessingError(null);
     const docsToProcess = selectedDocuments.length > 0 
       ? filteredDocuments.filter(doc => selectedDocuments.includes(doc.id))
       : filteredDocuments;
@@ -164,8 +235,16 @@ const CardyMindPage = () => {
         description: `Processing ${docsToProcess.length} documents for search capabilities.`,
       });
       
+      let successCount = 0;
+      let errorCount = 0;
+      
       for (const doc of docsToProcess) {
         try {
+          // Add a short delay between each document to avoid rate limiting
+          if (successCount + errorCount > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
           const { data, error } = await supabase.functions.invoke('process-document', {
             body: { documentId: doc.id }
           });
@@ -173,27 +252,32 @@ const CardyMindPage = () => {
           if (error) {
             console.error(`Error processing document ${doc.name}:`, error);
             newStatus[doc.id] = false;
+            errorCount++;
           } else {
             console.log(`Document ${doc.name} processed:`, data);
-            newStatus[doc.id] = data.success;
+            newStatus[doc.id] = true;
+            successCount++;
+            
+            // Update the status as we go
+            setDocProcessingStatus({...newStatus});
           }
         } catch (err) {
           console.error(`Error with document ${doc.name}:`, err);
           newStatus[doc.id] = false;
+          errorCount++;
         }
       }
       
       setDocProcessingStatus(newStatus);
       
-      const successCount = Object.values(newStatus).filter(Boolean).length;
-      
-      if (successCount === docsToProcess.length) {
+      if (errorCount === 0) {
         toast({
           title: "Processing complete",
           description: "All documents have been processed successfully.",
           variant: "success",
         });
       } else {
+        setProcessingError(`Failed to process ${errorCount} of ${docsToProcess.length} documents.`);
         toast({
           title: "Processing partially complete",
           description: `${successCount} of ${docsToProcess.length} documents processed successfully.`,
@@ -202,6 +286,7 @@ const CardyMindPage = () => {
       }
     } catch (err) {
       console.error("Error processing documents:", err);
+      setProcessingError(err instanceof Error ? err.message : "Unknown error occurred");
       toast({
         title: "Processing failed",
         description: "Failed to process documents for search capabilities.",
@@ -217,6 +302,8 @@ const CardyMindPage = () => {
     if (!selectedProjectId) return;
     
     setIsLoadingDocumentStatus(true);
+    setProcessingError(null);
+    
     try {
       toast({
         title: "Loading document status",
@@ -224,7 +311,6 @@ const CardyMindPage = () => {
       });
 
       // Query project_chunks to check which documents have been processed
-      // Fixed: Removed .distinct() and using a different approach
       const { data, error } = await supabase
         .from('project_chunks')
         .select('document_id')
@@ -242,6 +328,11 @@ const CardyMindPage = () => {
         filteredDocuments.forEach(doc => {
           newStatus[doc.id] = processedDocIds.includes(doc.id);
         });
+      } else {
+        // No chunks found, all documents are unprocessed
+        filteredDocuments.forEach(doc => {
+          newStatus[doc.id] = false;
+        });
       }
       
       setDocProcessingStatus(newStatus);
@@ -253,6 +344,7 @@ const CardyMindPage = () => {
       });
     } catch (err) {
       console.error("Error fetching document processing status:", err);
+      setProcessingError(err instanceof Error ? err.message : "Unknown error occurred");
       toast({
         title: "Error",
         description: "Failed to load document status. Please try again.",
@@ -261,6 +353,11 @@ const CardyMindPage = () => {
     } finally {
       setIsLoadingDocumentStatus(false);
     }
+  };
+  
+  // Refresh document status
+  const refreshDocumentStatus = () => {
+    fetchDocumentProcessingStatus();
   };
   
   useEffect(() => {
@@ -411,24 +508,37 @@ const CardyMindPage = () => {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
                   <CardTitle className="text-sm">Document Selection</CardTitle>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={processDocumentsForEmbeddings}
-                    disabled={isIndexing || filteredDocuments.length === 0}
-                  >
-                    {isIndexing ? (
-                      <>
-                        <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                        Indexing...
-                      </>
-                    ) : (
-                      <>
-                        <FileUp className="h-3 w-3 mr-1" />
-                        Index Docs
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex gap-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={refreshDocumentStatus}
+                      disabled={isLoadingDocumentStatus}
+                      className="h-7 px-2"
+                      title="Refresh status"
+                    >
+                      <RefreshCw className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={processDocumentsForEmbeddings}
+                      disabled={isIndexing || filteredDocuments.length === 0}
+                      className="h-7"
+                    >
+                      {isIndexing ? (
+                        <>
+                          <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                          Indexing...
+                        </>
+                      ) : (
+                        <>
+                          <FileUp className="h-3 w-3 mr-1" />
+                          Index Docs
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 <CardDescription>
                   {selectedDocuments.length === 0 
@@ -469,6 +579,14 @@ const CardyMindPage = () => {
                       </Button>
                     </div>
                     
+                    {processingError && (
+                      <Alert variant="destructive" className="mb-2 py-2">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle className="text-xs">Processing Error</AlertTitle>
+                        <AlertDescription className="text-xs">{processingError}</AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <ScrollArea className="h-[280px] pr-4">
                       {isLoadingDocumentStatus ? (
                         <div className="flex justify-center items-center h-full">
@@ -490,7 +608,12 @@ const CardyMindPage = () => {
                                 {doc.name}
                               </div>
                               <div className="ml-1 flex-shrink-0">
-                                {docProcessingStatus[doc.id] === true ? (
+                                {isIndexing && selectedDocuments.includes(doc.id) ? (
+                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                                    <Loader2 className="h-2 w-2 mr-1 animate-spin" />
+                                    Indexing
+                                  </Badge>
+                                ) : docProcessingStatus[doc.id] === true ? (
                                   <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
                                     Indexed
                                   </Badge>
@@ -515,9 +638,9 @@ const CardyMindPage = () => {
             
             <Alert>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>RAG-Powered Context</AlertTitle>
+              <AlertTitle>Document Processing</AlertTitle>
               <AlertDescription className="text-xs">
-                Cardy Mind uses Retrieval-Augmented Generation to analyze your documents and provide answers based on their content. Index your documents first to enable intelligent document search.
+                Cardy Mind uses AI to analyze your documents and provide answers. For PDF files, make sure they are properly indexed before asking questions. If responses show "I don't have access to the content," try re-indexing the document first.
               </AlertDescription>
             </Alert>
           </div>

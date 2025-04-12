@@ -38,7 +38,7 @@ serve(async (req) => {
     // Fetch the document data
     const { data: document, error: documentError } = await supabase
       .from('documents')
-      .select('id, name, type, content, project_id, file_url')
+      .select('id, name, type, content, project_id, file_url, file_type')
       .eq('id', documentId)
       .single();
 
@@ -61,11 +61,92 @@ serve(async (req) => {
         textContent = JSON.stringify(document.content);
       }
     } else if (document.file_url) {
-      // For PDFs, we would need PDF extraction here
-      // This is a simplified version - in production you'd need proper PDF parsing
-      console.log(`Document has file_url: ${document.file_url}`);
-      // For now, we'll just use the document name and type as placeholder content
-      textContent = `Document: ${document.name}\nType: ${document.type}`;
+      // For PDFs or other files, we need to download and process the content
+      if (document.file_type && document.file_type.includes('pdf')) {
+        console.log(`Processing PDF document: ${document.file_url}`);
+        
+        try {
+          // Download the PDF file
+          const response = await fetch(document.file_url);
+          if (!response.ok) {
+            throw new Error(`Failed to download file: ${response.statusText}`);
+          }
+          
+          // For PDF files, we'll use an OpenAI extraction approach
+          // This is a workaround since Deno doesn't have PDF parsing libraries
+          const fileBuffer = await response.arrayBuffer();
+          const base64File = btoa(
+            new Uint8Array(fileBuffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
+          );
+          
+          console.log(`PDF downloaded, size: ${fileBuffer.byteLength} bytes`);
+          
+          // Use OpenAI to extract text from the PDF
+          const extractResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openAIApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o',
+              messages: [
+                {
+                  role: 'system',
+                  content: `You are a PDF extraction tool. Extract as much text as possible from the PDF file URL. 
+                  The file name is "${document.name}" and seems to be about "${document.type}".
+                  Extract meaningful content only - ignore page numbers, headers, and formatting.`
+                },
+                {
+                  role: 'user',
+                  content: [
+                    {
+                      type: 'text',
+                      text: `Extract the text content from this PDF file: ${document.name}`
+                    },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: `data:application/pdf;base64,${base64File}`
+                      }
+                    }
+                  ]
+                }
+              ],
+              max_tokens: 4000  // Use a large token limit for PDF extraction
+            }),
+          });
+          
+          if (!extractResponse.ok) {
+            const errorData = await extractResponse.json();
+            throw new Error(`OpenAI extraction error: ${JSON.stringify(errorData)}`);
+          }
+          
+          const extractData = await extractResponse.json();
+          textContent = extractData.choices[0].message.content;
+          
+          console.log(`Successfully extracted text from PDF. Length: ${textContent.length} chars`);
+          
+          // Save the extracted content back to the document for future use
+          const { error: updateError } = await supabase
+            .from('documents')
+            .update({ content: textContent })
+            .eq('id', document.id);
+          
+          if (updateError) {
+            console.error(`Warning: Failed to update document with extracted content: ${updateError.message}`);
+          } else {
+            console.log(`Updated document with extracted text content`);
+          }
+        } catch (pdfError) {
+          console.error(`Error processing PDF: ${pdfError.message}`);
+          textContent = `Document: ${document.name}\nType: ${document.type}\nError: Could not process PDF content.`;
+        }
+      } else {
+        // For other file types, use a generic approach
+        console.log(`Document has file_url: ${document.file_url}`);
+        textContent = `Document: ${document.name}\nType: ${document.type}\nFile URL: ${document.file_url}`;
+      }
     }
 
     if (!textContent.trim()) {
@@ -82,8 +163,8 @@ serve(async (req) => {
       console.error(`Warning: Failed to delete existing chunks: ${deleteError.message}`);
     }
 
-    // Split content into chunks (simple approach, can be improved)
-    const chunks = splitIntoChunks(textContent, 1000, 200);
+    // Split content into chunks (improved approach with better overlap handling)
+    const chunks = splitIntoChunks(textContent, 1500, 300);
     console.log(`Split document into ${chunks.length} chunks`);
 
     // Process each chunk and get embeddings
@@ -147,7 +228,7 @@ serve(async (req) => {
   }
 });
 
-// Helper function to split text into chunks with overlap
+// Improved function to split text into chunks with better overlap handling
 function splitIntoChunks(text: string, chunkSize: number, overlap: number): string[] {
   const chunks: string[] = [];
   let startIndex = 0;
@@ -159,7 +240,7 @@ function splitIntoChunks(text: string, chunkSize: number, overlap: number): stri
     // If we're not at the end of the text, try to find a good break point
     if (endIndex < text.length) {
       // Look for a good break point (sentence or paragraph)
-      const breakPoints = ['. ', '! ', '? ', '\n\n', '\n', ' '];
+      const breakPoints = ['. ', '! ', '? ', '\n\n', '\n', ';', ',', ' '];
       let breakFound = false;
 
       for (const breakPoint of breakPoints) {
@@ -181,10 +262,13 @@ function splitIntoChunks(text: string, chunkSize: number, overlap: number): stri
     }
 
     // Add the chunk
-    chunks.push(text.substring(startIndex, endIndex).trim());
+    const chunk = text.substring(startIndex, endIndex).trim();
+    if (chunk.length > 0) {
+      chunks.push(chunk);
+    }
 
     // Move the start index for the next chunk, accounting for overlap
-    startIndex = endIndex - overlap;
+    startIndex = Math.max(startIndex + 1, endIndex - overlap);
     
     // Ensure we're making progress and not stuck in a loop
     if (startIndex <= 0 || startIndex >= text.length - 1) {
