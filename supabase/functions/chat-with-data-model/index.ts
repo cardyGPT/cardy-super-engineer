@@ -19,6 +19,7 @@ serve(async (req) => {
     const { message, dataModel, documentsContext, useAllProjects } = await req.json();
 
     if (!openAIApiKey) {
+      console.error("OpenAI API key is missing");
       return new Response(
         JSON.stringify({ error: 'OpenAI API key is not configured in environment variables' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -33,7 +34,7 @@ serve(async (req) => {
       modelRelationshipCount: normalizedDataModel.relationships.length,
       hasDocumentsContext: Boolean(documentsContext),
       useAllProjects: Boolean(useAllProjects),
-      message: message.substring(0, 100) + (message.length > 100 ? '...' : '')
+      messageLength: message.length
     });
 
     // Prepare entities and relationships sections
@@ -41,7 +42,7 @@ serve(async (req) => {
     const relationshipsSection = prepareRelationshipsSection(normalizedDataModel);
 
     // Enhance system message to provide more comprehensive context
-    const systemMessage = `You are an expert AI data modeling assistant. Your task is to provide detailed, insightful answers about the following data model while maintaining context from any additional project documents.
+    const systemMessage = `You are an expert AI data modeling assistant called Cardy Mind. Your task is to provide detailed, insightful answers about the following data model while maintaining context from any additional project documents.
 
 Data Model Overview:
 - Total Entities: ${normalizedDataModel.entities.length}
@@ -59,8 +60,12 @@ You should:
 3. Suggest potential improvements or optimizations
 4. Answer questions about the data model comprehensively
 5. If the question is about project requirements or documents that have been shared with you, answer based on that context
-6. If you don't know the answer, simply say so rather than making up information`;
+6. If you don't know the answer, simply say so rather than making up information
 
+IMPORTANT: Always respond to questions, even simple ones. If asked about entity counts, relationship types, or other basic information, provide a direct answer.`;
+
+    console.log("Sending request to OpenAI");
+    
     // Call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -91,9 +96,17 @@ You should:
     }
 
     const data = await response.json();
+    console.log("OpenAI response received successfully");
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error("Invalid response format from OpenAI:", data);
+      return new Response(
+        JSON.stringify({ error: "Invalid response format from OpenAI" }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const aiResponse = data.choices[0].message.content;
-
-    console.log("Successfully generated response");
     
     return new Response(
       JSON.stringify({ response: aiResponse }),

@@ -170,8 +170,10 @@ const DataModelPage = () => {
           
           {isFullscreen ? (
             selectedDocument && currentDataModel ? (
-              <div className="h-full relative">
-                <ERDiagramViewer dataModel={currentDataModel} />
+              <div className="h-full flex flex-col">
+                <div className="flex-1 overflow-auto">
+                  <ERDiagramViewer dataModel={currentDataModel} />
+                </div>
                 <div className="absolute bottom-4 right-4">
                   <Button onClick={exitFullscreen} variant="outline" className="shadow-md">
                     <Minimize2 className="h-4 w-4 mr-2" />

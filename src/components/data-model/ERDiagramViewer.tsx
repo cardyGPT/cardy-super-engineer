@@ -12,7 +12,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, ZoomIn, ZoomOut, Filter, Download, Share2, Info, GitBranch } from "lucide-react";
+import { Search, ZoomIn, ZoomOut, Filter, Download, Share2, Info, GitBranch, Database } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -39,6 +39,7 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   const [showHelp, setShowHelp] = useState(false);
   const [showRelationshipLines, setShowRelationshipLines] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const diagramRef = useRef<HTMLDivElement>(null);
   
   // Reset selected entity when data model changes
   useEffect(() => {
@@ -123,6 +124,68 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+  };
+
+  // Get the color based on entity type
+  const getEntityTypeColor = (type: string): string => {
+    switch (type) {
+      case 'entity':
+        return 'border-blue-500';
+      case 'sub-entity':
+        return 'border-green-500';
+      case 'core':
+        return 'border-purple-500';
+      case 'lookup':
+        return 'border-amber-500';
+      case 'reference':
+        return 'border-teal-500';
+      case 'compliance':
+        return 'border-red-500';
+      default:
+        return 'border-gray-400';
+    }
+  };
+
+  // Get a badge color based on entity type
+  const getEntityTypeBadgeVariant = (type: string): "default" | "outline" | "secondary" | "destructive" => {
+    switch (type) {
+      case 'entity':
+        return 'default';
+      case 'sub-entity':
+        return 'secondary';
+      case 'core':
+        return 'default';
+      case 'reference':
+        return 'outline';
+      case 'compliance':
+        return 'destructive';
+      default:
+        return 'outline';
+    }
+  };
+
+  // Calculate relationship line color 
+  const getRelationshipLineColor = (rel: Relationship, selectedEntityId: string) => {
+    const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId);
+    const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId);
+    
+    // Source is selected entity
+    if (rel.sourceEntityId === selectedEntityId) {
+      return sourceEntity && targetEntity && 
+             sourceEntity.type === 'entity' && targetEntity.type === 'sub-entity' 
+               ? '#10b981' // green for entity -> sub-entity
+               : '#3b82f6'; // blue for normal
+    }
+    
+    // Target is selected entity  
+    if (rel.targetEntityId === selectedEntityId) {
+      return sourceEntity && targetEntity && 
+             sourceEntity.type === 'sub-entity' && targetEntity.type === 'entity'
+               ? '#8b5cf6' // purple for sub-entity -> entity
+               : '#f59e0b'; // amber for normal
+    }
+    
+    return '#9ca3af'; // gray default
   };
 
   return (
@@ -249,6 +312,7 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
             ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" 
             : "flex flex-wrap gap-4"}`}
           style={{ transform: `scale(${zoom})`, transformOrigin: "top left" }}
+          ref={diagramRef}
         >
           {filteredEntities.length === 0 ? (
             <div className="col-span-full p-8 text-center text-gray-500">
@@ -290,6 +354,10 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     const scaledTargetX = targetX / zoom;
                     const scaledTargetY = targetY / zoom;
                     
+                    // Determine line style based on entity types
+                    const lineColor = getRelationshipLineColor(rel, selectedEntity.id);
+                    const isDashed = sourceEntity.type !== targetEntity.type;
+                    
                     return (
                       <g key={rel.id}>
                         <line 
@@ -297,9 +365,9 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                           y1={scaledSourceY} 
                           x2={scaledTargetX} 
                           y2={scaledTargetY}
-                          stroke={rel.sourceEntityId === selectedEntity.id ? "#3b82f6" : "#10b981"}
+                          stroke={lineColor}
                           strokeWidth="2"
-                          strokeDasharray={rel.targetEntityId === selectedEntity.id ? "5,5" : ""}
+                          strokeDasharray={isDashed ? "5,5" : ""}
                         />
                         <text 
                           x={(scaledSourceX + scaledTargetX) / 2} 
@@ -319,101 +387,111 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                 </svg>
               )}
               
-              {filteredEntities.map((entity) => (
-                <Card 
-                  key={entity.id}
-                  id={`entity-${entity.id}`}
-                  className={`cursor-pointer transition-all border-2 ${
-                    selectedEntity?.id === entity.id
-                      ? "border-blue-500 shadow-md"
-                      : selectedEntity && getRelatedEntities(selectedEntity.id).some(e => e.id === entity.id)
-                      ? "border-green-500"
-                      : "border-transparent"
-                  } ${layoutMode === "flow" ? "w-80" : ""} relative`}
-                  onClick={() => handleEntityClick(entity)}
-                >
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start justify-between">
-                      <CardTitle className="text-base font-semibold">
-                        {entity.name}
-                      </CardTitle>
-                      <Badge variant={entity.type === "entity" ? "default" : "outline"}>
-                        {entity.type === "entity" ? "Entity" : "Sub-Entity"}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">{entity.definition}</p>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="border rounded-md overflow-hidden">
-                      <table className="w-full text-xs">
-                        <thead>
-                          <tr className="bg-muted text-muted-foreground">
-                            <th className="font-medium text-left p-1">Attribute</th>
-                            <th className="font-medium text-left p-1">Type</th>
-                            <th className="font-medium text-center p-1">Req</th>
-                            <th className="font-medium text-center p-1">Key</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {entity.attributes.map((attr) => (
-                            <tr key={attr.id} className="border-t">
-                              <td className="p-1 text-left font-medium">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className="cursor-help">{attr.name}</span>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>{attr.description || "No description"}</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </td>
-                              <td className="p-1 text-left">{attr.type}</td>
-                              <td className="p-1 text-center">
-                                {attr.required ? "✓" : ""}
-                              </td>
-                              <td className="p-1 text-center">
-                                {attr.isPrimaryKey ? "PK" : ""}
-                                {attr.isForeignKey ? "FK" : ""}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    {selectedEntity?.id === entity.id && getEntityRelationships(entity.id).length > 0 && (
-                      <div className="mt-4">
-                        <h4 className="text-xs font-semibold mb-2">Relationships:</h4>
-                        <div className="space-y-1">
-                          {getEntityRelationships(entity.id).map((rel) => {
-                            const otherEntityId = rel.sourceEntityId === entity.id ? rel.targetEntityId : rel.sourceEntityId;
-                            const otherEntity = dataModel.entities.find(e => e.id === otherEntityId);
-                            const isSource = rel.sourceEntityId === entity.id;
-                            
-                            return (
-                              <div 
-                                key={rel.id}
-                                className="flex items-center gap-1 text-xs p-1 rounded hover:bg-slate-100"
-                              >
-                                <GitBranch className="h-3 w-3 flex-shrink-0" />
-                                <span className="flex-1 truncate">
-                                  {isSource ? 'To' : 'From'} <b>{otherEntity?.name || otherEntityId}</b>
-                                  {rel.name ? ` (${rel.name})` : ''}
-                                </span>
-                                <Badge variant="outline" className="text-[10px] h-4">
-                                  {getRelationshipTypeDisplay(rel)}
-                                </Badge>
-                              </div>
-                            );
-                          })}
-                        </div>
+              {filteredEntities.map((entity) => {
+                const entityTypeColor = getEntityTypeColor(entity.type);
+                const isRelated = selectedEntity && getRelatedEntities(selectedEntity.id).some(e => e.id === entity.id);
+                
+                return (
+                  <Card 
+                    key={entity.id}
+                    id={`entity-${entity.id}`}
+                    className={`cursor-pointer transition-all border-2 ${
+                      selectedEntity?.id === entity.id
+                        ? "border-blue-500 shadow-md"
+                        : isRelated
+                        ? entityTypeColor
+                        : "border-transparent"
+                    } ${layoutMode === "flow" ? "w-80" : ""} relative`}
+                    onClick={() => handleEntityClick(entity)}
+                  >
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between">
+                        <CardTitle className="text-base font-semibold">
+                          {entity.name}
+                        </CardTitle>
+                        <Badge variant={getEntityTypeBadgeVariant(entity.type)}>
+                          {entity.type}
+                        </Badge>
                       </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      <p className="text-xs text-muted-foreground">{entity.definition}</p>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="border rounded-md overflow-hidden">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-muted text-muted-foreground">
+                              <th className="font-medium text-left p-1">Attribute</th>
+                              <th className="font-medium text-left p-1">Type</th>
+                              <th className="font-medium text-center p-1">Req</th>
+                              <th className="font-medium text-center p-1">Key</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {entity.attributes.map((attr) => (
+                              <tr key={attr.id} className="border-t">
+                                <td className="p-1 text-left font-medium">
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className="cursor-help">{attr.name}</span>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>{attr.description || "No description"}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </td>
+                                <td className="p-1 text-left">{attr.type}</td>
+                                <td className="p-1 text-center">
+                                  {attr.required ? "✓" : ""}
+                                </td>
+                                <td className="p-1 text-center">
+                                  {attr.isPrimaryKey ? "PK" : ""}
+                                  {attr.isForeignKey ? "FK" : ""}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      
+                      {selectedEntity?.id === entity.id && getEntityRelationships(entity.id).length > 0 && (
+                        <div className="mt-4">
+                          <h4 className="text-xs font-semibold mb-2">Relationships:</h4>
+                          <div className="space-y-1">
+                            {getEntityRelationships(entity.id).map((rel) => {
+                              const otherEntityId = rel.sourceEntityId === entity.id ? rel.targetEntityId : rel.sourceEntityId;
+                              const otherEntity = dataModel.entities.find(e => e.id === otherEntityId);
+                              const isSource = rel.sourceEntityId === entity.id;
+                              
+                              // Determine the type of relationship (entity to entity, entity to sub-entity, etc.)
+                              const isCrossTypeRelationship = entity.type !== otherEntity?.type;
+                              
+                              return (
+                                <div 
+                                  key={rel.id}
+                                  className={`flex items-center gap-1 text-xs p-1 rounded hover:bg-slate-100 ${
+                                    isCrossTypeRelationship ? "bg-blue-50" : ""
+                                  }`}
+                                >
+                                  <GitBranch className="h-3 w-3 flex-shrink-0" />
+                                  <span className="flex-1 truncate">
+                                    {isSource ? 'To' : 'From'} <b>{otherEntity?.name || otherEntityId}</b>
+                                    {rel.name ? ` (${rel.name})` : ''}
+                                  </span>
+                                  <Badge variant="outline" className="text-[10px] h-4">
+                                    {getRelationshipTypeDisplay(rel)}
+                                  </Badge>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </>
           )}
         </div>
@@ -432,15 +510,24 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
               Close
             </Button>
           </div>
-          {getEntityRelationships(selectedEntity.id).length > 0 ? (
-            <div className="space-y-2">
-              {getEntityRelationships(selectedEntity.id).map((rel) => {
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+            {getEntityRelationships(selectedEntity.id).length > 0 ? (
+              getEntityRelationships(selectedEntity.id).map((rel) => {
                 const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId);
                 const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId);
                 const isSource = rel.sourceEntityId === selectedEntity.id;
+                const isCrossTypeRelationship = sourceEntity?.type !== targetEntity?.type;
                 
                 return (
-                  <div key={rel.id} className="text-sm p-2 bg-muted rounded-md">
+                  <div 
+                    key={rel.id} 
+                    className={`text-sm p-2 rounded-md ${
+                      isCrossTypeRelationship 
+                        ? "bg-blue-50 border border-blue-200" 
+                        : "bg-muted"
+                    }`}
+                  >
                     <div className="flex items-center justify-between">
                       <span className="font-medium">{rel.name || `Relation to ${isSource ? targetEntity?.name : sourceEntity?.name}`}</span>
                       <Badge variant="outline" className="ml-2">
@@ -449,18 +536,43 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     </div>
                     <p className="text-xs text-muted-foreground">{rel.description || "No description"}</p>
                     <div className="flex items-center justify-between mt-1 text-xs">
-                      <span>{sourceEntity?.name} {isSource ? "→" : "←"} {targetEntity?.name}</span>
+                      <span>
+                        {sourceEntity?.name} 
+                        {isSource ? " → " : " ← "}
+                        {targetEntity?.name}
+                      </span>
                       <span className="text-gray-500">
                         {rel.sourceCardinality || "1"} : {rel.targetCardinality || "1"}
                       </span>
                     </div>
+                    
+                    {isCrossTypeRelationship && (
+                      <div className="mt-1 text-xs text-blue-600">
+                        <strong>Cross-type relationship:</strong> {sourceEntity?.type} → {targetEntity?.type}
+                      </div>
+                    )}
                   </div>
                 );
-              })}
+              })
+            ) : (
+              <p className="text-sm text-muted-foreground">No relationships found.</p>
+            )}
+          </div>
+          
+          <div className="mt-3 text-xs text-muted-foreground border-t pt-2">
+            <div className="mb-1">Relationship line colors:</div>
+            <div className="flex flex-wrap gap-2">
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-blue-500 rounded-full mr-1"></span> Entity to Entity
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-green-500 rounded-full mr-1"></span> Entity to Sub-entity
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 bg-purple-500 rounded-full mr-1"></span> Sub-entity to Entity
+              </span>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No relationships found.</p>
-          )}
+          </div>
         </div>
       )}
     </div>

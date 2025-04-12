@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -153,7 +154,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   return (
     <div className="flex flex-col h-full">
       <div className="bg-muted/50 p-3 border-b">
-        <Alert className="bg-blue-50 border-blue-200">
+        <Alert variant="default" className="bg-blue-50 border-blue-200">
           <Info className="h-4 w-4" />
           <AlertTitle>Cardy Mind</AlertTitle>
           <AlertDescription className="text-sm">
