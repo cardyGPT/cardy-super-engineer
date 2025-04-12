@@ -63,10 +63,10 @@ export const useDocumentOperations = (
           // Try to normalize the content structure
           if (fileContent.entities && typeof fileContent.entities === 'object' && !Array.isArray(fileContent.entities)) {
             // Object-based entity format, convert to array-based
-            const entitiesArray = [];
-            const relationshipsArray = [];
+            const entitiesArray: any[] = [];
+            const relationshipsArray: any[] = [];
             
-            for (const [entityId, entityData] of Object.entries(fileContent.entities)) {
+            for (const [entityId, entityData] of Object.entries<Record<string, any>>(fileContent.entities)) {
               entitiesArray.push({
                 id: entityId,
                 name: entityData.name || entityId,

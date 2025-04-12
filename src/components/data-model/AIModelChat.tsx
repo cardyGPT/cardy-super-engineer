@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -49,12 +48,10 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
     setInput("");
     setError(null);
     
-    // Add user message to chat
     setMessages(prev => [...prev, { role: "user", content: userMessage }]);
     setIsLoading(true);
 
     try {
-      // Prepare data model context for the AI
       const modelContext = {
         entities: dataModel.entities.map(entity => ({
           id: entity.id,
@@ -81,7 +78,6 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         }))
       };
 
-      // Get content from other documents if using them
       let documentsContext = "";
       let includedDocNames: string[] = [];
       
@@ -95,7 +91,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
             includedDocNames.push(doc.name);
             return `Document: ${doc.name}\nContent: ${
               typeof doc.content === 'string' 
-                ? doc.content.substring(0, 1500) // Limit content size
+                ? doc.content.substring(0, 1500)
                 : JSON.stringify(doc.content).substring(0, 1500)
             }`;
           }).join("\n\n---\n\n");
@@ -112,7 +108,6 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         useAllProjects
       });
 
-      // Call OpenAI API
       const response = await fetch('/api/chat-with-data-model', {
         method: 'POST',
         headers: {
@@ -137,7 +132,6 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
       console.error('Error in AI chat:', error);
       const errorMessage = error instanceof Error ? error.message : "Failed to get response from AI";
       
-      // Check if it's a JSON parsing error
       const isJsonError = errorMessage.includes('JSON') || errorMessage.includes('json');
       
       setError(isJsonError 
@@ -159,7 +153,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   return (
     <div className="flex flex-col h-full">
       <div className="bg-muted/50 p-3 border-b">
-        <Alert variant="info" className="bg-blue-50 border-blue-200">
+        <Alert className="bg-blue-50 border-blue-200">
           <Info className="h-4 w-4" />
           <AlertTitle>Cardy Mind</AlertTitle>
           <AlertDescription className="text-sm">

@@ -81,18 +81,18 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
       const relationshipsArray: Relationship[] = [];
       
       // Convert object-based entities to array format
-      for (const [entityId, entityData] of Object.entries(content.entities)) {
+      for (const [entityId, entityData] of Object.entries<any>(content.entities)) {
         const entity: Entity = {
           id: entityId,
           name: entityData.name || entityId,
           definition: entityData.definition || '',
-          type: entityData.type || 'entity',
+          type: (entityData.type || 'entity') as 'entity' | 'sub-entity',
           attributes: []
         };
         
         // Handle columns/attributes conversion
         if (entityData.columns && Array.isArray(entityData.columns)) {
-          entity.attributes = entityData.columns.map(column => {
+          entity.attributes = entityData.columns.map((column: any) => {
             const columnStr = typeof column === 'string' ? column : column.name || '';
             const isPrimaryKey = columnStr.includes('(PK)');
             const isForeignKey = columnStr.includes('(FK)');
@@ -112,7 +112,7 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
         
         // Handle relationships if present at the entity level
         if (entityData.relationships && Array.isArray(entityData.relationships)) {
-          entityData.relationships.forEach(rel => {
+          entityData.relationships.forEach((rel: any) => {
             if (typeof rel === 'string') {
               const match = rel.match(/([^(]+)\s*\(([^)]+)\)/);
               if (match) {
