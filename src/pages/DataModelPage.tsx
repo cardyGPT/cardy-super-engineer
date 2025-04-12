@@ -13,7 +13,6 @@ import AIModelChat from "@/components/data-model/AIModelChat";
 import { DataModel } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 
 const DataModelPage = () => {
   const {
@@ -33,6 +32,7 @@ const DataModelPage = () => {
   const dataModelDocuments = documents.filter(doc => doc.type === "data-model");
   console.log("Data model documents:", dataModelDocuments);
   const selectedDocument = dataModelDocuments.find(doc => doc.id === selectedDocumentId);
+  const projectDocuments = documents.filter(doc => selectedDocument && doc.projectId === selectedDocument.projectId);
 
   // Load the selected data model
   useEffect(() => {
@@ -85,6 +85,10 @@ const DataModelPage = () => {
 
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen);
+  };
+
+  const exitFullscreen = () => {
+    setIsFullscreen(false);
   };
 
   const renderContent = () => {
@@ -166,7 +170,15 @@ const DataModelPage = () => {
           
           {isFullscreen ? (
             selectedDocument && currentDataModel ? (
-              <ERDiagramViewer dataModel={currentDataModel} />
+              <div className="h-full relative">
+                <ERDiagramViewer dataModel={currentDataModel} />
+                <div className="absolute bottom-4 right-4">
+                  <Button onClick={exitFullscreen} variant="outline" className="shadow-md">
+                    <Minimize2 className="h-4 w-4 mr-2" />
+                    Exit Fullscreen
+                  </Button>
+                </div>
+              </div>
             ) : (
               <div className="h-full flex items-center justify-center flex-col gap-4">
                 <p className="text-gray-500">
@@ -182,7 +194,10 @@ const DataModelPage = () => {
           ) : (
             <Tabs value={activeTab} className="h-full">
               <TabsContent value="diagram" className="h-full m-0 border-none">
-                {selectedDocument && currentDataModel ? <ERDiagramViewer dataModel={currentDataModel} /> : <div className="h-full flex items-center justify-center flex-col gap-4">
+                {selectedDocument && currentDataModel ? (
+                  <ERDiagramViewer dataModel={currentDataModel} />
+                ) : (
+                  <div className="h-full flex items-center justify-center flex-col gap-4">
                     <p className="text-gray-500">
                       {selectedDocument ? "Loading data model..." : "Select a data model to view its ER diagram"}
                     </p>
@@ -191,33 +206,29 @@ const DataModelPage = () => {
                         <Database className="h-4 w-4 mr-2" />
                         Load First Data Model
                       </Button>}
-                  </div>}
+                  </div>
+                )}
               </TabsContent>
               <TabsContent value="chat" className="h-full m-0 border-none">
-                {currentDataModel ? <AIModelChat dataModel={currentDataModel} documents={documents} /> : <div className="h-full flex items-center justify-center flex-col gap-4">
+                {currentDataModel ? (
+                  <AIModelChat dataModel={currentDataModel} documents={projectDocuments} />
+                ) : (
+                  <div className="h-full flex items-center justify-center flex-col gap-4">
                     <MessageSquare className="h-12 w-12 text-gray-300" />
                     <p className="text-gray-500">
-                      Select a data model to chat with the AI about it.
+                      Select a data model to chat with the AI about it and related project documents.
                     </p>
                     
                     {dataModelDocuments.length > 0 && !selectedDocument && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
                         <Database className="h-4 w-4 mr-2" />
                         Load Data Model
                       </Button>}
-                  </div>}
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           )}
         </div>
-        
-        {isFullscreen && (
-          <div className="border-t p-4 bg-muted">
-            <Button variant="outline" onClick={toggleFullscreen}>
-              <Minimize2 className="h-4 w-4 mr-2" />
-              Exit Fullscreen
-            </Button>
-          </div>
-        )}
       </div>
     );
   };
@@ -243,7 +254,7 @@ const DataModelPage = () => {
                 <DialogHeader>
                   <DialogTitle>Upload Data Model</DialogTitle>
                   <DialogDescription>
-                    Upload a JSON file containing your data model.
+                    JSON file must contain 'entities' and 'relationships' arrays. We support multiple formats, including object-based and array-based structures.
                   </DialogDescription>
                 </DialogHeader>
                 <DocumentUpload projectId={projects[0]?.id || ""} onUploadComplete={handleUploadComplete} />

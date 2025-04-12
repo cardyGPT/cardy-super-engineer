@@ -74,6 +74,83 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
     }
   };
 
+  // Handle object-based entity format (from screenshot)
+  const handleObjectEntities = (content: any): any => {
+    if (content.entities && typeof content.entities === 'object' && !Array.isArray(content.entities)) {
+      const entitiesArray: Entity[] = [];
+      const relationshipsArray: Relationship[] = [];
+      
+      // Convert object-based entities to array format
+      for (const [entityId, entityData] of Object.entries(content.entities)) {
+        const entity: Entity = {
+          id: entityId,
+          name: entityData.name || entityId,
+          definition: entityData.definition || '',
+          type: entityData.type || 'entity',
+          attributes: []
+        };
+        
+        // Handle columns/attributes conversion
+        if (entityData.columns && Array.isArray(entityData.columns)) {
+          entity.attributes = entityData.columns.map(column => {
+            const columnStr = typeof column === 'string' ? column : column.name || '';
+            const isPrimaryKey = columnStr.includes('(PK)');
+            const isForeignKey = columnStr.includes('(FK)');
+            const name = columnStr.replace(/\s*\([PF]K\)\s*/g, '').trim();
+            
+            return {
+              id: generateId(),
+              name,
+              type: 'string',
+              required: isPrimaryKey,
+              isPrimaryKey,
+              isForeignKey,
+              description: ''
+            };
+          });
+        }
+        
+        // Handle relationships if present at the entity level
+        if (entityData.relationships && Array.isArray(entityData.relationships)) {
+          entityData.relationships.forEach(rel => {
+            if (typeof rel === 'string') {
+              const match = rel.match(/([^(]+)\s*\(([^)]+)\)/);
+              if (match) {
+                const targetName = match[1].trim();
+                const cardinality = match[2];
+                const [sourceCard, targetCard] = cardinality.split(':');
+                
+                relationshipsArray.push({
+                  id: `${entityId}_to_${targetName}`,
+                  sourceEntityId: entityId,
+                  targetEntityId: targetName.toLowerCase(),
+                  name: `${entityId} to ${targetName}`,
+                  description: '',
+                  sourceCardinality: sourceCard || '1',
+                  targetCardinality: targetCard || '1'
+                });
+              }
+            }
+          });
+        }
+        
+        entitiesArray.push(entity);
+      }
+      
+      // Add any explicitly defined relationships
+      if (content.relationships && Array.isArray(content.relationships)) {
+        relationshipsArray.push(...content.relationships);
+      }
+      
+      return {
+        entities: entitiesArray,
+        relationships: relationshipsArray
+      };
+    }
+    
+    return content;
+  };
+
   const getDocumentDataModel = useCallback((documentId: string): DataModel | null => {
     try {
       console.log("Getting data model for document:", documentId);
@@ -108,15 +185,18 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
         }
       }
       
+      // Try to handle different JSON formats
+      content = handleObjectEntities(content);
+      
       // Basic validation for required structure
       if (!content.entities || !Array.isArray(content.entities)) {
         console.error("Invalid data model: 'entities' array missing");
         return null;
       }
       
+      // Create empty relationships array if missing
       if (!content.relationships || !Array.isArray(content.relationships)) {
-        console.error("Invalid data model: 'relationships' array missing");
-        return null;
+        content.relationships = [];
       }
       
       // Process and normalize entities
@@ -150,30 +230,31 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
   }, [documents, toast]);
 
   const validateDataModel = useCallback((content: any): boolean => {
-    // Check for required structure
-    if (!content || typeof content !== 'object') return false;
-    if (!content.entities || !Array.isArray(content.entities)) return false;
-    if (!content.relationships || !Array.isArray(content.relationships)) return false;
-    
-    // Validate each entity has required fields
-    for (const entity of content.entities) {
-      if (!entity.id || !entity.name || !entity.attributes || !Array.isArray(entity.attributes)) {
-        return false;
+    try {
+      // Handle string content
+      if (typeof content === 'string') {
+        content = JSON.parse(content);
       }
-    }
-    
-    // Validate each relationship has required fields
-    for (const rel of content.relationships) {
-      if (
-        !rel.id || 
-        (!rel.sourceEntityId && !rel.source) || 
-        (!rel.targetEntityId && !rel.target)
-      ) {
-        return false;
+      
+      // Handle object-based entity format
+      content = handleObjectEntities(content);
+      
+      // Basic checks
+      if (!content || typeof content !== 'object') return false;
+      
+      // Check if entities array exists
+      if (!content.entities || !Array.isArray(content.entities)) return false;
+      
+      // Create empty relationships array if missing
+      if (!content.relationships) {
+        content.relationships = [];
       }
+      
+      return true;
+    } catch (error) {
+      console.error("Error validating data model:", error);
+      return false;
     }
-    
-    return true;
   }, []);
 
   return {

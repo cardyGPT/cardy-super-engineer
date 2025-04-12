@@ -55,10 +55,41 @@ export const useDocumentOperations = (
           const text = await file.text();
           fileContent = JSON.parse(text);
           
-          // Basic validation of data model structure
-          if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
-              !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
-            throw new Error("Invalid data model format");
+          // Basic validation for data model
+          if (!fileContent) {
+            throw new Error("Empty file content");
+          }
+          
+          // Try to normalize the content structure
+          if (fileContent.entities && typeof fileContent.entities === 'object' && !Array.isArray(fileContent.entities)) {
+            // Object-based entity format, convert to array-based
+            const entitiesArray = [];
+            const relationshipsArray = [];
+            
+            for (const [entityId, entityData] of Object.entries(fileContent.entities)) {
+              entitiesArray.push({
+                id: entityId,
+                name: entityData.name || entityId,
+                definition: entityData.definition || '',
+                type: entityData.type || 'entity',
+                attributes: []
+              });
+            }
+            
+            fileContent = {
+              entities: entitiesArray,
+              relationships: fileContent.relationships || []
+            };
+          }
+          
+          // Ensure entities is an array
+          if (!fileContent.entities || !Array.isArray(fileContent.entities)) {
+            fileContent.entities = [];
+          }
+          
+          // Ensure relationships is an array
+          if (!fileContent.relationships || !Array.isArray(fileContent.relationships)) {
+            fileContent.relationships = [];
           }
         } catch (parseError) {
           console.error("JSON parsing error:", parseError);

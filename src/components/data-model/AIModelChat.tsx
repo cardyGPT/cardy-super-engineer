@@ -2,13 +2,13 @@
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Card } from "@/components/ui/card";
-import { BrainCircuit, SendHorizontal, Bot, User, Loader2, AlertTriangle } from "lucide-react";
+import { BrainCircuit, SendHorizontal, Bot, User, Loader2, AlertTriangle, Info } from "lucide-react";
 import { DataModel, ProjectDocument } from "@/types";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { useProject } from "@/contexts/ProjectContext";
+import { Badge } from "@/components/ui/badge";
 
 interface AIModelChatProps {
   dataModel: DataModel;
@@ -23,13 +23,14 @@ interface ChatMessage {
 const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: "assistant",
-    content: "Hello! I'm your data model assistant. I can help you understand your data model, explain relationships between entities, and answer questions about your project. How can I help you today?"
+    content: "Hello! I'm your project assistant. I can help you understand your data model, explain relationships between entities, and answer questions about your project documents. How can I help you today?"
   }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [useDocuments, setUseDocuments] = useState(true);
   const [useAllProjects, setUseAllProjects] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [usedDocuments, setUsedDocuments] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const { documents: allDocuments } = useProject();
@@ -82,27 +83,32 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
 
       // Get content from other documents if using them
       let documentsContext = "";
+      let includedDocNames: string[] = [];
+      
       if (useDocuments) {
         const docsToInclude = useAllProjects 
           ? allDocuments.filter(doc => doc.type !== "data-model" && doc.content)
           : documents.filter(doc => doc.type !== "data-model" && doc.content);
         
         if (docsToInclude.length > 0) {
-          documentsContext = "Additional project documents:\n" + 
-            docsToInclude.map(doc => 
-              `Document: ${doc.name}\nContent: ${
-                typeof doc.content === 'string' 
-                  ? doc.content.substring(0, 1500) // Limit content size
-                  : JSON.stringify(doc.content).substring(0, 1500)
-              }`
-            ).join("\n\n");
+          documentsContext = docsToInclude.map(doc => {
+            includedDocNames.push(doc.name);
+            return `Document: ${doc.name}\nContent: ${
+              typeof doc.content === 'string' 
+                ? doc.content.substring(0, 1500) // Limit content size
+                : JSON.stringify(doc.content).substring(0, 1500)
+            }`;
+          }).join("\n\n---\n\n");
         }
       }
+      
+      setUsedDocuments(includedDocNames);
 
       console.log("Calling AI with context:", {
         messageLength: userMessage.length,
         modelEntityCount: modelContext.entities.length,
         hasDocumentsContext: Boolean(documentsContext),
+        documentNames: includedDocNames,
         useAllProjects
       });
 
@@ -129,10 +135,20 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
       setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
     } catch (error) {
       console.error('Error in AI chat:', error);
-      setError(error instanceof Error ? error.message : "Failed to get response from AI");
+      const errorMessage = error instanceof Error ? error.message : "Failed to get response from AI";
+      
+      // Check if it's a JSON parsing error
+      const isJsonError = errorMessage.includes('JSON') || errorMessage.includes('json');
+      
+      setError(isJsonError 
+        ? "There was an error processing the response. The system is working to fix this issue. Please try a different question."
+        : errorMessage);
+      
       toast({
         title: "Error",
-        description: error instanceof Error ? error.message : "Failed to get response from AI",
+        description: isJsonError 
+          ? "There was an error processing the AI response. Please try a different question."
+          : errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -142,6 +158,17 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
 
   return (
     <div className="flex flex-col h-full">
+      <div className="bg-muted/50 p-3 border-b">
+        <Alert variant="info" className="bg-blue-50 border-blue-200">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Cardy Mind</AlertTitle>
+          <AlertDescription className="text-sm">
+            Ask questions about your data model and project documents. I'll use the selected data model 
+            and any included project documents to provide comprehensive answers.
+          </AlertDescription>
+        </Alert>
+      </div>
+      
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {error && (
           <Alert variant="destructive" className="mb-4">
@@ -150,12 +177,23 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
           </Alert>
         )}
         
+        {usedDocuments.length > 0 && (
+          <div className="flex flex-wrap gap-1 mb-2">
+            <span className="text-xs text-muted-foreground mr-1 mt-1">Using documents:</span>
+            {usedDocuments.map(doc => (
+              <Badge key={doc} variant="outline" className="text-xs">
+                {doc}
+              </Badge>
+            ))}
+          </div>
+        )}
+        
         {messages.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-center space-y-2">
               <BrainCircuit className="mx-auto h-12 w-12 text-muted" />
               <p className="text-muted-foreground">
-                Start chatting with the AI assistant about your data model.
+                Start chatting with the AI assistant about your data model and project documents.
               </p>
             </div>
           </div>
@@ -232,7 +270,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
           <Textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask something about your data model..."
+            placeholder="Ask about your data model or project documents..."
             className="flex-1 resize-none"
             disabled={isLoading}
           />
