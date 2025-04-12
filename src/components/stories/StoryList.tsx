@@ -12,11 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 const StoryList: React.FC = () => {
   const { tickets, loading, error, fetchTickets, setSelectedTicket, selectedTicket, selectedSprint } = useStories();
 
-  useEffect(() => {
-    // Initial load is handled by the context's effects cascade
-    // (projects -> sprints -> tickets)
-  }, []);
-
   // Create a proper click handler that doesn't pass parameters
   const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     fetchTickets();
@@ -34,8 +29,8 @@ const StoryList: React.FC = () => {
         <div className="flex justify-between items-center">
           <h2 className="text-xl font-semibold">Jira Tickets</h2>
           <Button variant="outline" size="sm" disabled>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            Loading...
           </Button>
         </div>
         
@@ -152,13 +147,13 @@ const StoryList: React.FC = () => {
                       'secondary'
                     }
                   >
-                    {ticket.priority}
+                    {ticket.priority || 'No Priority'}
                   </Badge>
                 </div>
                 <CardTitle className="text-lg">{ticket.summary}</CardTitle>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-500 line-clamp-2">{ticket.description}</p>
+                <p className="text-sm text-gray-500 line-clamp-2">{ticket.description || 'No description provided'}</p>
                 {ticket.labels && ticket.labels.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {ticket.labels.map((label) => (

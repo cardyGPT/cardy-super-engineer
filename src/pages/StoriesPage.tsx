@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -37,12 +37,20 @@ const StoriesPage: React.FC = () => {
     selectedSprint, 
     setSelectedSprint,
     fetchProjects,
+    fetchSprints,
+    fetchTickets,
     error,
     selectedTicket
   } = useStories();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
+  const [pageLoaded, setPageLoaded] = useState(false);
+
+  // Mark page as loaded after initial load
+  useEffect(() => {
+    setPageLoaded(true);
+  }, []);
 
   const handleRefresh = async () => {
     if (loading || isRefreshing) return;
@@ -65,6 +73,11 @@ const StoriesPage: React.FC = () => {
     const project = projects.find(p => p.id === projectId);
     if (project && (!selectedProject || selectedProject.id !== project.id)) {
       setSelectedProject(project);
+      // Reset selected sprint when project changes
+      setSelectedSprint(null);
+      
+      // Fetch sprints for the selected project
+      fetchSprints(project.id);
     }
   };
 
@@ -75,19 +88,22 @@ const StoriesPage: React.FC = () => {
     const sprint = projectSprints.find(s => s.id === sprintId);
     if (sprint && (!selectedSprint || selectedSprint.id !== sprint.id)) {
       setSelectedSprint(sprint);
+      
+      // Fetch tickets for the selected sprint
+      fetchTickets(sprint.id);
     }
   };
   
   // Show error toast only once
-  React.useEffect(() => {
-    if (error) {
+  useEffect(() => {
+    if (error && pageLoaded) {
       toast({
         title: "Error",
         description: error,
         variant: "destructive"
       });
     }
-  }, [error, toast]);
+  }, [error, toast, pageLoaded]);
 
   // Helper to determine if we're waiting for sprints to load
   const isLoadingSprints = loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
@@ -171,7 +187,7 @@ const StoriesPage: React.FC = () => {
                         </Alert>
                       ) : (
                         <Select 
-                          value={selectedProject?.id} 
+                          value={selectedProject?.id || ""} 
                           onValueChange={handleProjectChange}
                           disabled={loading || projects.length === 0}
                         >
@@ -205,7 +221,7 @@ const StoriesPage: React.FC = () => {
                         </Alert>
                       ) : (
                         <Select 
-                          value={selectedSprint?.id} 
+                          value={selectedSprint?.id || ""} 
                           onValueChange={handleSprintChange}
                           disabled={!selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
                         >
