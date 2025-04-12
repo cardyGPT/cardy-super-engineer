@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext } from "react";
 import { supabase } from "@/lib/supabase";
 import {
@@ -80,7 +81,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             labels: ["authentication", "frontend"],
             epic: "User Management",
             created_at: "2025-04-01T10:00:00Z",
-            updated_at: "2025-04-10T14:30:00Z"
+            updated_at: "2025-04-10T14:30:00Z",
+            domain: credentials.domain // Add domain from credentials
           },
           {
             id: "2",
@@ -95,7 +97,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             labels: ["database", "backend"],
             epic: "Inventory Management",
             created_at: "2025-04-02T09:15:00Z",
-            updated_at: "2025-04-11T11:45:00Z"
+            updated_at: "2025-04-11T11:45:00Z",
+            domain: credentials.domain // Add domain from credentials
           },
           {
             id: "3",
@@ -110,7 +113,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
             labels: ["api", "backend"],
             epic: "User Management",
             created_at: "2025-04-03T14:20:00Z",
-            updated_at: "2025-04-10T16:10:00Z"
+            updated_at: "2025-04-10T16:10:00Z",
+            domain: credentials.domain // Add domain from credentials
           }
         ];
         

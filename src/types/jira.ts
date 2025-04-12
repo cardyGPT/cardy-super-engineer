@@ -1,4 +1,3 @@
-
 export interface JiraTicket {
   id: string;
   key: string;
@@ -13,6 +12,7 @@ export interface JiraTicket {
   epic?: string;
   created_at?: string;
   updated_at?: string;
+  domain?: string;
 }
 
 export interface JiraCredentials {

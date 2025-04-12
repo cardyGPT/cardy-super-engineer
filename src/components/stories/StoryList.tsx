@@ -103,7 +103,8 @@ const StoryList: React.FC = () => {
                       variant={
                         ticket.status === 'To Do' ? 'secondary' :
                         ticket.status === 'In Progress' ? 'default' :
-                        ticket.status === 'Done' ? 'success' : 'outline'
+                        ticket.status === 'Done' ? 'secondary' : // Changed from 'success' to 'secondary'
+                        'outline'
                       }
                     >
                       {ticket.status}
@@ -144,7 +145,7 @@ const StoryList: React.FC = () => {
                       className="h-6 w-6 ml-1"
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.open(`https://${ticket.domain}/browse/${ticket.key}`, '_blank');
+                        window.open(`https://${ticket.domain || ticket.key.split('-')[0].toLowerCase()}.atlassian.net/browse/${ticket.key}`, '_blank');
                       }}
                     >
                       <ExternalLink className="h-3 w-3" />
