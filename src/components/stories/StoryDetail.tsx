@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useStories } from "@/contexts/StoriesContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
@@ -8,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, Code, FileText, TestTube, RefreshCw, Copy, Check, FileDown, Upload, Download } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { downloadAsPDF, formatTimestampForFilename } from "@/utils/exportUtils";
 import ReactMarkdown from 'react-markdown';
@@ -442,8 +443,8 @@ const StoryDetail: React.FC = () => {
   }
 
   return (
-    <div ref={contentRef}>
-      <Card className="mb-4">
+    <div className="flex flex-col space-y-4" ref={contentRef}>
+      <Card>
         <CardHeader>
           <div className="flex justify-between items-start">
             <div>
@@ -493,24 +494,6 @@ const StoryDetail: React.FC = () => {
                   </>
                 )}
               </Button>
-              
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => handleDownloadPDF('all')}
-              >
-                <Download className="h-4 w-4 mr-1" />
-                Download All
-              </Button>
-              
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={() => handlePushToJira('all')}
-              >
-                <Upload className="h-4 w-4 mr-1" />
-                Push All to Jira
-              </Button>
             </div>
           </div>
           <CardDescription>
@@ -546,38 +529,6 @@ const StoryDetail: React.FC = () => {
               <div className="flex justify-between items-center">
                 <Label>Low Level Design Document</Label>
                 <div className="flex gap-2">
-                  {lldContent && (
-                    <>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCopyContent(lldContent, 'lld')}
-                      >
-                        {copiedState['lld'] ? (
-                          <Check className="h-4 w-4 mr-1" />
-                        ) : (
-                          <Copy className="h-4 w-4 mr-1" />
-                        )}
-                        {copiedState['lld'] ? 'Copied' : 'Copy'}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDownloadPDF('lld')}
-                      >
-                        <FileDown className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handlePushToJira('lld')}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Push to Jira
-                      </Button>
-                    </>
-                  )}
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('lld')}
@@ -618,41 +569,36 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
-                  <div className="prose max-w-none dark:prose-invert">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                    >
-                      {lldContent || "Generate a Low Level Design document based on the selected story."}
-                    </ReactMarkdown>
+                <>
+                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
+                    <div className="prose max-w-none dark:prose-invert">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                      >
+                        {lldContent || "Generate a Low Level Design document based on the selected story."}
+                      </ReactMarkdown>
+                    </div>
                   </div>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="code" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Generated Code</Label>
-                <div className="flex gap-2">
-                  {codeContent && (
-                    <>
+                  
+                  {lldContent && (
+                    <div className="flex justify-end gap-2 pt-2">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handleCopyContent(codeContent, 'code')}
+                        onClick={() => handleCopyContent(lldContent, 'lld')}
                       >
-                        {copiedState['code'] ? (
+                        {copiedState['lld'] ? (
                           <Check className="h-4 w-4 mr-1" />
                         ) : (
                           <Copy className="h-4 w-4 mr-1" />
                         )}
-                        {copiedState['code'] ? 'Copied' : 'Copy'}
+                        {copiedState['lld'] ? 'Copied' : 'Copy'}
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handleDownloadPDF('code')}
+                        onClick={() => handleDownloadPDF('lld')}
                       >
                         <FileDown className="h-4 w-4 mr-1" />
                         Download
@@ -660,13 +606,21 @@ const StoryDetail: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handlePushToJira('code')}
+                        onClick={() => handlePushToJira('lld')}
                       >
                         <Upload className="h-4 w-4 mr-1" />
                         Push to Jira
                       </Button>
-                    </>
+                    </div>
                   )}
+                </>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="code" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label>Generated Code</Label>
+                <div className="flex gap-2">
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('code')}
@@ -707,41 +661,36 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
-                  <div className="prose max-w-none dark:prose-invert">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                    >
-                      {codeContent || "Generate code based on the selected story. Includes Angular.js frontend, Node.js backend, and PostgreSQL database scripts."}
-                    </ReactMarkdown>
+                <>
+                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
+                    <div className="prose max-w-none dark:prose-invert">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                      >
+                        {codeContent || "Generate code based on the selected story. Includes Angular.js frontend, Node.js backend, and PostgreSQL database scripts."}
+                      </ReactMarkdown>
+                    </div>
                   </div>
-                </div>
-              )}
-            </TabsContent>
-            
-            <TabsContent value="tests" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Test Cases</Label>
-                <div className="flex gap-2">
-                  {testContent && (
-                    <>
+                  
+                  {codeContent && (
+                    <div className="flex justify-end gap-2 pt-2">
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handleCopyContent(testContent, 'tests')}
+                        onClick={() => handleCopyContent(codeContent, 'code')}
                       >
-                        {copiedState['tests'] ? (
+                        {copiedState['code'] ? (
                           <Check className="h-4 w-4 mr-1" />
                         ) : (
                           <Copy className="h-4 w-4 mr-1" />
                         )}
-                        {copiedState['tests'] ? 'Copied' : 'Copy'}
+                        {copiedState['code'] ? 'Copied' : 'Copy'}
                       </Button>
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handleDownloadPDF('tests')}
+                        onClick={() => handleDownloadPDF('code')}
                       >
                         <FileDown className="h-4 w-4 mr-1" />
                         Download
@@ -749,13 +698,21 @@ const StoryDetail: React.FC = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        onClick={() => handlePushToJira('tests')}
+                        onClick={() => handlePushToJira('code')}
                       >
                         <Upload className="h-4 w-4 mr-1" />
                         Push to Jira
                       </Button>
-                    </>
+                    </div>
                   )}
+                </>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="tests" className="space-y-4">
+              <div className="flex justify-between items-center">
+                <Label>Test Cases</Label>
+                <div className="flex gap-2">
                   <Button 
                     size="sm" 
                     onClick={() => handleGenerateContent('tests')}
@@ -796,20 +753,78 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <div className="border rounded-md p-4 min-h-[300px] overflow-auto">
-                  <div className="prose max-w-none dark:prose-invert">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                    >
-                      {testContent || "Generate test cases based on the selected story."}
-                    </ReactMarkdown>
+                <>
+                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
+                    <div className="prose max-w-none dark:prose-invert">
+                      <ReactMarkdown
+                        remarkPlugins={[remarkGfm]}
+                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+                      >
+                        {testContent || "Generate test cases based on the selected story."}
+                      </ReactMarkdown>
+                    </div>
                   </div>
-                </div>
+                  
+                  {testContent && (
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleCopyContent(testContent, 'tests')}
+                      >
+                        {copiedState['tests'] ? (
+                          <Check className="h-4 w-4 mr-1" />
+                        ) : (
+                          <Copy className="h-4 w-4 mr-1" />
+                        )}
+                        {copiedState['tests'] ? 'Copied' : 'Copy'}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleDownloadPDF('tests')}
+                      >
+                        <FileDown className="h-4 w-4 mr-1" />
+                        Download
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handlePushToJira('tests')}
+                      >
+                        <Upload className="h-4 w-4 mr-1" />
+                        Push to Jira
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </TabsContent>
           </Tabs>
         </CardContent>
+        <CardFooter className="flex justify-between">
+          <div></div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handleDownloadPDF('all')}
+              disabled={!lldContent && !codeContent && !testContent}
+            >
+              <Download className="h-4 w-4 mr-1" />
+              Download All
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => handlePushToJira('all')}
+              disabled={!lldContent && !codeContent && !testContent}
+            >
+              <Upload className="h-4 w-4 mr-1" />
+              Push All to Jira
+            </Button>
+          </div>
+        </CardFooter>
       </Card>
     </div>
   );

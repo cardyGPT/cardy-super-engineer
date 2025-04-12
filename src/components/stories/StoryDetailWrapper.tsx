@@ -10,7 +10,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { supabase } from "@/lib/supabase";
 import { FileText, Code, TestTube, RefreshCw } from "lucide-react";
-import ExportToGSuite from "./ExportToGSuite";
 
 const StoryDetailWrapper = () => {
   const { id } = useParams<{ id: string }>();
@@ -72,7 +71,6 @@ const StoryDetailWrapper = () => {
 
   return (
     <div className="p-6">
-      {/* Remove the ticket prop since StoryDetail doesn't accept it */}
       <StoryDetail />
       <Separator className="my-6" />
       
@@ -115,7 +113,6 @@ const StoryDetailWrapper = () => {
               />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={selectedTicket.id} artifactType="lld" content={lldContent} />
         </TabsContent>
         
         <TabsContent value="code" className="space-y-4">
@@ -129,7 +126,6 @@ const StoryDetailWrapper = () => {
               />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={selectedTicket.id} artifactType="code" content={codeContent} />
         </TabsContent>
         
         <TabsContent value="tests" className="space-y-4">
@@ -143,7 +139,6 @@ const StoryDetailWrapper = () => {
               />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={selectedTicket.id} artifactType="test" content={testContent} />
         </TabsContent>
       </Tabs>
     </div>
