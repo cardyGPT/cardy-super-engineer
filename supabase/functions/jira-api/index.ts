@@ -4,12 +4,8 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
-  // Add request logging
-  console.log(`Edge function 'jira-api' received ${req.method} request`);
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
     return new Response(null, { 
       headers: corsHeaders,
       status: 204
@@ -17,230 +13,140 @@ serve(async (req) => {
   }
 
   try {
-    // Parse request body
-    const { endpoint, method, credentials, params, data } = await req.json();
+    const { action, domain, email, apiToken, data } = await req.json();
     
-    if (!credentials || !credentials.domain || !credentials.email || !credentials.apiToken) {
-      console.error("Missing Jira credentials");
+    // Basic validation
+    if (!domain || !email || !apiToken) {
       return new Response(
-        JSON.stringify({ error: 'Jira credentials are required' }),
+        JSON.stringify({ error: "Missing Jira credentials" }),
         { 
-          status: 400, 
-          headers: corsHeaders
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
         }
       );
     }
-
-    if (!endpoint) {
-      console.error("Missing Jira API endpoint");
-      return new Response(
-        JSON.stringify({ error: 'Jira API endpoint is required' }),
-        { 
-          status: 400, 
-          headers: corsHeaders
-        }
-      );
-    }
-
-    // Clean up domain to prevent double https:// issues
-    const cleanDomain = credentials.domain
-      .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
-      .replace(/\/+$/, '')         // Remove trailing slashes
-      .replace(/\.atlassian\.net\.atlassian\.net$/, '.atlassian.net'); // Fix double domain suffix
     
-    // Construct Jira API URL properly
-    let jiraApiUrl;
+    // Prepare authorization header
+    const authHeader = `Basic ${btoa(`${email}:${apiToken}`)}`;
     
-    // Handle different API paths properly
-    if (endpoint.startsWith('agile/')) {
-      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // agile endpoints use different path
-    } else if (endpoint.startsWith('api/2/') || endpoint.startsWith('api/3/')) {
-      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // Handle explicitly specified api versions
-    } else {
-      jiraApiUrl = `https://${cleanDomain}/rest/api/3/${endpoint}`; // Default to api/3
-    }
+    let response;
     
-    // Add URL parameters if provided
-    if (params) {
-      const urlParams = new URLSearchParams();
-      for (const key in params) {
-        if (params[key] !== undefined && params[key] !== null) {
-          urlParams.append(key, params[key]);
-        }
-      }
-      const queryString = urlParams.toString();
-      if (queryString) {
-        jiraApiUrl += `?${queryString}`;
-      }
-    }
-    
-    console.log(`Calling Jira API: ${method || 'GET'} ${jiraApiUrl}`);
-
-    // Create authorization header from email and API token
-    const authHeader = `Basic ${btoa(`${credentials.email}:${credentials.apiToken}`)}`;
-    
-    // Make request to Jira API with timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-    
-    try {
-      const jiraResponse = await fetch(jiraApiUrl, {
-        method: method || 'GET',
-        headers: {
-          'Authorization': authHeader,
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        },
-        body: data ? JSON.stringify(data) : undefined,
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-
-      // Log response status
-      console.log(`Jira API response status: ${jiraResponse.status}`);
-      
-      // Special handling for common Jira error scenarios
-      if (jiraResponse.status === 400 && endpoint.includes('board/') && endpoint.includes('/sprint')) {
-        // Handle case where board ID might be invalid or there's a permission issue with sprints
-        console.log(`Board sprint error: ${jiraApiUrl}`);
-        return new Response(
-          JSON.stringify({ 
-            values: [],
-            message: "No sprints found or board configuration issue. Please check your board setup in Jira." 
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    switch (action) {
+      case 'getProjects':
+        response = await fetch(`https://${domain}/rest/api/2/project`, {
+          headers: {
+            'Authorization': authHeader,
+            'Accept': 'application/json'
           }
-        );
-      }
-
-      // Special case for search endpoint with no results - return empty issues array instead of treating as error
-      if (jiraResponse.status === 404 && endpoint === 'search') {
-        console.log("Search returned no results, returning empty issues array");
-        return new Response(
-          JSON.stringify({ 
-            issues: [],
-            message: "No items found matching your search criteria." 
-          }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
-      }
-      
-      // For non-200 responses, try to get meaningful error messages
-      if (!jiraResponse.ok) {
-        let errorMessage = `Jira API returned status ${jiraResponse.status}`;
-        try {
-          // Try to parse error as JSON
-          const errorData = await jiraResponse.json();
-          if (errorData.errorMessages && errorData.errorMessages.length > 0) {
-            errorMessage = errorData.errorMessages.join('. ');
-          } else if (errorData.errors) {
-            // Join all error keys and messages
-            const errorParts = [];
-            for (const key in errorData.errors) {
-              errorParts.push(`${key}: ${errorData.errors[key]}`);
+        });
+        break;
+        
+      case 'getSprints':
+        if (!data.boardId) {
+          return new Response(
+            JSON.stringify({ error: "Board ID is required for getting sprints" }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400 
             }
-            errorMessage = errorParts.join('. ');
-          } else if (errorData.message) {
-            errorMessage = errorData.message;
-          }
-          
-          // Add more diagnostic info for 404s
-          if (jiraResponse.status === 404) {
-            console.error(`404 Not Found: ${jiraApiUrl}`, { errorData });
-            errorMessage = `Resource not found: ${endpoint}. ${errorMessage}`;
-          }
-          
-          // Return a more sensible response for common Jira API errors
-          if (endpoint.includes('board') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
-            console.log("Board not found or permission denied - returning empty results");
-            return new Response(
-              JSON.stringify({ 
-                values: [],
-                message: "No boards found or you don't have permission to access this board."
-              }),
-              { 
-                status: 200, 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-
-          // Handle no sprints found by returning empty array (easier to handle in frontend)
-          if (endpoint.includes('sprint') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
-            console.log("No sprints found or permission denied - returning empty results");
-            return new Response(
-              JSON.stringify({ 
-                values: [],
-                message: "No sprints found for this board or you don't have permission to view them."
-              }),
-              { 
-                status: 200, 
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-              }
-            );
-          }
-        } catch (e) {
-          // If we can't parse JSON, try to get text
-          try {
-            const errorText = await jiraResponse.text();
-            if (errorText && errorText.length < 200) {
-              errorMessage = errorText;
-            }
-          } catch (_) {
-            // If that fails too, just use the status-based message
-          }
+          );
         }
         
+        response = await fetch(`https://${domain}/rest/agile/1.0/board/${data.boardId}/sprint`, {
+          headers: {
+            'Authorization': authHeader,
+            'Accept': 'application/json'
+          }
+        });
+        break;
+        
+      case 'getTickets':
+        if (!data.jql) {
+          return new Response(
+            JSON.stringify({ error: "JQL query is required for getting tickets" }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400 
+            }
+          );
+        }
+        
+        response = await fetch(`https://${domain}/rest/api/2/search?jql=${encodeURIComponent(data.jql)}`, {
+          headers: {
+            'Authorization': authHeader,
+            'Accept': 'application/json'
+          }
+        });
+        break;
+      
+      case 'updateTicket':
+        if (!data.ticketId || !data.content) {
+          return new Response(
+            JSON.stringify({ error: "Ticket ID and content are required for updating a ticket" }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400 
+            }
+          );
+        }
+        
+        // Update ticket with content (adding as a comment)
+        response = await fetch(`https://${domain}/rest/api/2/issue/${data.ticketId}/comment`, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({
+            body: data.content
+          })
+        });
+        break;
+        
+      default:
         return new Response(
-          JSON.stringify({ error: errorMessage }),
+          JSON.stringify({ error: "Invalid action" }),
           { 
-            status: jiraResponse.status, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400 
           }
         );
-      }
+    }
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error(`Error from Jira API: ${response.status}`, errorData);
       
-      // Get response data
-      const responseData = await jiraResponse.json();
-      
-      // For empty results, add a message to help frontend display appropriate message
-      if (endpoint === 'search' && (!responseData.issues || responseData.issues.length === 0)) {
-        responseData.message = "No issues found for this sprint.";
-      } else if (endpoint.includes('sprint') && (!responseData.values || responseData.values.length === 0)) {
-        responseData.message = "No sprints found for this board.";
-      }
-      
-      // Return response with CORS headers
       return new Response(
-        JSON.stringify(responseData),
+        JSON.stringify({ 
+          error: `Jira API error: ${response.status}`, 
+          details: errorData 
+        }),
         { 
-          status: jiraResponse.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: response.status 
         }
       );
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      
-      if (fetchError.name === 'AbortError') {
-        console.error('Jira API request timed out');
-        throw new Error('Jira API request timed out after 15 seconds');
-      }
-      
-      throw fetchError;
     }
-  } catch (error) {
-    console.error('Error in jira-api function:', error);
+    
+    const responseData = await response.json();
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Error calling Jira API' }),
+      JSON.stringify(responseData),
       { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200 
+      }
+    );
+  } catch (err) {
+    console.error("Error in Jira API function:", err);
+    
+    return new Response(
+      JSON.stringify({ error: err.message }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500 
       }
     );
   }

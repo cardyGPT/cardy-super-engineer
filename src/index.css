@@ -1,8 +1,8 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import './styles/markdown.css';
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
- 
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -65,7 +65,7 @@
     --sidebar-ring: 263.4 70% 50.4%;
   }
 }
- 
+
 @layer base {
   * {
     @apply border-border;
