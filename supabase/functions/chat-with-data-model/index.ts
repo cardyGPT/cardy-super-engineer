@@ -23,27 +23,38 @@ serve(async (req) => {
       );
     }
 
-    // Generate a system message with data model information to provide context
-    const systemMessage = `You are a data modeling expert assistant. Your task is to help understand and explain the following data model:
+    // Enhance system message to provide more comprehensive context
+    const systemMessage = `You are an expert AI data modeling assistant. Your task is to provide detailed, insightful answers about the following data model while maintaining context from any additional project documents.
 
-Data Model Entities:
+Data Model Overview:
+- Total Entities: ${dataModel.entities.length}
+- Total Relationships: ${dataModel.relationships.length}
+
+Detailed Data Model Entities:
 ${dataModel.entities.map(entity => 
-  `- ${entity.name} (${entity.type}): ${entity.definition}
+  `Entity: ${entity.name} (${entity.type})
+  Definition: ${entity.definition}
   Attributes: ${entity.attributes.map(attr => 
-    `${attr.name} (${attr.type}${attr.required ? ', required' : ''}${attr.isPrimaryKey ? ', PK' : ''}${attr.isForeignKey ? ', FK' : ''})`
+    `${attr.name} (${attr.type}${attr.required ? ', required' : ''}${attr.isPrimaryKey ? ', Primary Key' : ''}${attr.isForeignKey ? ', Foreign Key' : ''})`
   ).join(', ')}`
-).join('\n')}
+).join('\n\n')}
 
 Data Model Relationships:
 ${dataModel.relationships.map(rel => {
   const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId)?.name || rel.sourceEntityId;
   const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId)?.name || rel.targetEntityId;
-  return `- ${rel.name || `Relationship ${rel.id}`}: ${sourceEntity} to ${targetEntity} (${rel.sourceCardinality || '1'}:${rel.targetCardinality || '1'})${rel.description ? ` - ${rel.description}` : ''}`;
-}).join('\n')}
+  return `Relationship: ${sourceEntity} to ${targetEntity}
+  Cardinality: ${rel.sourceCardinality || '1'}:${rel.targetCardinality || '1'}
+  Description: ${rel.description || 'No additional description'}`
+}).join('\n\n')}
 
 ${documentsContext ? `\nAdditional Project Context:\n${documentsContext}` : ''}
 
-Provide clear and concise answers to questions about this data model. You can explain relationships, suggest improvements, or clarify the purpose of entities and attributes. If asked about SQL or code generation, provide examples relevant to this data model.`;
+You should:
+1. Explain data model structure clearly
+2. Provide insights about relationships
+3. Suggest potential improvements or optimizations
+4. Answer questions about the data model comprehensively`;
 
     // Call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
