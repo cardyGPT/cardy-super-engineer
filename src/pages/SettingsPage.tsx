@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import JiraLogin from "@/components/stories/JiraLogin";
 import { Button } from "@/components/ui/button";
@@ -8,13 +8,28 @@ import { Mail, Settings, BrainCircuit, CheckCircle, AlertTriangle } from "lucide
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import OpenAISettings from "@/components/settings/OpenAISettings";
 import { useStories } from "@/contexts/StoriesContext";
+import { supabase } from "@/lib/supabase";
 
 const SettingsPage = () => {
   const [activeTab, setActiveTab] = useState("jira");
   const { isAuthenticated: isJiraAuthenticated } = useStories();
+  const [isOpenAIConfigured, setIsOpenAIConfigured] = useState(false);
   
-  // We'll check if OpenAI API is set
-  const isOpenAIConfigured = !!Deno?.env?.get('OPENAI_API_KEY');
+  // Check if OpenAI API is configured on component mount
+  useEffect(() => {
+    const checkOpenAIConfig = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('validate-openai', {});
+        if (!error && data?.valid) {
+          setIsOpenAIConfigured(true);
+        }
+      } catch (err) {
+        console.error("Error checking OpenAI configuration:", err);
+      }
+    };
+    
+    checkOpenAIConfig();
+  }, []);
 
   return (
     <AppLayout>
@@ -57,7 +72,7 @@ const SettingsPage = () => {
           <TabsContent value="openai" className="space-y-4">
             <div className="p-6 bg-white rounded-lg shadow-sm">
               <h2 className="text-xl font-semibold mb-4">OpenAI API Settings</h2>
-              <OpenAISettings />
+              <OpenAISettings onConfigChange={(configured) => setIsOpenAIConfigured(configured)} />
             </div>
           </TabsContent>
           

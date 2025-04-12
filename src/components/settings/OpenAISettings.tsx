@@ -8,7 +8,11 @@ import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle } from "lucide-react";
 
-const OpenAISettings: React.FC = () => {
+interface OpenAISettingsProps {
+  onConfigChange?: (configured: boolean) => void;
+}
+
+const OpenAISettings: React.FC<OpenAISettingsProps> = ({ onConfigChange }) => {
   const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -26,10 +30,12 @@ const OpenAISettings: React.FC = () => {
       if (error) {
         console.error("Error checking OpenAI API key:", error);
         setIsConnected(false);
+        if (onConfigChange) onConfigChange(false);
         return;
       }
       
       setIsConnected(!!data?.valid);
+      if (onConfigChange) onConfigChange(!!data?.valid);
       
       if (data?.valid) {
         toast({
@@ -41,6 +47,7 @@ const OpenAISettings: React.FC = () => {
     } catch (err) {
       console.error("Error checking OpenAI API key:", err);
       setIsConnected(false);
+      if (onConfigChange) onConfigChange(false);
     }
   };
 
@@ -64,6 +71,7 @@ const OpenAISettings: React.FC = () => {
 
       // Success - API key is valid
       setIsConnected(true);
+      if (onConfigChange) onConfigChange(true);
       setApiKey(''); // Clear the input for security
 
       toast({
@@ -78,6 +86,7 @@ const OpenAISettings: React.FC = () => {
         variant: "destructive",
       });
       setIsConnected(false);
+      if (onConfigChange) onConfigChange(false);
     } finally {
       setIsLoading(false);
     }
