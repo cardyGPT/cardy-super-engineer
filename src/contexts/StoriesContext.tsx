@@ -55,7 +55,21 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const lastProjectIdRef = useRef<string | null>(null);
   const lastSprintIdRef = useRef<string | null>(null);
   
+  // Track operation states to prevent setting state after component unmounts
+  const isMountedRef = useRef(true);
+  
+  // Track initialization status
+  const isInitializedRef = useRef(false);
+  
   const isAuthenticated = !!credentials;
+
+  // Cleanup effect
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (credentials) {
@@ -97,6 +111,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       });
       
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       if (error) throw new Error(error.message);
       
       if (data) {
@@ -111,6 +128,7 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }));
         
         setProjects(formattedProjects);
+        isInitializedRef.current = true;
         
         if (formattedProjects.length > 0 && !selectedProject) {
           setSelectedProject(formattedProjects[0]);
@@ -118,10 +136,15 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         console.log("No active projects found in Jira response");
         setProjects([]);
+        isInitializedRef.current = true;
       }
     } catch (err: any) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       console.error("Error fetching projects:", err);
       setError(`Failed to fetch projects: ${err.message}`);
+      isInitializedRef.current = true;
       
       toast({
         title: "Error",
@@ -129,7 +152,10 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
       projectsFetchingRef.current = false;
     }
   }, [credentials, toast, selectedProject]);
@@ -173,6 +199,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       });
       
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       if (boardsError) throw new Error(boardsError.message);
       
       if (!boardsData || !boardsData.values || boardsData.values.length === 0) {
@@ -202,6 +231,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
         }
       });
+      
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
       
       if (sprintsError && !sprintsError.message.includes('404')) {
         throw new Error(sprintsError.message);
@@ -257,6 +289,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setTickets([]);
       }
     } catch (err: any) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       console.error("Error fetching sprints:", err);
       
       // Don't show toast for 404 errors, just log them
@@ -276,8 +311,14 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         ...prev,
         [projectToUse]: []
       }));
+      
+      // Clear tickets when we can't get sprints
+      setTickets([]);
     } finally {
-      setLoading(false);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
       sprintsFetchingRef.current = false;
     }
   }, [credentials, selectedProject, selectedSprint, toast]);
@@ -321,6 +362,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       });
       
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       if (error) throw new Error(error.message);
       
       if (data && data.issues) {
@@ -346,83 +390,79 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setTickets([]);
       }
     } catch (err: any) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+      
       console.error("Error fetching tickets:", err);
       setError(`Failed to fetch tickets: ${err.message}`);
       
-      toast({
-        title: "Error",
-        description: `Failed to fetch tickets: ${err.message}`,
-        variant: "destructive",
-      });
+      // Skip showing error for "Sprint does not exist" scenarios
+      if (!err.message.includes("does not exist") && !err.message.includes("No permission")) {
+        toast({
+          title: "Error",
+          description: `Failed to fetch tickets: ${err.message}`,
+          variant: "destructive",
+        });
+      } else {
+        console.log("Sprint issues: either not found or no permission");
+      }
       
       setTickets([]);
     } finally {
-      setLoading(false);
+      // Only update state if component is still mounted
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
       ticketsFetchingRef.current = false;
     }
   }, [credentials, selectedSprint, toast, tickets.length]);
 
   // Load projects only once on initial authentication
   useEffect(() => {
-    let isMounted = true;
-    
-    if (isAuthenticated && projects.length === 0 && !projectsFetchingRef.current) {
+    if (isAuthenticated && !isInitializedRef.current && !projectsFetchingRef.current) {
       // Small delay to prevent race conditions
       const timeoutId = setTimeout(() => {
-        if (isMounted) fetchProjects();
+        if (isMountedRef.current) fetchProjects();
       }, 300);
       
       return () => {
         clearTimeout(timeoutId);
-        isMounted = false;
       };
     }
     
-    return () => {
-      isMounted = false;
-    };
-  }, [isAuthenticated, fetchProjects, projects.length]);
+    return () => {};
+  }, [isAuthenticated, fetchProjects]);
 
   // Load sprints when project changes
   useEffect(() => {
-    let isMounted = true;
-    
     if (selectedProject && !sprintsFetchingRef.current) {
       // Small delay to allow UI to update first
       const timeoutId = setTimeout(() => {
-        if (isMounted) fetchSprints(selectedProject.id);
+        if (isMountedRef.current) fetchSprints(selectedProject.id);
       }, 300);
       
       return () => {
         clearTimeout(timeoutId);
-        isMounted = false;
       };
     }
     
-    return () => {
-      isMounted = false;
-    };
+    return () => {};
   }, [selectedProject, fetchSprints]);
 
   // Load tickets when sprint changes
   useEffect(() => {
-    let isMounted = true;
-    
     if (selectedSprint && !ticketsFetchingRef.current) {
       // Small delay to allow UI to update first
       const timeoutId = setTimeout(() => {
-        if (isMounted) fetchTickets(selectedSprint.id);
+        if (isMountedRef.current) fetchTickets(selectedSprint.id);
       }, 300);
       
       return () => {
         clearTimeout(timeoutId);
-        isMounted = false;
       };
     }
     
-    return () => {
-      isMounted = false;
-    };
+    return () => {};
   }, [selectedSprint, fetchTickets]);
 
   // Handle changes in selected project by resetting sprint selection
@@ -435,8 +475,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const validSprint = selectedSprint && projectSprints.some(s => s.id === selectedSprint.id);
         if (!validSprint) {
           const activeSprintIndex = projectSprints.findIndex(s => s.state === 'active');
-          setSelectedSprint(projectSprints[activeSprintIndex !== -1 ? activeSprintIndex : 0]);
+          if (isMountedRef.current) {
+            setSelectedSprint(projectSprints[activeSprintIndex !== -1 ? activeSprintIndex : 0]);
+          }
         }
+      } else if (isMountedRef.current && projectSprints.length === 0 && selectedSprint) {
+        // Clear selected sprint if there are no sprints for the project
+        setSelectedSprint(null);
       }
     }
   }, [selectedProject, sprints, selectedSprint]);

@@ -5,7 +5,7 @@ import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ExternalLink, RefreshCw, Settings, ChevronDown } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, ChevronDown, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -22,6 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const StoriesPage: React.FC = () => {
   const { 
@@ -136,60 +137,94 @@ const StoriesPage: React.FC = () => {
           </Card>
         ) : (
           <div className="space-y-4">
-            <Card className="shadow-sm">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-lg">Select Project & Sprint</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label htmlFor="project-select" className="text-sm font-medium">
-                    Project
-                  </label>
-                  <Select 
-                    value={selectedProject?.id} 
-                    onValueChange={handleProjectChange}
-                    disabled={loading || projects.length === 0}
-                  >
-                    <SelectTrigger id="project-select" className="w-full">
-                      <SelectValue placeholder="Select a project" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map(project => (
-                        <SelectItem key={project.id} value={project.id}>
-                          {project.name} ({project.key})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                <div className="space-y-2">
-                  <label htmlFor="sprint-select" className="text-sm font-medium">
-                    Sprint
-                  </label>
-                  {isLoadingSprints ? (
-                    <Skeleton className="h-10 w-full rounded-md" />
-                  ) : (
-                    <Select 
-                      value={selectedSprint?.id} 
-                      onValueChange={handleSprintChange}
-                      disabled={!selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
-                    >
-                      <SelectTrigger id="sprint-select" className="w-full">
-                        <SelectValue placeholder="Select a sprint" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(sprints[selectedProject?.id || ''] || []).map(sprint => (
-                          <SelectItem key={sprint.id} value={sprint.id}>
-                            {sprint.name} ({sprint.state})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Show a loading state while projects are initially loading */}
+            {loading && projects.length === 0 ? (
+              <Card className="animate-pulse">
+                <CardHeader>
+                  <Skeleton className="h-6 w-40 mb-2" />
+                  <Skeleton className="h-4 w-60" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Select Project & Sprint</CardTitle>
+                </CardHeader>
+                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label htmlFor="project-select" className="text-sm font-medium">
+                      Project
+                    </label>
+                    {projects.length === 0 ? (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>No Projects Found</AlertTitle>
+                        <AlertDescription>
+                          No projects were found in your Jira account. Make sure you have the correct permissions.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Select 
+                        value={selectedProject?.id} 
+                        onValueChange={handleProjectChange}
+                        disabled={loading || projects.length === 0}
+                      >
+                        <SelectTrigger id="project-select" className="w-full">
+                          <SelectValue placeholder="Select a project" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projects.map(project => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name} ({project.key})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label htmlFor="sprint-select" className="text-sm font-medium">
+                      Sprint
+                    </label>
+                    {isLoadingSprints ? (
+                      <Skeleton className="h-10 w-full rounded-md" />
+                    ) : selectedProject && (sprints[selectedProject?.id] || []).length === 0 ? (
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>No Sprints Found</AlertTitle>
+                        <AlertDescription>
+                          No sprints were found for this project. Make sure the project uses Scrum methodology.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Select 
+                        value={selectedSprint?.id} 
+                        onValueChange={handleSprintChange}
+                        disabled={!selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
+                      >
+                        <SelectTrigger id="sprint-select" className="w-full">
+                          <SelectValue placeholder="Select a sprint" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(sprints[selectedProject?.id || ''] || []).map(sprint => (
+                            <SelectItem key={sprint.id} value={sprint.id}>
+                              {sprint.name} ({sprint.state})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Loading state for tickets */}
             {isLoadingTickets ? (

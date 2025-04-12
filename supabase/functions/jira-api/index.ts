@@ -102,10 +102,22 @@ serve(async (req) => {
       
       // Special handling for common Jira error scenarios
       if (jiraResponse.status === 400 && endpoint.includes('board/') && endpoint.includes('/sprint')) {
-        // Handle case where board ID might be invalid or there's a permission issue
+        // Handle case where board ID might be invalid or there's a permission issue with sprints
         console.log(`Board sprint error: ${jiraApiUrl}`);
         return new Response(
           JSON.stringify({ values: [] }), // Return empty sprint array
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
+      // Special case for search endpoint with no results - return empty issues array instead of treating as error
+      if (jiraResponse.status === 404 && endpoint === 'search') {
+        console.log("Search returned no results, returning empty issues array");
+        return new Response(
+          JSON.stringify({ issues: [] }),
           { 
             status: 200, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -141,6 +153,18 @@ serve(async (req) => {
           // Return a more sensible response for common Jira API errors
           if (endpoint.includes('board') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
             console.log("Board not found or permission denied - returning empty results");
+            return new Response(
+              JSON.stringify({ values: [] }),
+              { 
+                status: 200, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
+          }
+
+          // Handle no sprints found by returning empty array (easier to handle in frontend)
+          if (endpoint.includes('sprint') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
+            console.log("No sprints found or permission denied - returning empty results");
             return new Response(
               JSON.stringify({ values: [] }),
               { 
