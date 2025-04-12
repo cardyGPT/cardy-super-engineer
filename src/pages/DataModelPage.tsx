@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Database, FileUp, AlertTriangle } from "lucide-react";
+import { Database, FileUp, AlertTriangle, Info } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -23,6 +23,7 @@ import DocumentUpload from "@/components/documents/DocumentUpload";
 import ERDiagramViewer from "@/components/data-model/ERDiagramViewer";
 import { DataModel } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 const DataModelPage = () => {
   const { projects, documents, getDocumentDataModel } = useProject();
@@ -31,10 +32,15 @@ const DataModelPage = () => {
   );
   const [currentDataModel, setCurrentDataModel] = useState<DataModel | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const { toast } = useToast();
   
+  // Filter to only show data model documents
   const dataModelDocuments = documents.filter(
     (doc) => doc.type === "data-model"
   );
+  
+  console.log("Data model documents:", dataModelDocuments);
   
   const selectedDocument = dataModelDocuments.find(
     (doc) => doc.id === selectedDocumentId
@@ -42,9 +48,13 @@ const DataModelPage = () => {
   
   // Load the selected data model
   useEffect(() => {
+    console.log("Selected document ID changed:", selectedDocumentId);
+    
     if (selectedDocumentId) {
       try {
         const model = getDocumentDataModel(selectedDocumentId);
+        console.log("Loaded data model:", model);
+        
         if (model) {
           setCurrentDataModel(model);
           setError(null);
@@ -70,6 +80,28 @@ const DataModelPage = () => {
   const handleDocumentChange = (docId: string) => {
     setSelectedDocumentId(docId);
   };
+  
+  const handleUploadComplete = () => {
+    console.log("Upload complete, refreshing data models...");
+    setUploadDialogOpen(false);
+    
+    // Find the most recently uploaded data model
+    const latestDoc = documents
+      .filter(doc => doc.type === "data-model")
+      .sort((a, b) => 
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      )[0];
+      
+    if (latestDoc) {
+      console.log("Setting selected document to latest:", latestDoc.id);
+      setSelectedDocumentId(latestDoc.id);
+      
+      toast({
+        title: "Data model uploaded",
+        description: `${latestDoc.name} has been uploaded and selected.`
+      });
+    }
+  };
 
   return (
     <AppLayout>
@@ -83,7 +115,7 @@ const DataModelPage = () => {
           </div>
           
           {projects.length > 0 && (
-            <Dialog>
+            <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
               <DialogTrigger asChild>
                 <Button>
                   <FileUp className="h-4 w-4 mr-2" />
@@ -94,42 +126,13 @@ const DataModelPage = () => {
                 <DialogHeader>
                   <DialogTitle>Upload Data Model</DialogTitle>
                   <DialogDescription>
-                    Select a project to upload a data model JSON file
+                    Upload a JSON file containing your data model.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="project" className="text-sm font-medium block mb-1">
-                      Select Project
-                    </label>
-                    <Select defaultValue={projects[0]?.id}>
-                      <SelectTrigger id="project">
-                        <SelectValue placeholder="Select a project" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {projects.map((project) => (
-                          <SelectItem key={project.id} value={project.id}>
-                            {project.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <DocumentUpload 
-                    projectId={projects[0]?.id || ""}
-                    onUploadComplete={() => {
-                      // Refresh the selected document to the latest uploaded one
-                      const latestDoc = documents
-                        .filter(doc => doc.type === "data-model")
-                        .sort((a, b) => 
-                          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-                        )[0];
-                      if (latestDoc) {
-                        setSelectedDocumentId(latestDoc.id);
-                      }
-                    }}
-                  />
-                </div>
+                <DocumentUpload 
+                  projectId={projects[0]?.id || ""}
+                  onUploadComplete={handleUploadComplete}
+                />
               </DialogContent>
             </Dialog>
           )}
@@ -145,7 +148,7 @@ const DataModelPage = () => {
                 : "Upload a JSON data model file to visualize your entity relationships"}
             </p>
             {projects.length > 0 && (
-              <Dialog>
+              <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
                 <DialogTrigger asChild>
                   <Button className="mt-4">
                     <FileUp className="h-4 w-4 mr-2" />
@@ -161,16 +164,7 @@ const DataModelPage = () => {
                   </DialogHeader>
                   <DocumentUpload 
                     projectId={projects[0]?.id || ""}
-                    onUploadComplete={() => {
-                      const latestDoc = documents
-                        .filter(doc => doc.type === "data-model")
-                        .sort((a, b) => 
-                          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-                        )[0];
-                      if (latestDoc) {
-                        setSelectedDocumentId(latestDoc.id);
-                      }
-                    }}
+                    onUploadComplete={handleUploadComplete}
                   />
                 </DialogContent>
               </Dialog>
@@ -217,17 +211,38 @@ const DataModelPage = () => {
               {selectedDocument && currentDataModel ? (
                 <ERDiagramViewer dataModel={currentDataModel} />
               ) : (
-                <div className="h-full flex items-center justify-center">
+                <div className="h-full flex items-center justify-center flex-col gap-4">
                   <p className="text-gray-500">
                     {selectedDocument 
                       ? "Loading data model..." 
                       : "Select a data model to view its ER diagram"}
                   </p>
+                  
+                  {!selectedDocument && dataModelDocuments.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}
+                    >
+                      <Database className="h-4 w-4 mr-2" />
+                      Load First Data Model
+                    </Button>
+                  )}
                 </div>
               )}
             </div>
           </div>
         )}
+        
+        <div className="mt-4">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>Tips for Data Models</AlertTitle>
+            <AlertDescription>
+              Upload a JSON file with <code>entities</code> and <code>relationships</code> arrays. Each entity should have
+              an id, name, definition, type, and attributes array. Each relationship should have source and target entity IDs.
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
     </AppLayout>
   );
