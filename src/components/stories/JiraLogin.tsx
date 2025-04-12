@@ -47,39 +47,44 @@ const JiraLogin: React.FC = () => {
       }
       
       // Create credentials object
-      const credentials: JiraCredentials = {
+      const newCredentials: JiraCredentials = {
         domain: cleanDomain,
         email: email.trim(),
         apiToken: apiToken.trim()
       };
       
-      console.log("Testing Jira connection with credentials:", { domain: credentials.domain, email: credentials.email });
+      console.log("Testing Jira connection with credentials:", { domain: newCredentials.domain, email: newCredentials.email });
       
-      // Validate credentials by making a test API call to get current user
+      // Validate credentials by making a test API call to get projects
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
           action: 'getProjects',
-          domain: credentials.domain,
-          email: credentials.email,
-          apiToken: credentials.apiToken
+          domain: newCredentials.domain,
+          email: newCredentials.email,
+          apiToken: newCredentials.apiToken
         }
       });
       
       console.log("Jira API response:", data);
       
-      if (error || !data || data.error) {
-        console.error("Jira login error:", error || data?.error);
+      if (error) {
+        console.error("Jira API error from Edge Function:", error);
+        throw new Error(error.message || "Failed to connect to Jira API");
+      }
+      
+      if (data?.error) {
+        console.error("Jira API returned an error:", data.error);
         throw new Error(
-          error?.message || 
-          data?.error || 
-          data?.details?.message || 
-          data?.details?.errorMessages?.join(', ') || 
+          data.message || 
+          data.error || 
+          data.details?.message || 
+          data.details?.errorMessages?.join(', ') || 
           "Invalid Jira credentials"
         );
       }
       
       // Credentials are valid, save them permanently
-      setCredentials(credentials);
+      setCredentials(newCredentials);
       setIsConnected(true);
       
       toast({
@@ -88,18 +93,18 @@ const JiraLogin: React.FC = () => {
         variant: "success",
       });
       
-      setIsLoading(false);
     } catch (error: any) {
       console.error("Login error:", error);
       setLoginError(error.message || "Failed to connect to Jira");
       setIsConnected(false);
-      setIsLoading(false);
       
       toast({
         title: "Connection Failed",
         description: error.message || "Failed to connect to Jira",
         variant: "destructive",
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 

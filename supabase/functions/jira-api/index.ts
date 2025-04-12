@@ -17,10 +17,36 @@ serve(async (req) => {
   }
 
   try {
-    const { action, domain, email, apiToken, data } = await req.json();
+    const requestData = await req.json();
+    console.log("Request data received:", {
+      action: requestData.action,
+      endpoint: requestData.endpoint,
+      hasCredentials: !!requestData.credentials || !!requestData.domain,
+      method: requestData.method || 'GET'
+    });
+    
+    // Handle both legacy 'action' and new 'endpoint' parameter formats
+    const action = requestData.action;
+    const endpoint = requestData.endpoint;
+    
+    // Extract credentials - handle both formats
+    let domain, email, apiToken;
+    
+    if (requestData.credentials) {
+      // New format with credentials object
+      domain = requestData.credentials.domain;
+      email = requestData.credentials.email;
+      apiToken = requestData.credentials.apiToken || requestData.credentials.token; // Support both naming conventions
+    } else {
+      // Legacy format with separate parameters
+      domain = requestData.domain;
+      email = requestData.email;
+      apiToken = requestData.apiToken;
+    }
     
     // Enhanced logging
-    console.log(`Processing ${action} request for domain: ${domain}`);
+    console.log(`Processing request for domain: ${domain}`);
+    console.log(`Credential check: domain=${!!domain}, email=${!!email}, apiToken=${!!apiToken}`);
     
     // Basic validation
     if (!domain || !email || !apiToken) {
@@ -48,104 +74,121 @@ serve(async (req) => {
     
     let response;
     let url;
+    let method = requestData.method || 'GET';
+    let body = null;
     
-    switch (action) {
-      case 'getProjects':
-        url = `https://${cleanDomain}/rest/api/2/project`;
-        console.log(`Fetching projects from: ${url}`);
-        
-        response = await fetch(url, {
-          headers: {
-            'Authorization': authHeader,
-            'Accept': 'application/json'
-          }
-        });
-        break;
-        
-      case 'getSprints':
-        if (!data?.boardId) {
-          console.error("Missing boardId for getSprints action");
-          return new Response(
-            JSON.stringify({ error: "Board ID is required for getting sprints" }),
-            { 
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 400 
-            }
-          );
-        }
-        
-        url = `https://${cleanDomain}/rest/agile/1.0/board/${data.boardId}/sprint`;
-        console.log(`Fetching sprints from: ${url}`);
-        
-        response = await fetch(url, {
-          headers: {
-            'Authorization': authHeader,
-            'Accept': 'application/json'
-          }
-        });
-        break;
-        
-      case 'getTickets':
-        if (!data?.jql) {
-          console.error("Missing JQL for getTickets action");
-          return new Response(
-            JSON.stringify({ error: "JQL query is required for getting tickets" }),
-            { 
-              headers: { ...corsHeaders, "Content-Type": "application/json" },
-              status: 400 
-            }
-          );
-        }
-        
-        url = `https://${cleanDomain}/rest/api/2/search?jql=${encodeURIComponent(data.jql)}`;
-        console.log(`Fetching tickets from: ${url}`);
-        
-        response = await fetch(url, {
-          headers: {
-            'Authorization': authHeader,
-            'Accept': 'application/json'
-          }
-        });
-        break;
+    // Handle either endpoint or legacy action pattern
+    if (endpoint) {
+      // New pattern: using endpoint
+      url = `https://${cleanDomain}/rest/${endpoint.startsWith('agile/') ? '' : 'api/2/'}${endpoint}`;
       
-      case 'updateTicket':
-        if (!data?.ticketId || !data?.content) {
-          console.error("Missing ticketId or content for updateTicket action");
+      // Add query parameters if provided
+      if (requestData.params) {
+        const queryParams = new URLSearchParams();
+        for (const [key, value] of Object.entries(requestData.params)) {
+          queryParams.append(key, String(value));
+        }
+        url += `?${queryParams.toString()}`;
+      }
+      
+      console.log(`Making request to: ${url} (${method})`);
+      
+      // Add body for POST, PUT, PATCH methods
+      if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && requestData.data) {
+        body = JSON.stringify(requestData.data);
+      }
+      
+    } else if (action) {
+      // Legacy pattern: using action
+      const data = requestData.data;
+      
+      switch (action) {
+        case 'getProjects':
+          url = `https://${cleanDomain}/rest/api/2/project`;
+          console.log(`Fetching projects from: ${url}`);
+          break;
+          
+        case 'getSprints':
+          if (!data?.boardId) {
+            console.error("Missing boardId for getSprints action");
+            return new Response(
+              JSON.stringify({ error: "Board ID is required for getting sprints" }),
+              { 
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 400 
+              }
+            );
+          }
+          
+          url = `https://${cleanDomain}/rest/agile/1.0/board/${data.boardId}/sprint`;
+          console.log(`Fetching sprints from: ${url}`);
+          break;
+          
+        case 'getTickets':
+          if (!data?.jql) {
+            console.error("Missing JQL for getTickets action");
+            return new Response(
+              JSON.stringify({ error: "JQL query is required for getting tickets" }),
+              { 
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 400 
+              }
+            );
+          }
+          
+          url = `https://${cleanDomain}/rest/api/2/search?jql=${encodeURIComponent(data.jql)}`;
+          console.log(`Fetching tickets from: ${url}`);
+          break;
+        
+        case 'updateTicket':
+          if (!data?.ticketId || !data?.content) {
+            console.error("Missing ticketId or content for updateTicket action");
+            return new Response(
+              JSON.stringify({ error: "Ticket ID and content are required for updating a ticket" }),
+              { 
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+                status: 400 
+              }
+            );
+          }
+          
+          url = `https://${cleanDomain}/rest/api/2/issue/${data.ticketId}/comment`;
+          method = 'POST';
+          body = JSON.stringify({ body: data.content });
+          console.log(`Updating ticket at: ${url}`);
+          break;
+          
+        default:
+          console.error(`Invalid action requested: ${action}`);
           return new Response(
-            JSON.stringify({ error: "Ticket ID and content are required for updating a ticket" }),
+            JSON.stringify({ error: "Invalid action" }),
             { 
               headers: { ...corsHeaders, "Content-Type": "application/json" },
               status: 400 
             }
           );
+      }
+    } else {
+      console.error("No endpoint or action specified");
+      return new Response(
+        JSON.stringify({ error: "No endpoint or action specified" }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
         }
-        
-        url = `https://${cleanDomain}/rest/api/2/issue/${data.ticketId}/comment`;
-        console.log(`Updating ticket at: ${url}`);
-        
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Authorization': authHeader,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({
-            body: data.content
-          })
-        });
-        break;
-        
-      default:
-        console.error(`Invalid action requested: ${action}`);
-        return new Response(
-          JSON.stringify({ error: "Invalid action" }),
-          { 
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 400 
-          }
-        );
+      );
     }
+    
+    // Make the API request
+    response = await fetch(url, {
+      method: method,
+      headers: {
+        'Authorization': authHeader,
+        'Accept': 'application/json',
+        ...(body ? { 'Content-Type': 'application/json' } : {})
+      },
+      ...(body ? { body } : {})
+    });
     
     // Detailed response logging
     console.log(`Jira API response status: ${response.status}`);
@@ -176,7 +219,7 @@ serve(async (req) => {
     }
     
     const responseData = await response.json();
-    console.log(`Successful response for ${action}, received ${JSON.stringify(responseData).substring(0, 100)}...`);
+    console.log(`Successful response, received ${JSON.stringify(responseData).substring(0, 100)}...`);
     
     return new Response(
       JSON.stringify(responseData),

@@ -4,8 +4,12 @@ import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
+  // Add request logging
+  console.log(`GSuite validation function received ${req.method} request`);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
     return new Response(null, { 
       headers: corsHeaders,
       status: 204
@@ -36,11 +40,22 @@ serve(async (req) => {
     // For successful validation, both API key and settings should be present
     const success = isValid && !!settings;
     
+    let message;
+    if (!apiKey) {
+      message = "GSuite API key is not configured";
+    } else if (!settings) {
+      message = "GSuite settings are not configured";
+    } else if (success) {
+      message = "GSuite configuration is valid";
+    } else {
+      message = "GSuite configuration is incomplete";
+    }
+    
     return new Response(
       JSON.stringify({ 
         valid: success,
         settings: settings,
-        message: success ? "GSuite configuration is valid" : "GSuite configuration is incomplete"
+        message: message
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -54,7 +69,7 @@ serve(async (req) => {
       JSON.stringify({ 
         valid: false, 
         error: err.message,
-        message: "Error validating GSuite configuration"
+        message: "Error validating GSuite configuration: " + err.message
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
