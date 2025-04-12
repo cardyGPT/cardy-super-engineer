@@ -1,1 +1,8 @@
+
 project_id = "gswwmieyrfdhrfwsgjnw"
+
+[functions.chat-with-data-model]
+verify_jwt = true
+
+[functions.chat-with-documents]
+verify_jwt = true

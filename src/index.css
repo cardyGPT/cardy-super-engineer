@@ -1,101 +1,291 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
+ 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
-
+    --foreground: 224 71.4% 4.1%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
+    --card-foreground: 224 71.4% 4.1%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 262.1 83.3% 57.8%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220.9 39.3% 11%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220.9 39.3% 11%;
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
-
+    --destructive-foreground: 210 20% 98%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 262.1 83.3% 57.8%;
     --radius: 0.5rem;
-
-    --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 224 71.4% 4.1%;
+    --sidebar-muted: 220 14.3% 95.9%;
+    --sidebar-muted-foreground: 220 8.9% 46.1%;
+    --sidebar-accent: 220 14.3% 95.9%;
+    --sidebar-accent-foreground: 220.9 39.3% 11%;
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 262.1 83.3% 57.8%;
   }
-
+ 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
+    --background: 224 71.4% 4.1%;
+    --foreground: 210 20% 98%;
+    --card: 224 71.4% 4.1%;
+    --card-foreground: 210 20% 98%;
+    --popover: 224 71.4% 4.1%;
+    --popover-foreground: 210 20% 98%;
+    --primary: 263.4 70% 50.4%;
+    --primary-foreground: 210 20% 98%;
+    --secondary: 215 27.9% 16.9%;
+    --secondary-foreground: 210 20% 98%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
+    --accent: 215 27.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --destructive-foreground: 210 20% 98%;
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 263.4 70% 50.4%;
+    --sidebar: 224 71.4% 4.1%;
+    --sidebar-foreground: 210 20% 98%;
+    --sidebar-muted: 215 27.9% 16.9%;
+    --sidebar-muted-foreground: 217.9 10.6% 64.9%;
+    --sidebar-accent: 215 27.9% 16.9%;
+    --sidebar-accent-foreground: 210 20% 98%;
+    --sidebar-border: 215 27.9% 16.9%;
+    --sidebar-ring: 263.4 70% 50.4%;
   }
 }
-
+ 
 @layer base {
   * {
     @apply border-border;
   }
-
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ER Diagram Styles */
+.entity-node {
+  border: 2px solid #e5e7eb;
+  border-radius: 4px;
+  background-color: white;
+  padding: 8px;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  min-width: 180px;
+}
+
+.entity-node__header {
+  padding: 4px 6px;
+  margin: -8px -8px 8px -8px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.entity-node__type-badge {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 99px;
+  font-weight: 500;
+  text-transform: uppercase;
+  background-color: #f3f4f6;
+}
+
+.entity-node__definition {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.entity-node.selected {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.entity-node.entity {
+  border-left: 3px solid #8b5cf6;
+}
+
+.entity-node.sub-entity {
+  border-left: 3px solid #10b981;
+}
+
+.entity-attribute {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  padding: 3px 0;
+  border-bottom: 1px dashed #f3f4f6;
+}
+
+.entity-attribute:last-child {
+  border-bottom: none;
+}
+
+.entity-attribute__name {
+  font-weight: 500;
+}
+
+.entity-attribute__type {
+  color: #6b7280;
+  font-size: 11px;
+}
+
+.entity-attribute .pk-badge, 
+.entity-attribute .fk-badge, 
+.entity-attribute .req-badge {
+  height: 16px;
+  font-size: 10px;
+  padding: 0 4px;
+  border-radius: 3px;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.entity-attribute .pk-badge {
+  background-color: #fed7aa;
+  color: #9a3412;
+}
+
+.entity-attribute .fk-badge {
+  background-color: #bfdbfe;
+  color: #1e40af;
+}
+
+.entity-attribute .req-badge {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+/* Fix relationship edges */
+.react-flow__edge path {
+  stroke: #3b82f6 !important; /* Blue color */
+  stroke-dasharray: 5 !important; /* Dotted line */
+  stroke-width: 1.5 !important;
+  animation: flowAnimation 30s linear infinite;
+}
+
+.react-flow__edge-path {
+  stroke: #3b82f6 !important; /* Blue color */
+  stroke-dasharray: 5 !important; /* Dotted line */
+  stroke-width: 1.5 !important;
+}
+
+.react-flow__edge-text {
+  font-size: 10px;
+  font-weight: 500;
+  fill: #4b5563;
+}
+
+@keyframes flowAnimation {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Control styles */
+.flow-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.flow-controls button {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.flow-controls button:hover {
+  background-color: #f9fafb;
+}
+
+.minimap {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  z-index: 5;
+  border-radius: 4px;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+/* React Flow Style Overrides */
+.react-flow__node {
+  border-radius: 4px !important;
+  padding: 0 !important;
+  background-color: transparent !important;
+  border: none !important;
+  display: block !important;
+  min-width: auto !important;
+  box-shadow: none !important;
+}
+
+.react-flow__handle {
+  opacity: 0 !important;
+}
+
+.react-flow__edge-text-wrapper {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+}
+
+.react-flow__edge-textbg {
+  fill: rgba(255, 255, 255, 0.9);
+  border-radius: 5px;
+}
+
+.react-flow__minimap {
+  background-color: #f9fafb !important;
+  border-radius: 4px !important;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(139, 92, 246, 0.1) !important;
+  stroke: #8b5cf6 !important;
+}
+
+.react-flow__minimap-node {
+  fill: #d8b4fe !important;
+  stroke: #8b5cf6 !important;
+}
+
+.react-flow__controls {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  border-radius: 4px !important;
+  overflow: hidden !important;
+}
+
+.react-flow__controls-button {
+  background-color: white !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  border-right: none !important;
+  color: #374151 !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: #f9fafb !important;
 }

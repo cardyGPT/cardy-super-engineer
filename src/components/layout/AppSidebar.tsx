@@ -18,6 +18,7 @@ import {
   Database,
   User,
   Settings,
+  BrainCircuit,
 } from "lucide-react";
 
 export function AppSidebar() {
@@ -65,6 +66,17 @@ export function AppSidebar() {
                 >
                   <Database className="h-5 w-5" />
                   <span>Data Models</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Cardy Mind">
+                <Link
+                  to="/cardy-mind"
+                  className={location.pathname === "/cardy-mind" ? "text-primary" : ""}
+                >
+                  <BrainCircuit className="h-5 w-5" />
+                  <span>Cardy Mind</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -9,6 +9,7 @@ import ProjectsPage from "./pages/ProjectsPage";
 import ProjectDetailPage from "./pages/ProjectDetailPage";
 import DocumentsPage from "./pages/DocumentsPage";
 import DataModelPage from "./pages/DataModelPage";
+import CardyMindPage from "./pages/CardyMindPage";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 
@@ -27,6 +28,7 @@ const App = () => (
             <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/data-models" element={<DataModelPage />} />
+            <Route path="/cardy-mind" element={<CardyMindPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
