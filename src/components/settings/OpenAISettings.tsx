@@ -1,85 +1,85 @@
 
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/components/ui/use-toast";
-import { BrainCircuit, Save, CheckCircle } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
+import { CheckCircle } from "lucide-react";
 
 const OpenAISettings: React.FC = () => {
-  const [apiKey, setApiKey] = useState<string>(() => {
-    return localStorage.getItem("openai_api_key") || "";
-  });
-  const [defaultModel, setDefaultModel] = useState<string>(() => {
-    return localStorage.getItem("openai_default_model") || "gpt-4o-mini";
-  });
-  const [isVerified, setIsVerified] = useState<boolean>(() => {
-    return localStorage.getItem("openai_verified") === "true";
-  });
+  const [apiKey, setApiKey] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  
+  const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
 
-  const handleSaveSettings = () => {
-    setIsLoading(true);
-    
-    // Save to localStorage
-    localStorage.setItem("openai_api_key", apiKey);
-    localStorage.setItem("openai_default_model", defaultModel);
-    
-    setTimeout(() => {
-      setIsLoading(false);
-      
-      toast({
-        title: "Settings Saved",
-        description: "Your OpenAI API settings have been saved successfully.",
-        variant: "success",
-      });
-    }, 500);
-  };
+  useEffect(() => {
+    // Check if API key is configured
+    checkApiKeyStatus();
+  }, []);
 
-  const verifyAPIKey = async () => {
-    setIsVerifying(true);
-    
+  const checkApiKeyStatus = async () => {
     try {
-      // Simulate API verification
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const { data, error } = await supabase.functions.invoke('validate-openai', {});
       
-      // In a real app, you would make an API call to verify the key
-      const isValid = apiKey.startsWith("sk-") && apiKey.length > 20;
+      if (error) {
+        console.error("Error checking OpenAI API key:", error);
+        setIsConnected(false);
+        return;
+      }
       
-      if (isValid) {
-        localStorage.setItem("openai_verified", "true");
-        setIsVerified(true);
-        
+      setIsConnected(!!data?.valid);
+      
+      if (data?.valid) {
         toast({
-          title: "API Key Verified",
-          description: "Your OpenAI API key has been verified successfully.",
+          title: "OpenAI API",
+          description: "Your OpenAI API key is configured and working",
           variant: "success",
         });
-      } else {
-        localStorage.setItem("openai_verified", "false");
-        setIsVerified(false);
-        
-        toast({
-          title: "Invalid API Key",
-          description: "Please check your OpenAI API key and try again.",
-          variant: "destructive",
-        });
       }
-    } catch (error) {
-      console.error("Error verifying API key:", error);
-      
+    } catch (err) {
+      console.error("Error checking OpenAI API key:", err);
+      setIsConnected(false);
+    }
+  };
+
+  const handleSaveApiKey = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      if (!apiKey.trim()) {
+        throw new Error("API key cannot be empty");
+      }
+
+      // Test the API key
+      const { data, error } = await supabase.functions.invoke('validate-openai', {
+        body: { apiKey }
+      });
+
+      if (error || !data?.valid) {
+        throw new Error(error?.message || data?.error || "Invalid OpenAI API key");
+      }
+
+      // Success - API key is valid
+      setIsConnected(true);
+      setApiKey(''); // Clear the input for security
+
       toast({
-        title: "Verification Failed",
-        description: "There was an error verifying your API key. Please try again.",
+        title: "API Key Saved",
+        description: "Your OpenAI API key has been saved successfully",
+        variant: "success",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save API key",
         variant: "destructive",
       });
+      setIsConnected(false);
     } finally {
-      setIsVerifying(false);
+      setIsLoading(false);
     }
   };
 
@@ -88,93 +88,74 @@ const OpenAISettings: React.FC = () => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>OpenAI API Settings</span>
-          {isVerified && <CheckCircle className="h-5 w-5 text-green-500" />}
+          {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
+        <CardDescription>
+          {isConnected
+            ? "Your OpenAI API key is configured and working"
+            : "Configure your OpenAI API key to enable AI-powered features"}
+        </CardDescription>
       </CardHeader>
-      <CardContent className="pt-2 space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="api-key">OpenAI API Key</Label>
-          <div className="flex gap-2">
-            <Input 
-              id="api-key" 
-              placeholder="Enter your OpenAI API key" 
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              type="password"
-              className="flex-1"
-            />
-            <Button 
-              variant="outline" 
-              onClick={verifyAPIKey}
-              disabled={!apiKey || isVerifying}
-            >
-              {isVerifying ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
-                  Verifying...
-                </span>
-              ) : isVerified ? (
-                <span className="flex items-center gap-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                  Verified
-                </span>
-              ) : (
-                "Verify"
-              )}
-            </Button>
-          </div>
-          <p className="text-sm text-muted-foreground">
-            Get your API key from the <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">OpenAI dashboard</a>
-          </p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="default-model">Default Model</Label>
-          <select 
-            id="default-model"
-            value={defaultModel}
-            onChange={(e) => setDefaultModel(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
-          >
-            <option value="gpt-4o-mini">GPT-4o Mini (Faster)</option>
-            <option value="gpt-4o">GPT-4o (More Powerful)</option>
-            <option value="gpt-4.5-preview">GPT-4.5 Preview (Experimental)</option>
-          </select>
-          <p className="text-sm text-muted-foreground">
-            Select which model to use by default for generating content
-          </p>
-        </div>
-        
-        <div className="space-y-4 pt-4">
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="streaming" className="flex-1">Enable streaming responses</Label>
-            <Switch id="streaming" defaultChecked />
-          </div>
-          
-          <div className="flex items-center justify-between space-x-2">
-            <Label htmlFor="save-history" className="flex-1">Save chat history</Label>
-            <Switch id="save-history" defaultChecked />
-          </div>
-        </div>
-        
-        <Button 
-          onClick={handleSaveSettings} 
-          disabled={isLoading} 
-          className="w-full mt-4"
-        >
-          {isLoading ? (
-            <span className="flex items-center gap-2">
-              <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
-              Saving...
-            </span>
+      <form onSubmit={handleSaveApiKey}>
+        <CardContent className="space-y-4">
+          {isConnected ? (
+            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+              <div className="flex">
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                <div>
+                  <p className="text-green-800 font-medium">Connected to OpenAI API</p>
+                  <p className="text-green-700 text-sm mt-1">
+                    Your API key is securely stored and working correctly.
+                  </p>
+                </div>
+              </div>
+            </div>
           ) : (
-            <span className="flex items-center gap-2">
-              <Save className="h-4 w-4" />
-              Save Settings
-            </span>
+            <div className="space-y-2">
+              <Label htmlFor="openai-key">OpenAI API Key</Label>
+              <Input
+                id="openai-key"
+                type="password"
+                placeholder="sk-..."
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                required={!isConnected}
+              />
+              <p className="text-sm text-muted-foreground">
+                You can get your API key from the{" "}
+                <a 
+                  href="https://platform.openai.com/api-keys" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline"
+                >
+                  OpenAI dashboard
+                </a>
+              </p>
+            </div>
           )}
-        </Button>
-      </CardContent>
+        </CardContent>
+        <CardFooter>
+          {isConnected ? (
+            <Button
+              type="submit"
+              className="w-full"
+              variant="outline"
+              disabled={isLoading}
+            >
+              Update API Key
+            </Button>
+          ) : (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isLoading || !apiKey.trim()}
+            >
+              {isLoading ? "Validating..." : "Save API Key"}
+            </Button>
+          )}
+        </CardFooter>
+      </form>
     </Card>
   );
 };

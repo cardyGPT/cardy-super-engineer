@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { ArrowLeft, FileDown, FileUp, Code, FileCheck, ClipboardList } from "lucide-react";
 import { JiraTicket } from "@/types/jira";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 
 const StoryDetail: React.FC = () => {
@@ -18,6 +18,7 @@ const StoryDetail: React.FC = () => {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("lld");
   const [editedContent, setEditedContent] = useState<Record<string, string>>({});
+  const [isGenerating, setIsGenerating] = useState(false);
 
   // Find any data model documents
   const dataModelDoc = documents.find(doc => doc.type === "data-model");
@@ -45,7 +46,7 @@ const StoryDetail: React.FC = () => {
     if (content && typeof content === 'object' && 
         'type' in content && 'version' in content && 'content' in content) {
       try {
-        return JSON.stringify(content);
+        return JSON.stringify(content, null, 2);
       } catch (e) {
         console.error("Error parsing Jira content object:", e);
         return "[Content formatting error]";
@@ -55,7 +56,7 @@ const StoryDetail: React.FC = () => {
     // Handle any other object type
     if (typeof content === 'object') {
       try {
-        return JSON.stringify(content);
+        return JSON.stringify(content, null, 2);
       } catch (e) {
         console.error("Error stringifying content object:", e);
         return "[Invalid content format]";
@@ -69,17 +70,39 @@ const StoryDetail: React.FC = () => {
   const handleGenerate = async (type: "lld" | "code" | "tests" | "all") => {
     if (!selectedTicket) return;
     
+    setIsGenerating(true);
+    
     // Get all document content as context
     const documentsContext = documents
       .map(doc => `${doc.name} (${doc.type}): ${JSON.stringify(doc.content).substring(0, 1000)}...`)
       .join("\n\n");
     
-    await generateContent({
-      type,
-      jiraTicket: selectedTicket,
-      dataModel,
-      documentsContext
-    });
+    try {
+      await generateContent({
+        type,
+        jiraTicket: selectedTicket,
+        dataModel,
+        documentsContext
+      });
+      
+      // Switch to the appropriate tab after generation
+      setActiveTab(type === 'all' ? 'lld' : type);
+      
+      toast({
+        title: "Content Generated",
+        description: `Successfully generated ${type === 'all' ? 'all content' : type} content`,
+        variant: "success"
+      });
+    } catch (error) {
+      console.error("Error generating content:", error);
+      toast({
+        title: "Generation Failed",
+        description: "Failed to generate content. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleEdit = (tab: string, content: string) => {
@@ -124,6 +147,7 @@ const StoryDetail: React.FC = () => {
       toast({
         title: "Content Pushed",
         description: `Successfully updated Jira ticket ${selectedTicket.key}`,
+        variant: "success"
       });
     }
   };
@@ -170,11 +194,11 @@ const StoryDetail: React.FC = () => {
         </Card>
       )}
       
-      <div className="flex gap-2 mt-4">
+      <div className="flex flex-wrap gap-2 mt-4">
         <Button 
           variant="outline" 
           onClick={() => handleGenerate("lld")}
-          disabled={loading}
+          disabled={loading || isGenerating}
         >
           <FileDown className="h-4 w-4 mr-2" />
           Generate LLD
@@ -182,7 +206,7 @@ const StoryDetail: React.FC = () => {
         <Button 
           variant="outline" 
           onClick={() => handleGenerate("code")}
-          disabled={loading}
+          disabled={loading || isGenerating}
         >
           <Code className="h-4 w-4 mr-2" />
           Generate Code
@@ -190,21 +214,21 @@ const StoryDetail: React.FC = () => {
         <Button 
           variant="outline" 
           onClick={() => handleGenerate("tests")}
-          disabled={loading}
+          disabled={loading || isGenerating}
         >
           <FileCheck className="h-4 w-4 mr-2" />
           Generate Tests
         </Button>
         <Button 
           onClick={() => handleGenerate("all")}
-          disabled={loading}
+          disabled={loading || isGenerating}
         >
           <ClipboardList className="h-4 w-4 mr-2" />
           Generate All
         </Button>
       </div>
       
-      {loading && (
+      {(loading || isGenerating) && (
         <Card className="mt-4">
           <CardContent className="py-8">
             <div className="flex flex-col items-center justify-center">
@@ -215,7 +239,7 @@ const StoryDetail: React.FC = () => {
         </Card>
       )}
       
-      {generatedContent && !loading && (
+      {generatedContent && !loading && !isGenerating && (
         <div className="mt-4">
           <Tabs value={activeTab} onValueChange={setActiveTab}>
             <div className="flex justify-between items-center">
@@ -228,7 +252,7 @@ const StoryDetail: React.FC = () => {
               <Button 
                 size="sm" 
                 onClick={handlePushToJira}
-                disabled={loading}
+                disabled={loading || isGenerating}
               >
                 <FileUp className="h-4 w-4 mr-2" />
                 Push to Jira
@@ -246,7 +270,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.lld || safeGetContent(generatedContent.response || "")}
+                    value={editedContent.lld || safeGetContent(generatedContent.lld || generatedContent.response || "")}
                     onChange={(e) => handleEdit("lld", e.target.value)}
                   />
                 </CardContent>
@@ -264,7 +288,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.code || safeGetContent(generatedContent.response || "")}
+                    value={editedContent.code || safeGetContent(generatedContent.code || generatedContent.response || "")}
                     onChange={(e) => handleEdit("code", e.target.value)}
                   />
                 </CardContent>
@@ -282,7 +306,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.tests || safeGetContent(generatedContent.response || "")}
+                    value={editedContent.tests || safeGetContent(generatedContent.tests || generatedContent.response || "")}
                     onChange={(e) => handleEdit("tests", e.target.value)}
                   />
                 </CardContent>

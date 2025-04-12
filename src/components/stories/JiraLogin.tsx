@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,11 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { JiraCredentials } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
-import { useToast } from "@/components/ui/use-toast";
-import { CheckCircle } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { CheckCircle, Save } from "lucide-react";
 
 const JiraLogin: React.FC = () => {
-  const { setCredentials } = useStories();
+  const { credentials, setCredentials } = useStories();
   const [domain, setDomain] = useState("");
   const [email, setEmail] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -19,6 +19,16 @@ const JiraLogin: React.FC = () => {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
+
+  // Initialize form with existing credentials
+  useEffect(() => {
+    if (credentials) {
+      setDomain(credentials.domain || "");
+      setEmail(credentials.email || "");
+      setApiToken(credentials.apiToken || "");
+      setIsConnected(true);
+    }
+  }, [credentials]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +65,7 @@ const JiraLogin: React.FC = () => {
         throw new Error(error?.message || data?.error || "Invalid Jira credentials");
       }
       
-      // Credentials are valid, save them
+      // Credentials are valid, save them permanently
       setCredentials(credentials);
       setIsConnected(true);
       
@@ -88,7 +98,7 @@ const JiraLogin: React.FC = () => {
           {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
         <CardDescription>
-          Enter your Jira credentials to validate the connection
+          Enter your Jira credentials to connect and save your settings
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleLogin}>
@@ -150,7 +160,12 @@ const JiraLogin: React.FC = () => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Testing Connection..." : isConnected ? "Update Connection" : "Test Jira Connection"}
+            {isLoading ? "Testing Connection..." : (
+              <>
+                {isConnected ? <Save className="h-4 w-4 mr-2" /> : null}
+                {isConnected ? "Save Connection" : "Test & Save Connection"}
+              </>
+            )}
           </Button>
         </CardFooter>
       </form>

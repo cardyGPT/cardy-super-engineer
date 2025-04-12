@@ -32,9 +32,19 @@ export function useToast() {
     console.log(`Toast [${variant}]: ${title} - ${description}`);
   };
 
+  const dismiss = (toastId?: number) => {
+    setToasts(toasts => {
+      if (toastId) {
+        return toasts.filter(t => t.id !== toastId);
+      }
+      return [];
+    });
+  };
+
   return { 
     toast, 
-    toasts
+    toasts,
+    dismiss
   };
 }
 
