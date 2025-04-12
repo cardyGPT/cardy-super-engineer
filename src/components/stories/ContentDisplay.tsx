@@ -8,7 +8,7 @@ import 'highlight.js/styles/github.css';
 import { Button } from "@/components/ui/button";
 import { downloadContent, downloadFormattedHTML } from "@/utils/contentFormatters";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Download, Upload } from "lucide-react";
 import { useStories } from "@/contexts/StoriesContext";
 

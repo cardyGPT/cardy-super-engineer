@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useStories } from "@/contexts/StoriesContext";
@@ -60,7 +61,7 @@ const StoryDetailWrapper = () => {
         toast({
           title: "Content loaded",
           description: "Previously generated content has been loaded",
-          variant: "success",
+          variant: "default",
         });
       }
     } catch (error) {
@@ -154,7 +155,7 @@ const StoryDetailWrapper = () => {
         toast({
           title: "Content Pushed to Jira",
           description: `${contentTitle} has been added to Jira ticket ${selectedTicket.key}`,
-          variant: "success",
+          variant: "default",
         });
       } else {
         throw new Error("Failed to push content to Jira");
