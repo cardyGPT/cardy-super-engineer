@@ -33,18 +33,13 @@ serve(async (req) => {
     // Basic validation - in a real app, you'd verify the key with Google's API
     const isValid = apiKey.length > 10;
     
-    // Get the settings from KV or another permanent storage
-    let settings = null;
-    try {
-      // In a real implementation, you'd retrieve settings from some storage
-      // For this example, we'll simulate stored settings
-      settings = {
-        defaultDriveFolder: Deno.env.get("GSUITE_DEFAULT_FOLDER") || "",
-        autoSync: Deno.env.get("GSUITE_AUTO_SYNC") === "true"
-      };
-    } catch (err) {
-      console.error("Error retrieving GSuite settings:", err);
-    }
+    // Get the settings from environment variables
+    const settings = {
+      defaultDriveFolder: Deno.env.get("GSUITE_DEFAULT_FOLDER") || "",
+      autoSync: Deno.env.get("GSUITE_AUTO_SYNC") === "true"
+    };
+    
+    console.log("GSuite validation result:", { valid: isValid, settings });
     
     return new Response(
       JSON.stringify({ 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Mail, Save, Link, FileCheck, CheckCircle } from "lucide-react";
+import { Mail, Save, Link, FileCheck, CheckCircle, Shield, ArrowLeft, FileDown } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
 
 const GSuiteSettingsPage: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>("");
@@ -19,6 +22,7 @@ const GSuiteSettingsPage: React.FC = () => {
   const [initializing, setInitializing] = useState(true);
   
   const { toast } = useToast();
+  const navigate = useNavigate();
 
   // Reset the success message after a delay
   useEffect(() => {
@@ -37,15 +41,19 @@ const GSuiteSettingsPage: React.FC = () => {
   useEffect(() => {
     const checkGSuiteSettings = async () => {
       try {
+        console.log("Checking GSuite settings...");
         // Check if GSuite API key is stored
         const { data, error } = await supabase.functions.invoke('validate-gsuite', {});
         
         if (error) {
           console.error("Error checking GSuite settings:", error);
+          setIsConnected(false);
+          setInitializing(false);
           return;
         }
         
         if (data?.valid) {
+          console.log("GSuite is connected. Settings:", data.settings);
           setIsConnected(true);
           
           // Load settings
@@ -58,6 +66,9 @@ const GSuiteSettingsPage: React.FC = () => {
             title: "GSuite Connection",
             description: "Your GSuite integration is configured and working",
           });
+        } else {
+          console.log("GSuite is not connected:", data?.message);
+          setIsConnected(false);
         }
       } catch (err) {
         console.error("Error checking GSuite settings:", err);
@@ -73,16 +84,23 @@ const GSuiteSettingsPage: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Save API key securely
-      const { data: storedData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
-        body: { 
-          provider: 'gsuite',
-          apiKey
-        }
-      });
+      console.log("Saving GSuite settings...");
       
-      if (storeError) {
-        throw new Error(storeError.message);
+      // If API key provided, save it securely
+      if (apiKey.trim()) {
+        // Save API key securely
+        const { data: storedData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
+          body: { 
+            provider: 'gsuite',
+            apiKey
+          }
+        });
+        
+        if (storeError) {
+          throw new Error(storeError.message);
+        }
+        
+        console.log("API key stored successfully:", storedData);
       }
       
       // Save other settings
@@ -97,7 +115,18 @@ const GSuiteSettingsPage: React.FC = () => {
         throw new Error(settingsError.message);
       }
       
-      setIsConnected(true);
+      console.log("Settings saved successfully:", settingsData);
+      
+      // Verify that the settings were saved correctly
+      const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-gsuite', {});
+      
+      if (validationError) {
+        throw new Error(validationError.message);
+      }
+      
+      console.log("Validation after save:", validationData);
+      
+      setIsConnected(validationData?.valid || false);
       setApiKey("");  // Clear API key for security
       setConnectionSuccess(true);
       
@@ -107,6 +136,7 @@ const GSuiteSettingsPage: React.FC = () => {
         variant: "success",
       });
     } catch (error: any) {
+      console.error("Error saving GSuite settings:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to save GSuite settings",
@@ -146,19 +176,49 @@ const GSuiteSettingsPage: React.FC = () => {
       setIsLoading(false);
     }
   };
+  
+  // Handle navigation back to settings
+  const handleBackToSettings = () => {
+    navigate('/settings');
+  };
 
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <h1 className="text-3xl font-bold mb-2 flex items-center">
-          GSuite Integration Settings
-          {isConnected && (
-            <span className="ml-3 inline-flex items-center bg-green-100 text-green-700 text-sm px-2.5 py-0.5 rounded">
-              <CheckCircle className="w-4 h-4 mr-1" />
-              Connected
-            </span>
-          )}
-        </h1>
+        <div className="flex items-center mb-4">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={handleBackToSettings} 
+            className="mr-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Settings
+          </Button>
+          <h1 className="text-3xl font-bold flex items-center">
+            GSuite Integration Settings
+            {isConnected && (
+              <span className="ml-3 inline-flex items-center bg-green-100 text-green-700 text-sm px-2.5 py-0.5 rounded">
+                <CheckCircle className="w-4 h-4 mr-1" />
+                Connected
+              </span>
+            )}
+          </h1>
+        </div>
+        
+        <Alert className="mb-6 bg-blue-50 border border-blue-200">
+          <Shield className="h-5 w-5 text-blue-600" />
+          <AlertTitle className="text-blue-800">Security Information</AlertTitle>
+          <AlertDescription className="text-blue-700">
+            <p className="mb-2">Your Google API credentials are secured using industry best practices:</p>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>API keys are stored as encrypted environment variables</li>
+              <li>Keys are never exposed to browser code or included in application bundles</li>
+              <li>All Google API requests are processed through secure Edge Functions</li>
+              <li>Secure HTTPS connections are used for all API communications</li>
+            </ul>
+          </AlertDescription>
+        </Alert>
         
         {connectionSuccess && (
           <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
@@ -242,7 +302,7 @@ const GSuiteSettingsPage: React.FC = () => {
                 <Button 
                   className="w-full" 
                   onClick={handleSaveSettings} 
-                  disabled={!apiKey || isLoading || initializing}
+                  disabled={!apiKey && !isConnected || isLoading || initializing}
                 >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
@@ -264,17 +324,21 @@ const GSuiteSettingsPage: React.FC = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileCheck className="h-5 w-5" />
-                Export Preferences
+                Export & Download Options
               </CardTitle>
               <CardDescription>
-                Configure how content is exported to Google Workspace
+                Configure how content is exported to Google Workspace or downloaded as files
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Default Export Format</Label>
+                <Label>Content Download Formats</Label>
                 <div className="grid grid-cols-2 gap-2">
                   <Button variant="outline" className="justify-start border-2 border-primary">
+                    <FileDown className="h-4 w-4 mr-2 text-blue-600" />
+                    PDF Download
+                  </Button>
+                  <Button variant="outline" className="justify-start">
                     <svg 
                       className="h-4 w-4 mr-2 text-blue-600" 
                       viewBox="0 0 24 24" 
@@ -285,18 +349,10 @@ const GSuiteSettingsPage: React.FC = () => {
                     </svg>
                     Google Docs
                   </Button>
-                  <Button variant="outline" className="justify-start">
-                    <svg 
-                      className="h-4 w-4 mr-2 text-green-600" 
-                      viewBox="0 0 24 24" 
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="currentColor"
-                    >
-                      <path d="M21 3H3v18h18V3zm-2 4h-6v2h6v2h-6v2h6v2h-6v2h6v2H5V5h14v2z"/>
-                    </svg>
-                    Google Sheets
-                  </Button>
                 </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Download or export your LLDs, code, and test cases in your preferred format
+                </p>
               </div>
               
               <div className="space-y-2">
@@ -318,15 +374,19 @@ const GSuiteSettingsPage: React.FC = () => {
               </div>
               
               <div className="space-y-2">
-                <Label>Sharing Settings</Label>
+                <Label>File Generation Options</Label>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <Switch id="auto-share" />
-                    <Label htmlFor="auto-share">Automatically share with team members</Label>
+                    <Switch id="angular-frontend" defaultChecked />
+                    <Label htmlFor="angular-frontend">Include Angular.js frontend code</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch id="link-to-jira" defaultChecked />
-                    <Label htmlFor="link-to-jira">Add link back to Jira ticket</Label>
+                    <Switch id="nodejs-backend" defaultChecked />
+                    <Label htmlFor="nodejs-backend">Include Node.js backend code</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Switch id="postgres-sql" defaultChecked />
+                    <Label htmlFor="postgres-sql">Include PostgreSQL (SPs, Triggers, Functions)</Label>
                   </div>
                 </div>
               </div>
@@ -345,7 +405,7 @@ const GSuiteSettingsPage: React.FC = () => {
             <CardHeader>
               <CardTitle>Quick Start Guide</CardTitle>
               <CardDescription>
-                Learn how to use the GSuite integration with your Jira tickets
+                Learn how to use the GSuite integration and download options with your Jira tickets
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -353,8 +413,8 @@ const GSuiteSettingsPage: React.FC = () => {
                 <li>Connect your Google account using the settings above</li>
                 <li>Select a Jira ticket from the Stories page</li>
                 <li>Generate LLD, code, or tests using the AI assistant</li>
-                <li>Click the "Export to Google" button to save your content</li>
-                <li>Access your documents directly in Google Drive</li>
+                <li>Use the "Export to Google" button to save to Google Drive or "Download as PDF" to download locally</li>
+                <li>Content can be generated for various platforms including Angular.js (frontend), Node.js (backend), and PostgreSQL</li>
               </ol>
             </CardContent>
           </Card>
