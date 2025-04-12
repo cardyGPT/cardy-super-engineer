@@ -60,7 +60,7 @@ const StoryDetailWrapper = () => {
         toast({
           title: "Content loaded",
           description: "Previously generated content has been loaded",
-          variant: "default",
+          variant: "success",
         });
       }
     } catch (error) {

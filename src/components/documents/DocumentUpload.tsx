@@ -142,7 +142,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       toast({
         title: "Upload successful",
         description: `${file.name} has been uploaded successfully.`,
-        variant: "default",
+        variant: "success",
       });
       
       if (onUploadComplete) {
