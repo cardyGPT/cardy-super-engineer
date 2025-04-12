@@ -20,6 +20,7 @@ import {
   Settings,
   BrainCircuit,
   FolderKanban,
+  ClipboardList,
 } from "lucide-react";
 
 export function AppSidebar() {
@@ -46,6 +47,11 @@ export function AppSidebar() {
       title: "Cardy Mind",
       href: "/cardy-mind",
       icon: <BrainCircuit className="h-5 w-5" />,
+    },
+    {
+      title: "Stories",
+      href: "/stories",
+      icon: <ClipboardList className="h-5 w-5" />,
     },
   ];
 
