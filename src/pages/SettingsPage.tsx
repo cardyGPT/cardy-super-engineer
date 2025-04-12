@@ -4,7 +4,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import JiraLogin from "@/components/stories/JiraLogin";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Google } from "lucide-react";
+import { Mail, Settings } from "lucide-react";
 
 const SettingsPage = () => {
   return (
@@ -27,7 +27,7 @@ const SettingsPage = () => {
             </p>
             <Button asChild>
               <Link to="/gsuite-settings">
-                <Google className="h-4 w-4 mr-2" />
+                <Mail className="h-4 w-4 mr-2" />
                 GSuite Settings
               </Link>
             </Button>

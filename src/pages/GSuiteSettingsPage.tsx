@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Google, Save, Link, FileCheck } from "lucide-react";
+import { Mail, Save, Link, FileCheck } from "lucide-react";
 
 const GSuiteSettingsPage: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>(() => {
@@ -71,7 +71,7 @@ const GSuiteSettingsPage: React.FC = () => {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Google className="h-5 w-5" />
+                <Mail className="h-5 w-5" />
                 Google Workspace Connection
               </CardTitle>
               <CardDescription>
