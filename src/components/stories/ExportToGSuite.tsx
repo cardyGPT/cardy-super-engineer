@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { GoogleDrive, File, Upload, Loader2, Check } from 'lucide-react';
+import { FileCloud, File, Upload, Loader2, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 
@@ -77,7 +77,7 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
     <Card className="w-full">
       <CardHeader>
         <CardTitle className="text-base flex items-center">
-          <GoogleDrive className="h-5 w-5 mr-2 text-blue-600" />
+          <FileCloud className="h-5 w-5 mr-2 text-blue-600" />
           Export to Google Docs
         </CardTitle>
       </CardHeader>

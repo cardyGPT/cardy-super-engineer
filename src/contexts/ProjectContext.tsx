@@ -1,6 +1,7 @@
+
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
-import { toast } from "@/hooks/use-toast"; 
+import { useToast } from "@/hooks/use-toast"; 
 import { useProjectOperations } from "@/hooks/useProjectOperations";
 import { useDocumentOperations } from "@/hooks/useDocumentOperations";
 import { useDataModelOperations } from "@/hooks/useDataModelOperations";
@@ -29,44 +30,96 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [dataModel, setDataModel] = useState<DataModel | null>(null);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-  const { fetchProjects, addProject, updateProject, deleteProject } = 
-    useProjectOperations(projectList, setProjectList, setLoading, toast);
-    
-  const { uploadDocument, deleteDocument } = 
-    useDocumentOperations(documentList, setDocumentList, setDataModel, setLoading, toast);
-    
-  const { getDocumentDataModel } = 
-    useDataModelOperations(documentList);
+  const projectOps = useProjectOperations();
+  const documentOps = useDocumentOperations();
+  const dataModelOps = useDataModelOperations(documentList);
 
+  // Wrap the project operations to fit the expected interface
+  const addProject = async (project: Partial<Project>): Promise<Project | undefined> => {
+    try {
+      const result = await projectOps.createProject(project);
+      if (result) {
+        setProjectList(prev => [...prev, result]);
+      }
+      return result;
+    } catch (error) {
+      console.error("Failed to add project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create project",
+        variant: "destructive",
+      });
+      return undefined;
+    }
+  };
+
+  const updateProject = async (project: Project): Promise<void> => {
+    try {
+      const result = await projectOps.updateProject(project.id, project);
+      if (result) {
+        setProjectList(prev => 
+          prev.map(p => p.id === project.id ? result : p)
+        );
+      }
+    } catch (error) {
+      console.error("Failed to update project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to update project",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteProject = async (id: string): Promise<void> => {
+    try {
+      await projectOps.deleteProject(id);
+      setProjectList(prev => prev.filter(p => p.id !== id));
+      if (currentProject?.id === id) {
+        setCurrentProject(null);
+      }
+    } catch (error) {
+      console.error("Failed to delete project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete project",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const uploadDocument = async (document: Partial<ProjectDocument>, file: File): Promise<ProjectDocument | undefined> => {
+    return await documentOps.uploadDocument(document, file, documentList, setDocumentList, setDataModel);
+  };
+
+  const deleteDocument = async (id: string): Promise<void> => {
+    return await documentOps.deleteDocument(id, documentList, setDocumentList);
+  };
+
+  // Fetch projects on component mount
   useEffect(() => {
-    const loadData = async () => {
+    const fetchInitialData = async () => {
       try {
-        console.log("Loading initial data from Supabase");
-        const result = await fetchProjects();
+        setLoading(true);
+        console.log("Fetching initial data...");
         
-        if (!result) {
-          console.log("No data returned from fetchProjects");
-          return;
-        }
-        
-        const { documents } = result;
-        console.log("Loaded documents:", documents);
-        
-        if (documents && documents.length > 0) {
-          const formattedDocs = documents.map((d: any) => ({
-            id: d.id,
-            projectId: d.project_id,
-            name: d.name,
-            type: d.type,
-            fileUrl: d.file_url,
-            fileType: d.file_type,
-            uploadedAt: d.uploaded_at,
-            content: d.content,
-          }));
+        // Fetch projects
+        const projects = await projectOps.fetchProjects();
+        if (projects) {
+          setProjectList(projects);
           
-          console.log("Formatted documents:", formattedDocs);
-          setDocumentList(formattedDocs);
+          // Fetch documents for all projects
+          const allDocuments: ProjectDocument[] = [];
+          for (const project of projects) {
+            const documents = await documentOps.fetchDocuments(project.id);
+            if (documents) {
+              allDocuments.push(...documents);
+            }
+          }
+          
+          setDocumentList(allDocuments);
         }
       } catch (error) {
         console.error("Error loading initial data:", error);
@@ -75,11 +128,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
           description: "Failed to load initial data. Please refresh the page.",
           variant: "destructive",
         });
+      } finally {
+        setLoading(false);
       }
     };
     
-    loadData();
-  }, [fetchProjects, toast]);
+    fetchInitialData();
+  }, []);
 
   return (
     <ProjectContext.Provider
@@ -96,7 +151,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         uploadDocument,
         deleteDocument,
         setDataModel,
-        getDocumentDataModel,
+        getDocumentDataModel: dataModelOps.getDocumentDataModel,
       }}
     >
       {children}

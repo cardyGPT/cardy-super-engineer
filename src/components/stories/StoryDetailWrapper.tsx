@@ -14,7 +14,7 @@ import ExportToGSuite from "./ExportToGSuite";
 
 const StoryDetailWrapper = () => {
   const { id } = useParams<{ id: string }>();
-  const { stories, activeStory, setActiveStory, loading } = useStories();
+  const { tickets, selectedTicket, setSelectedTicket, loading } = useStories();
   const [activeTab, setActiveTab] = useState("lld");
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -24,28 +24,28 @@ const StoryDetailWrapper = () => {
   const [testContent, setTestContent] = useState("");
 
   useEffect(() => {
-    if (id && stories.length > 0 && !activeStory) {
-      const story = stories.find((s) => s.id === id);
-      if (story) {
-        setActiveStory(story);
+    if (id && tickets.length > 0 && !selectedTicket) {
+      const ticket = tickets.find((t) => t.id === id);
+      if (ticket) {
+        setSelectedTicket(ticket);
       }
     }
-  }, [id, stories, activeStory, setActiveStory]);
+  }, [id, tickets, selectedTicket, setSelectedTicket]);
 
   useEffect(() => {
-    if (activeStory) {
+    if (selectedTicket) {
       fetchStoryArtifacts();
     }
-  }, [activeStory]);
+  }, [selectedTicket]);
 
   const fetchStoryArtifacts = async () => {
-    if (!activeStory) return;
+    if (!selectedTicket) return;
     
     try {
       const { data, error } = await supabase
         .from("story_artifacts")
         .select("*")
-        .eq("story_id", activeStory.id)
+        .eq("story_id", selectedTicket.id)
         .maybeSingle();
       
       if (error) throw error;
@@ -62,17 +62,17 @@ const StoryDetailWrapper = () => {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    // Add refresh logic here
+    await fetchStoryArtifacts();
     setIsRefreshing(false);
   };
 
-  if (loading || !activeStory) {
+  if (loading || !selectedTicket) {
     return <div className="p-8">Loading...</div>;
   }
 
   return (
     <div className="p-6">
-      <StoryDetail story={activeStory} />
+      <StoryDetail ticket={selectedTicket} />
       <Separator className="my-6" />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-8">
@@ -106,28 +106,28 @@ const StoryDetailWrapper = () => {
         <TabsContent value="lld" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={lldContent} contentType="lld" />
+              <ContentDisplay content={lldContent} type="lld" />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={activeStory.id} artifactType="lld" content={lldContent} />
+          <ExportToGSuite storyId={selectedTicket.id} artifactType="lld" content={lldContent} />
         </TabsContent>
         
         <TabsContent value="code" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={codeContent} contentType="code" />
+              <ContentDisplay content={codeContent} type="code" />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={activeStory.id} artifactType="code" content={codeContent} />
+          <ExportToGSuite storyId={selectedTicket.id} artifactType="code" content={codeContent} />
         </TabsContent>
         
         <TabsContent value="tests" className="space-y-4">
           <Card>
             <CardContent className="p-0">
-              <ContentDisplay content={testContent} contentType="test" />
+              <ContentDisplay content={testContent} type="test" />
             </CardContent>
           </Card>
-          <ExportToGSuite storyId={activeStory.id} artifactType="test" content={testContent} />
+          <ExportToGSuite storyId={selectedTicket.id} artifactType="test" content={testContent} />
         </TabsContent>
       </Tabs>
     </div>

@@ -1,120 +1,122 @@
-import { useCallback } from "react";
+
+import { useState } from "react";
 import { ProjectDocument, DataModel } from "@/types";
 import { supabase } from "@/lib/supabase";
-import { ToastActionElement } from "@/components/ui/toast";
 
-type Toast = {
-  title?: string;
-  description?: string;
-  action?: ToastActionElement;
-  variant?: "default" | "destructive";
-};
+export const useDocumentOperations = () => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-export const useDocumentOperations = (
-  documents: ProjectDocument[],
-  setDocuments: React.Dispatch<React.SetStateAction<ProjectDocument[]>>,
-  setDataModel: React.Dispatch<React.SetStateAction<DataModel | null>>,
-  setLoading: React.Dispatch<React.SetStateAction<boolean>>,
-  toast: (props: Toast) => void
-) => {
-  const uploadDocument = async (documentData: Partial<ProjectDocument>, file: File) => {
+  const fetchDocuments = async (projectId: string): Promise<ProjectDocument[]> => {
     setLoading(true);
+    setError(null);
+    
     try {
-      console.log("Starting document upload process:", { 
-        documentData, 
-        fileName: file.name, 
-        projectId: documentData.projectId 
-      });
+      const { data, error } = await supabase
+        .from("documents")
+        .select("*")
+        .eq("project_id", projectId)
+        .order("uploaded_at", { ascending: false });
       
-      if (!documentData.projectId) {
-        throw new Error("Project ID is required for document upload");
+      if (error) {
+        throw error;
       }
       
-      // First upload the file to storage
+      return data.map((doc: any) => ({
+        id: doc.id,
+        projectId: doc.project_id,
+        name: doc.name,
+        type: doc.type,
+        fileUrl: doc.file_url,
+        fileType: doc.file_type,
+        uploadedAt: doc.uploaded_at,
+        content: doc.content,
+      })) || [];
+    } catch (err: any) {
+      console.error("Error fetching documents:", err);
+      setError(err.message);
+      return [];
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const uploadDocument = async (
+    document: Partial<ProjectDocument>, 
+    file: File,
+    documentList: ProjectDocument[],
+    setDocumentList: React.Dispatch<React.SetStateAction<ProjectDocument[]>>,
+    setDataModel: React.Dispatch<React.SetStateAction<DataModel | null>>
+  ): Promise<ProjectDocument | undefined> => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      // Step 1: Upload to storage
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${file.name}`;
+      const fileName = `${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const filePath = `documents/${fileName}`;
       
-      console.log("Uploading file to storage:", fileName);
-      
-      const { data: fileData, error: uploadError } = await supabase.storage
+      const { error: uploadError } = await supabase.storage
         .from('documents')
-        .upload(fileName, file);
+        .upload(filePath, file);
       
       if (uploadError) {
-        console.error("Storage upload error:", uploadError);
         throw uploadError;
       }
       
-      console.log("File uploaded successfully:", fileData);
-      
-      // Create a public URL for the file
-      const { data: urlData } = await supabase.storage
+      // Get the public URL
+      const { data: fileUrl } = supabase.storage
         .from('documents')
-        .getPublicUrl(fileName);
+        .getPublicUrl(filePath);
       
-      console.log("Generated public URL:", urlData);
-      
-      let fileContent = null;
-      
-      // If it's a data model, attempt to parse the JSON content
-      if (documentData.type === "data-model") {
-        try {
-          const text = await file.text();
-          console.log("Parsing JSON data model content");
-          fileContent = JSON.parse(text);
-          
-          // Basic validation for data model
-          if (!fileContent) {
-            throw new Error("Empty file content");
-          }
-          
-          // Normalize the structure specifically for our data model format
-          // This handles different common JSON formats users might upload
-          fileContent = normalizeDataModelStructure(fileContent);
-          
-          console.log("Normalized data model structure:", {
-            entities: fileContent.entities?.length || 0,
-            relationships: fileContent.relationships?.length || 0
-          });
-        } catch (parseError) {
-          console.error("JSON parsing error:", parseError);
-          toast({
-            title: "Error parsing JSON",
-            description: "The data model file is not valid JSON or has incorrect format.",
-            variant: "destructive",
-          });
-          setLoading(false);
-          return;
-        }
+      if (!fileUrl) {
+        throw new Error("Failed to get file URL");
       }
       
-      // Map client model to database columns
-      const newDocument = {
-        project_id: documentData.projectId,
-        name: file.name,
-        type: documentData.type || "system-requirements",
-        file_url: urlData.publicUrl,
-        file_type: file.type,
-        content: fileContent,
-      };
-      
-      console.log("Inserting document record:", newDocument);
-      
+      // Step 2: Create document record
       const { data: docData, error: docError } = await supabase
-        .from('documents')
-        .insert([newDocument])
+        .from("documents")
+        .insert([{
+          project_id: document.projectId,
+          name: document.name || file.name,
+          type: document.type || 'other',
+          file_url: fileUrl.publicUrl,
+          file_type: file.type
+        }])
         .select()
         .single();
       
       if (docError) {
-        console.error("Database insert error:", docError);
         throw docError;
       }
       
-      console.log("Document inserted successfully:", docData);
+      // Step 3: Process the document content if needed
+      if (file.type === 'application/json' || file.type === 'application/pdf') {
+        try {
+          const { data: processData, error: processError } = await supabase.functions.invoke('process-document', {
+            body: {
+              documentId: docData.id,
+              fileUrl: fileUrl.publicUrl,
+              fileType: file.type,
+              projectId: document.projectId
+            }
+          });
+          
+          if (processError) {
+            console.error("Error processing document:", processError);
+          }
+          
+          if (processData && processData.dataModel && file.type === 'application/json') {
+            setDataModel(processData.dataModel);
+          }
+        } catch (processErr) {
+          console.error("Error invoking process-document function:", processErr);
+        }
+      }
       
-      // Map database response to client model
-      const formattedDocument: ProjectDocument = {
+      // Map to ProjectDocument type
+      const newDocument: ProjectDocument = {
         id: docData.id,
         projectId: docData.project_id,
         name: docData.name,
@@ -122,254 +124,80 @@ export const useDocumentOperations = (
         fileUrl: docData.file_url,
         fileType: docData.file_type,
         uploadedAt: docData.uploaded_at,
-        content: docData.content,
+        content: docData.content || null,
       };
       
-      setDocuments((prev) => [...prev, formattedDocument]);
+      // Update state
+      setDocumentList([newDocument, ...documentList]);
       
-      if (formattedDocument.type === "data-model" && formattedDocument.content) {
-        setDataModel(formattedDocument.content);
-      }
-      
-      // Process the document to generate embeddings
-      processDocumentForEmbeddings(formattedDocument.id);
-      
-      toast({
-        title: "Upload successful",
-        description: `${file.name} has been uploaded successfully.`,
-      });
-      
-      return formattedDocument;
-    } catch (error) {
-      console.error("Error uploading document:", error);
-      toast({
-        title: "Upload failed",
-        description: "There was an error uploading your document. Please try again.",
-        variant: "destructive",
-      });
+      return newDocument;
+    } catch (err: any) {
+      console.error("Error uploading document:", err);
+      setError(err.message);
+      return undefined;
     } finally {
       setLoading(false);
     }
   };
 
-  const processDocumentForEmbeddings = async (documentId: string) => {
-    try {
-      console.log(`Processing document ${documentId} for embeddings`);
-      
-      const { data, error } = await supabase.functions.invoke('process-document', {
-        body: { documentId }
-      });
-      
-      if (error) {
-        console.error("Error processing document:", error);
-        toast({
-          title: "Processing warning",
-          description: "Document was uploaded but there was an issue processing it for search capabilities.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      console.log("Document processing result:", data);
-      
-      if (data.success) {
-        toast({
-          title: "Processing complete",
-          description: `${data.successfulChunks} document chunks have been indexed for search.`,
-        });
-      }
-    } catch (err) {
-      console.error("Error calling process-document function:", err);
-    }
-  };
-
-  const normalizeDataModelStructure = (content: any) => {
-    // If content is already normalized, return it
-    if (content.entities && Array.isArray(content.entities) && 
-        content.relationships && Array.isArray(content.relationships)) {
-      return content;
-    }
-    
-    let entities = [];
-    let relationships = [];
-    
-    // Handle object-based entity format (common in some tools)
-    if (content.entities && typeof content.entities === 'object' && !Array.isArray(content.entities)) {
-      console.log("Converting object-based entities to array format");
-      
-      for (const [entityId, entityData] of Object.entries(content.entities)) {
-        if (typeof entityData !== 'object') continue;
-        
-        const entityObj = entityData as any;
-        
-        // Create normalized entity
-        const entity = {
-          id: entityId,
-          name: entityObj.name || entityId,
-          definition: entityObj.definition || entityObj.description || '',
-          type: (entityObj.type || 'entity'),
-          attributes: []
-        };
-        
-        // Process attributes/columns
-        if (entityObj.attributes && Array.isArray(entityObj.attributes)) {
-          entity.attributes = entityObj.attributes;
-        } else if (entityObj.columns && Array.isArray(entityObj.columns)) {
-          // Convert columns to attributes format
-          entity.attributes = entityObj.columns.map((col: any) => {
-            if (typeof col === 'string') {
-              return {
-                id: generateId(),
-                name: col,
-                type: 'string',
-                required: false
-              };
-            } else {
-              return {
-                id: col.id || generateId(),
-                name: col.name,
-                type: col.type || 'string',
-                required: col.required || false,
-                isPrimaryKey: col.key === true || col.isPrimaryKey === true,
-                isForeignKey: col.isForeignKey === true
-              };
-            }
-          });
-        }
-        
-        entities.push(entity);
-      }
-      
-      // Process relationships
-      if (content.relationships && Array.isArray(content.relationships)) {
-        relationships = content.relationships.map((rel: any) => {
-          return {
-            id: rel.id || generateId(),
-            name: rel.name || '',
-            sourceEntityId: rel.source || rel.sourceEntityId || '',
-            targetEntityId: rel.target || rel.targetEntityId || '',
-            sourceCardinality: getCardinalityFromType(rel.type, 'source'),
-            targetCardinality: getCardinalityFromType(rel.type, 'target'),
-            description: rel.definition || rel.description || ''
-          };
-        });
-      }
-    } else if (Array.isArray(content)) {
-      // Handle array of entities format (another common format)
-      console.log("Converting array format to entity/relationship structure");
-      
-      entities = content.filter(item => item.type !== 'relationship').map(entity => ({
-        id: entity.id || generateId(),
-        name: entity.name,
-        definition: entity.definition || entity.description || '',
-        type: entity.type || 'entity',
-        attributes: entity.attributes || []
-      }));
-      
-      relationships = content.filter(item => item.type === 'relationship').map(rel => ({
-        id: rel.id || generateId(),
-        name: rel.name || '',
-        sourceEntityId: rel.source || rel.sourceEntityId || '',
-        targetEntityId: rel.target || rel.targetEntityId || '',
-        sourceCardinality: rel.sourceCardinality || '1',
-        targetCardinality: rel.targetCardinality || '1',
-        description: rel.description || ''
-      }));
-    }
-    
-    return {
-      entities: entities.length > 0 ? entities : (content.entities || []),
-      relationships: relationships.length > 0 ? relationships : (content.relationships || [])
-    };
-  };
-
-  // Helper function to generate a random ID
-  const generateId = () => {
-    return Math.random().toString(36).substring(2, 15);
-  };
-
-  // Convert relationship type to cardinality notation
-  const getCardinalityFromType = (type: string | undefined, end: 'source' | 'target'): string => {
-    if (!type) return '1';
-    
-    type = type.toLowerCase();
-    
-    if (type === 'one-to-one' || type === '1:1') {
-      return '1';
-    } else if (type === 'one-to-many' || type === '1:m' || type === '1:n' || type === '1:*') {
-      return end === 'source' ? '1' : '*';
-    } else if (type === 'many-to-one' || type === 'm:1' || type === 'n:1' || type === '*:1') {
-      return end === 'source' ? '*' : '1';
-    } else if (type === 'many-to-many' || type === 'm:m' || type === 'n:n' || type === '*:*') {
-      return '*';
-    }
-    
-    return '1';
-  };
-
-  const deleteDocument = async (id: string) => {
+  const deleteDocument = async (
+    id: string,
+    documentList: ProjectDocument[],
+    setDocumentList: React.Dispatch<React.SetStateAction<ProjectDocument[]>>
+  ): Promise<void> => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // First get the document to find the file path
-      const { data: doc, error: fetchError } = await supabase
-        .from('documents')
-        .select('*')
-        .eq('id', id)
-        .single();
+      // Find the document to get the file path
+      const document = documentList.find(doc => doc.id === id);
       
-      if (fetchError) throw fetchError;
-      
-      // Delete associated chunks from project_chunks table
-      const { error: chunksError } = await supabase
-        .from('project_chunks')
-        .delete()
-        .eq('document_id', id);
+      if (document && document.fileUrl) {
+        // Extract the path from the URL
+        const urlParts = document.fileUrl.split('/');
+        const fileName = urlParts[urlParts.length - 1];
+        const filePath = `documents/${fileName}`;
         
-      if (chunksError) {
-        console.error("Error deleting document chunks:", chunksError);
-      }
-      
-      // Delete the file from storage if we have a URL
-      if (doc.file_url) {
-        const fileName = doc.file_url.split('/').pop();
-        if (fileName) {
+        // Delete from storage (don't throw if this fails)
+        try {
           const { error: storageError } = await supabase.storage
             .from('documents')
-            .remove([fileName]);
+            .remove([filePath]);
           
-          if (storageError) console.error("Error removing file from storage:", storageError);
+          if (storageError) {
+            console.warn("Error removing file from storage:", storageError);
+          }
+        } catch (storageErr) {
+          console.warn("Error in storage deletion:", storageErr);
         }
       }
       
-      // Delete the document record
+      // Delete document record
       const { error } = await supabase
-        .from('documents')
+        .from("documents")
         .delete()
-        .eq('id', id);
+        .eq("id", id);
       
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
       
-      setDocuments((prev) => prev.filter((doc) => doc.id !== id));
-      
-      toast({
-        title: "Document deleted",
-        description: "Document has been deleted successfully.",
-      });
-    } catch (error) {
-      console.error("Error deleting document:", error);
-      toast({
-        title: "Error",
-        description: "Failed to delete document. Please try again.",
-        variant: "destructive",
-      });
+      // Update state
+      setDocumentList(documentList.filter(doc => doc.id !== id));
+    } catch (err: any) {
+      console.error("Error deleting document:", err);
+      setError(err.message);
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
   return {
+    fetchDocuments,
     uploadDocument,
     deleteDocument,
-    processDocumentForEmbeddings
+    loading,
+    error
   };
 };
