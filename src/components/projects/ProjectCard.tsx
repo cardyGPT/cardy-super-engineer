@@ -3,7 +3,7 @@ import { Project } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Edit, Trash2, FileUp, Database } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isValid } from "date-fns";
 import { useProject } from "@/contexts/ProjectContext";
 import { useNavigate } from "react-router-dom";
 import { 
@@ -44,6 +44,21 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
     deleteProject(project.id);
   };
 
+  // Format the updated date with validation
+  const getFormattedDate = () => {
+    if (!project.updatedAt) return "Recently";
+    
+    try {
+      const date = new Date(project.updatedAt);
+      return isValid(date) 
+        ? formatDistanceToNow(date, { addSuffix: true })
+        : "Recently";
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Recently";
+    }
+  };
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -51,7 +66,7 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
           <div>
             <CardTitle className="text-lg font-semibold">{project.name}</CardTitle>
             <CardDescription>
-              Updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
+              Updated {getFormattedDate()}
             </CardDescription>
           </div>
           <Badge variant="outline">{project.type}</Badge>
