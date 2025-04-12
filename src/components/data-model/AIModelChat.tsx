@@ -17,11 +17,12 @@ interface ChatMessage {
 }
 
 interface AIModelChatProps {
-  dataModel: DataModel;
-  documents: ProjectDocument[];
+  dataModel?: DataModel;
+  documents?: ProjectDocument[];
+  initialMessage?: string;
 }
 
-const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
+const AIModelChat = ({ dataModel, documents, initialMessage = "" }: AIModelChatProps) => {
   const [messages, setMessages] = useState<ChatMessage[]>([{
     role: "assistant",
     content: "Hello! I'm your project assistant. I can help you understand your data model, explain relationships between entities, and answer questions about your project documents. How can I help you today?"
@@ -41,6 +42,13 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   const { toast } = useToast();
   const { projects, documents: allDocuments } = useProject();
 
+  // Use initialMessage if provided
+  useState(() => {
+    if (initialMessage) {
+      handleSubmit(initialMessage);
+    }
+  });
+
   const handleSubmit = async (userMessage: string) => {
     if (isLoading) return;
 
@@ -50,7 +58,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
 
     try {
       const modelContext = {
-        entities: dataModel.entities.map(entity => ({
+        entities: dataModel?.entities?.map(entity => ({
           id: entity.id,
           name: entity.name,
           definition: entity.definition,
@@ -63,8 +71,8 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
             isForeignKey: attr.isForeignKey,
             description: attr.description
           }))
-        })),
-        relationships: dataModel.relationships.map(rel => ({
+        })) || [],
+        relationships: dataModel?.relationships?.map(rel => ({
           id: rel.id,
           name: rel.name,
           sourceEntityId: rel.sourceEntityId,
@@ -72,14 +80,14 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
           sourceCardinality: rel.sourceCardinality,
           targetCardinality: rel.targetCardinality,
           description: rel.description
-        }))
+        })) || []
       };
 
       let documentsContext = "";
       let includedDocNames: string[] = [];
       
       // If using documents, filter them based on selections
-      if (useDocuments) {
+      if (useDocuments && documents) {
         let docsToInclude = useAllProjects 
           ? allDocuments.filter(doc => doc.type !== "data-model" && doc.content)
           : documents.filter(doc => doc.type !== "data-model" && doc.content);
@@ -130,7 +138,9 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         selectedProjectDocs
       });
 
-      const response = await fetch('/api/chat-with-data-model', {
+      const endpoint = dataModel ? '/api/chat-with-data-model' : '/api/chat-with-documents';
+      
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -199,8 +209,8 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
   };
 
   const hasActiveFilters = selectedProjects.length > 0 || 
-                           selectedProjectTypes.length > 0 || 
-                           selectedProjectDocs.length > 0;
+                          selectedProjectTypes.length > 0 || 
+                          selectedProjectDocs.length > 0;
 
   return (
     <div className="flex flex-col h-full">
@@ -235,7 +245,7 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
         selectedProjectDocs={selectedProjectDocs}
         setSelectedProjectDocs={setSelectedProjectDocs}
         clearAllFilters={clearAllFilters}
-        documents={documents}
+        documents={documents || []}
         triggerElement={<div />} // This will be provided by ChatInput
       />
       
