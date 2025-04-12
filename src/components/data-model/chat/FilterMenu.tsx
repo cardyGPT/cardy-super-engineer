@@ -9,11 +9,11 @@ interface FilterMenuProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   selectedProjects: string[];
-  setSelectedProjects: (projects: string[]) => void;
+  setSelectedProjects: React.Dispatch<React.SetStateAction<string[]>>;
   selectedProjectTypes: string[];
-  setSelectedProjectTypes: (types: string[]) => void;
+  setSelectedProjectTypes: React.Dispatch<React.SetStateAction<string[]>>;
   selectedProjectDocs: string[];
-  setSelectedProjectDocs: (docs: string[]) => void;
+  setSelectedProjectDocs: React.Dispatch<React.SetStateAction<string[]>>;
   clearAllFilters: () => void;
   triggerElement: React.ReactNode;
   documents: ProjectDocument[];
