@@ -122,7 +122,8 @@ const DataModelPage = () => {
     }
 
     return (
-      <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'bg-white rounded-lg border'} h-[calc(100vh-12rem)] overflow-hidden flex flex-col`}>
+      <div className={`${isFullscreen ? 'fixed inset-0 z-50 bg-white' : 'bg-white rounded-lg border'} flex flex-col`}
+           style={{ height: isFullscreen ? '100vh' : 'calc(100vh-12rem)' }}>
         <div className="p-4 bg-muted border-b flex flex-col md:flex-row gap-4 md:items-center justify-between">
           <div className="flex items-center gap-4">
             {!isFullscreen && (

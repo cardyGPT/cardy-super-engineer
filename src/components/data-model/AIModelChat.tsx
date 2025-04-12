@@ -158,8 +158,8 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
           <Info className="h-4 w-4" />
           <AlertTitle>Cardy Mind</AlertTitle>
           <AlertDescription className="text-sm">
-            Ask questions about your data model and project documents. I'll use the selected data model 
-            and any included project documents to provide comprehensive answers.
+            Ask questions about your data model AND project documents. I'll analyze both to provide 
+            comprehensive answers about your project. Toggle the options below to include project documents in my analysis.
           </AlertDescription>
         </Alert>
       </div>

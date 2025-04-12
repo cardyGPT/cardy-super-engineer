@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { DataModel, Entity, Relationship } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -41,7 +40,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const diagramRef = useRef<HTMLDivElement>(null);
   
-  // Reset selected entity when data model changes
   useEffect(() => {
     setSelectedEntity(null);
   }, [dataModel]);
@@ -66,14 +64,12 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     setSelectedEntity(entity === selectedEntity ? null : entity);
   };
   
-  // Find relationships for the selected entity
   const getEntityRelationships = (entityId: string) => {
     return dataModel.relationships.filter(
       (rel) => rel.sourceEntityId === entityId || rel.targetEntityId === entityId
     );
   };
   
-  // Get related entities for an entity
   const getRelatedEntities = (entityId: string) => {
     const relationships = getEntityRelationships(entityId);
     const relatedEntityIds = relationships.flatMap((rel) => [
@@ -85,7 +81,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     );
   };
   
-  // Get relationship type display
   const getRelationshipTypeDisplay = (relationship: Relationship) => {
     const sourceCardinality = relationship.sourceCardinality || "1";
     const targetCardinality = relationship.targetCardinality || "1";
@@ -103,7 +98,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     return `${sourceCardinality}:${targetCardinality}`;
   };
   
-  // Generate exportable diagram data
   const exportDiagram = () => {
     const diagramData = {
       entities: dataModel.entities,
@@ -126,7 +120,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     linkElement.click();
   };
 
-  // Get the color based on entity type
   const getEntityTypeColor = (type: string): string => {
     switch (type) {
       case 'entity':
@@ -146,7 +139,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     }
   };
 
-  // Get a badge color based on entity type
   const getEntityTypeBadgeVariant = (type: string): "default" | "outline" | "secondary" | "destructive" => {
     switch (type) {
       case 'entity':
@@ -164,28 +156,45 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     }
   };
 
-  // Calculate relationship line color 
   const getRelationshipLineColor = (rel: Relationship, selectedEntityId: string) => {
     const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId);
     const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId);
     
-    // Source is selected entity
+    const isCrossTypeRelationship = sourceEntity && targetEntity && sourceEntity.type !== targetEntity.type;
+    
     if (rel.sourceEntityId === selectedEntityId) {
-      return sourceEntity && targetEntity && 
-             sourceEntity.type === 'entity' && targetEntity.type === 'sub-entity' 
-               ? '#10b981' // green for entity -> sub-entity
-               : '#3b82f6'; // blue for normal
+      if (isCrossTypeRelationship) {
+        return sourceEntity?.type === 'entity' && targetEntity?.type === 'sub-entity' 
+          ? '#10b981' // green for entity -> sub-entity
+          : '#8b5cf6'; // purple for entity -> other type
+      }
+      return '#3b82f6'; // blue for normal entity -> entity
     }
     
-    // Target is selected entity  
     if (rel.targetEntityId === selectedEntityId) {
-      return sourceEntity && targetEntity && 
-             sourceEntity.type === 'sub-entity' && targetEntity.type === 'entity'
-               ? '#8b5cf6' // purple for sub-entity -> entity
-               : '#f59e0b'; // amber for normal
+      if (isCrossTypeRelationship) {
+        return sourceEntity?.type === 'sub-entity' && targetEntity?.type === 'entity'
+          ? '#8b5cf6' // purple for sub-entity -> entity
+          : '#10b981'; // green for other type -> entity
+      }
+      return '#f59e0b'; // amber for normal entity -> entity
     }
     
     return '#9ca3af'; // gray default
+  };
+
+  const getRelationshipLineStyle = (sourceType: string | undefined, targetType: string | undefined) => {
+    if (sourceType !== targetType) {
+      return {
+        strokeDasharray: "5,5", 
+        strokeWidth: 2.5
+      };
+    }
+    
+    return {
+      strokeDasharray: "", 
+      strokeWidth: 2
+    };
   };
 
   return (
@@ -332,7 +341,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     
                     if (!sourceEntity || !targetEntity) return null;
                     
-                    // Find the DOM elements for source and target
                     const sourceEl = document.getElementById(`entity-${sourceEntity.id}`);
                     const targetEl = document.getElementById(`entity-${targetEntity.id}`);
                     
@@ -342,21 +350,32 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     const targetRect = targetEl.getBoundingClientRect();
                     const containerRect = canvasRef.current?.getBoundingClientRect() || { left: 0, top: 0 };
                     
-                    // Calculate center points relative to the container
                     const sourceX = (sourceRect.left + sourceRect.width / 2) - containerRect.left;
                     const sourceY = (sourceRect.top + sourceRect.height / 2) - containerRect.top;
                     const targetX = (targetRect.left + targetRect.width / 2) - containerRect.left;
                     const targetY = (targetRect.top + targetRect.height / 2) - containerRect.top;
                     
-                    // Apply zoom scaling
                     const scaledSourceX = sourceX / zoom;
                     const scaledSourceY = sourceY / zoom;
                     const scaledTargetX = targetX / zoom;
                     const scaledTargetY = targetY / zoom;
                     
-                    // Determine line style based on entity types
                     const lineColor = getRelationshipLineColor(rel, selectedEntity.id);
-                    const isDashed = sourceEntity.type !== targetEntity.type;
+                    const lineStyle = getRelationshipLineStyle(sourceEntity.type, targetEntity.type);
+                    
+                    const angle = Math.atan2(scaledTargetY - scaledSourceY, scaledTargetX - scaledSourceX);
+                    const arrowLength = 10;
+                    const arrowWidth = 6;
+                    
+                    const arrowDist = 20;
+                    const arrowX = scaledTargetX - arrowDist * Math.cos(angle);
+                    const arrowY = scaledTargetY - arrowDist * Math.sin(angle);
+                    
+                    const arrowPoints = [
+                      [arrowX, arrowY],
+                      [arrowX - arrowLength * Math.cos(angle - Math.PI/6), arrowY - arrowLength * Math.sin(angle - Math.PI/6)],
+                      [arrowX - arrowLength * Math.cos(angle + Math.PI/6), arrowY - arrowLength * Math.sin(angle + Math.PI/6)]
+                    ];
                     
                     return (
                       <g key={rel.id}>
@@ -366,21 +385,29 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                           x2={scaledTargetX} 
                           y2={scaledTargetY}
                           stroke={lineColor}
-                          strokeWidth="2"
-                          strokeDasharray={isDashed ? "5,5" : ""}
+                          strokeWidth={lineStyle.strokeWidth}
+                          strokeDasharray={lineStyle.strokeDasharray}
                         />
-                        <text 
-                          x={(scaledSourceX + scaledTargetX) / 2} 
-                          y={(scaledSourceY + scaledTargetY) / 2 - 10}
-                          textAnchor="middle" 
-                          fill="#4b5563" 
-                          fontSize="10"
-                          className="bg-white px-1"
+                        
+                        <polygon 
+                          points={arrowPoints.map(p => p.join(',')).join(' ')}
+                          fill={lineColor}
+                        />
+                        
+                        <foreignObject
+                          x={(scaledSourceX + scaledTargetX) / 2 - 60} 
+                          y={(scaledSourceY + scaledTargetY) / 2 - 15}
+                          width="120"
+                          height="30"
+                          style={{ overflow: 'visible' }}
                         >
-                          <tspan className="bg-white px-1">
+                          <div 
+                            className="bg-white px-2 py-0.5 rounded border shadow-sm text-center text-xs"
+                            style={{ display: 'inline-block', maxWidth: '100%', margin: '0 auto' }}
+                          >
                             {rel.name || getRelationshipTypeDisplay(rel)}
-                          </tspan>
-                        </text>
+                          </div>
+                        </foreignObject>
                       </g>
                     );
                   })}
@@ -460,12 +487,11 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                           <h4 className="text-xs font-semibold mb-2">Relationships:</h4>
                           <div className="space-y-1">
                             {getEntityRelationships(entity.id).map((rel) => {
-                              const otherEntityId = rel.sourceEntityId === entity.id ? rel.targetEntityId : rel.sourceEntityId;
+                              const otherEntityId = rel.sourceEntityId === entity.id ? 
+                                rel.targetEntityId : 
+                                rel.sourceEntityId;
                               const otherEntity = dataModel.entities.find(e => e.id === otherEntityId);
                               const isSource = rel.sourceEntityId === entity.id;
-                              
-                              // Determine the type of relationship (entity to entity, entity to sub-entity, etc.)
-                              const isCrossTypeRelationship = entity.type !== otherEntity?.type;
                               
                               return (
                                 <div 
@@ -538,7 +564,9 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     <div className="flex items-center justify-between mt-1 text-xs">
                       <span>
                         {sourceEntity?.name} 
-                        {isSource ? " → " : " ← "}
+                        <span className="mx-1">
+                          {isSource ? "→" : "←"}
+                        </span>
                         {targetEntity?.name}
                       </span>
                       <span className="text-gray-500">
@@ -547,20 +575,20 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                     </div>
                     
                     {isCrossTypeRelationship && (
-                      <div className="mt-1 text-xs text-blue-600">
-                        <strong>Cross-type relationship:</strong> {sourceEntity?.type} → {targetEntity?.type}
+                      <div className="mt-1 text-xs text-blue-600 font-medium">
+                        Cross-type: {sourceEntity?.type} → {targetEntity?.type}
                       </div>
                     )}
                   </div>
                 );
               })
             ) : (
-              <p className="text-sm text-muted-foreground">No relationships found.</p>
+              <p className="text-sm text-muted-foreground">No relationships found for this entity.</p>
             )}
           </div>
           
           <div className="mt-3 text-xs text-muted-foreground border-t pt-2">
-            <div className="mb-1">Relationship line colors:</div>
+            <div className="mb-1">Relationship visualization:</div>
             <div className="flex flex-wrap gap-2">
               <span className="flex items-center">
                 <span className="w-3 h-3 bg-blue-500 rounded-full mr-1"></span> Entity to Entity
@@ -570,6 +598,11 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
               </span>
               <span className="flex items-center">
                 <span className="w-3 h-3 bg-purple-500 rounded-full mr-1"></span> Sub-entity to Entity
+              </span>
+              <span className="flex items-center">
+                <span className="w-3 h-3 border border-gray-400 rounded-full mr-1"></span> 
+                <span className="border-t border-dashed border-gray-400 w-4 mx-1"></span> 
+                Cross-type Relationship
               </span>
             </div>
           </div>

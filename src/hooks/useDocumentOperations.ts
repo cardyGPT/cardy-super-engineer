@@ -69,9 +69,9 @@ export const useDocumentOperations = (
             for (const [entityId, entityData] of Object.entries<Record<string, any>>(fileContent.entities)) {
               entitiesArray.push({
                 id: entityId,
-                name: entityData.name || entityId,
-                definition: entityData.definition || '',
-                type: entityData.type || 'entity',
+                name: (entityData as any).name as string || entityId,
+                definition: (entityData as any).definition as string || '',
+                type: (entityData as any).type as string || 'entity',
                 attributes: []
               });
             }

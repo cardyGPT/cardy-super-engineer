@@ -84,15 +84,15 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
       for (const [entityId, entityData] of Object.entries<any>(content.entities)) {
         const entity: Entity = {
           id: entityId,
-          name: entityData.name || entityId,
-          definition: entityData.definition || '',
-          type: (entityData.type || 'entity') as 'entity' | 'sub-entity',
+          name: entityData.name as string || entityId,
+          definition: entityData.definition as string || '',
+          type: (entityData.type as string || 'entity') as 'entity' | 'sub-entity',
           attributes: []
         };
         
         // Handle columns/attributes conversion
         if (entityData.columns && Array.isArray(entityData.columns)) {
-          entity.attributes = entityData.columns.map((column: any) => {
+          entity.attributes = (entityData.columns as any[]).map((column: any) => {
             const columnStr = typeof column === 'string' ? column : column.name || '';
             const isPrimaryKey = columnStr.includes('(PK)');
             const isForeignKey = columnStr.includes('(FK)');
@@ -112,7 +112,7 @@ export const useDataModelOperations = (documents: ProjectDocument[]) => {
         
         // Handle relationships if present at the entity level
         if (entityData.relationships && Array.isArray(entityData.relationships)) {
-          entityData.relationships.forEach((rel: any) => {
+          (entityData.relationships as any[]).forEach((rel: any) => {
             if (typeof rel === 'string') {
               const match = rel.match(/([^(]+)\s*\(([^)]+)\)/);
               if (match) {

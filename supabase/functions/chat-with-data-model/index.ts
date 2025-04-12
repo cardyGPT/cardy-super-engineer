@@ -41,8 +41,8 @@ serve(async (req) => {
     const entitiesSection = prepareEntitiesSection(normalizedDataModel.entities);
     const relationshipsSection = prepareRelationshipsSection(normalizedDataModel);
 
-    // Enhance system message to provide more comprehensive context
-    const systemMessage = `You are an expert AI data modeling assistant called Cardy Mind. Your task is to provide detailed, insightful answers about the following data model while maintaining context from any additional project documents.
+    // Enhanced system message to provide more comprehensive context and better directions
+    const systemMessage = `You are an expert AI assistant called Cardy Mind. Your task is to answer questions about data models and project documentation with precision and clarity.
 
 Data Model Overview:
 - Total Entities: ${normalizedDataModel.entities.length}
@@ -52,21 +52,22 @@ ${entitiesSection}
 
 ${relationshipsSection}
 
-${documentsContext ? `\nAdditional Project Context:\n${documentsContext}` : ''}
+${documentsContext ? `\nProject Documentation Context:\n${documentsContext}` : ''}
 
-You should:
-1. Explain data model structure clearly
-2. Provide insights about relationships
-3. Suggest potential improvements or optimizations
-4. Answer questions about the data model comprehensively
-5. If the question is about project requirements or documents that have been shared with you, answer based on that context
-6. If you don't know the answer, simply say so rather than making up information
+GUIDELINES:
+1. ALWAYS respond to questions directly and concisely
+2. For data model questions, explain relationships between entities clearly
+3. Never say you don't have access to the data model - you DO have it and MUST answer questions about it
+4. If asked about project requirements or specifications, use the project documentation provided to you
+5. For entity counts, relationship types, or other structural questions, provide specific numbers and details
+6. Be helpful and informative even for simple questions
+7. Use examples where appropriate to illustrate concepts
 
-IMPORTANT: Always respond to questions, even simple ones. If asked about entity counts, relationship types, or other basic information, provide a direct answer.`;
+IMPORTANT: Your purpose is to help users understand their data model and project documentation. Always assume you have the information required to answer questions about the provided data model or documents.`;
 
-    console.log("Sending request to OpenAI");
+    console.log("Sending request to OpenAI with enhanced system message");
     
-    // Call the OpenAI API
+    // Call the OpenAI API with improved parameters
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -79,7 +80,7 @@ IMPORTANT: Always respond to questions, even simple ones. If asked about entity 
           { role: 'system', content: systemMessage },
           { role: 'user', content: message }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temperature for more focused responses
         max_tokens: 2000,
       }),
     });
@@ -169,18 +170,24 @@ function normalizeDataModel(dataModel) {
           }
           
           entityData.relationships.forEach(rel => {
-            const [targetName, cardinality] = rel.split(/\s+\(([^)]+)\)/);
-            const relationship = {
-              id: `${entityId}_to_${targetName}`,
-              sourceEntityId: entityId,
-              targetEntityId: targetName.trim().toLowerCase(),
-              name: `${entityId} to ${targetName}`,
-              description: '',
-              sourceCardinality: cardinality ? cardinality.split(':')[0] : '1',
-              targetCardinality: cardinality ? cardinality.split(':')[1] : '1'
-            };
-            
-            dataModel.relationships.push(relationship);
+            if (typeof rel === 'string') {
+              const match = rel.match(/([^(]+)\s*\(([^)]+)\)/);
+              if (match) {
+                const targetName = match[1].trim();
+                const cardinality = match[2];
+                const [sourceCard, targetCard] = cardinality.split(':');
+                
+                dataModel.relationships.push({
+                  id: `${entityId}_to_${targetName}`,
+                  sourceEntityId: entityId,
+                  targetEntityId: targetName.toLowerCase(),
+                  name: `${entityId} to ${targetName}`,
+                  description: '',
+                  sourceCardinality: sourceCard || '1',
+                  targetCardinality: targetCard || '1'
+                });
+              }
+            }
           });
         }
         
@@ -228,7 +235,12 @@ function prepareRelationshipsSection(dataModel) {
 ${dataModel.relationships.map(rel => {
   const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId)?.name || rel.sourceEntityId;
   const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId)?.name || rel.targetEntityId;
-  return `Relationship: ${sourceEntity} to ${targetEntity}
+  
+  // Get entity types for source and target to highlight cross-type relationships
+  const sourceType = dataModel.entities.find(e => e.id === rel.sourceEntityId)?.type || 'entity';
+  const targetType = dataModel.entities.find(e => e.id === rel.targetEntityId)?.type || 'entity';
+  
+  return `Relationship: ${sourceEntity} (${sourceType}) to ${targetEntity} (${targetType})
   Cardinality: ${rel.sourceCardinality || '1'}:${rel.targetCardinality || '1'}
   Description: ${rel.description || 'No additional description'}`
 }).join('\n\n')}`;
