@@ -1,13 +1,12 @@
 
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
+import { Project } from "@/types";
+import { useToast } from "@/hooks/use-toast";
 import AppLayout from "@/components/layout/AppLayout";
+import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectForm from "@/components/projects/ProjectForm";
 import { Button } from "@/components/ui/button";
-import { Plus, Pencil, Trash2, File, ArrowUpRight } from "lucide-react";
-import { Project } from "@/types";
-import ProjectCard from "@/components/projects/ProjectCard";
 import {
   Dialog,
   DialogContent,
@@ -16,11 +15,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useToast } from "@/hooks/use-toast";
+import { Loader2, Plus } from "lucide-react";
 
 const ProjectsPage = () => {
-  const { projects, addProject, deleteProject, loading: projectsLoading } = useProject();
-  const navigate = useNavigate();
+  const { projects, loading: projectsLoading, addProject } = useProject();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const { toast } = useToast();
@@ -34,8 +32,8 @@ const ProjectsPage = () => {
     }
   }, [projects, projectsLoading]);
 
-  const handleEditProject = (project: Project) => {
-    setEditingProject(project);
+  const handleDialogOpen = () => {
+    setEditingProject(null);
     setIsDialogOpen(true);
   };
 
@@ -50,10 +48,10 @@ const ProjectsPage = () => {
       const newProject = await addProject(formData);
       if (newProject) {
         toast({
-          title: "Project created",
-          description: `Project ${newProject.name} has been created successfully.`,
+          title: "Success",
+          description: "Project created successfully!",
         });
-        handleDialogClose();
+        setIsDialogOpen(false);
       }
     } catch (error) {
       console.error("Error creating project:", error);
@@ -67,42 +65,29 @@ const ProjectsPage = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <AppLayout>
-        <div className="container mx-auto py-6">
-          <div className="flex justify-center items-center h-64">
-            <p className="text-lg text-gray-500">Loading projects...</p>
-          </div>
-        </div>
-      </AppLayout>
-    );
-  }
+  const handleEditProject = (project: Project) => {
+    setEditingProject(project);
+    setIsDialogOpen(true);
+  };
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-6">
+      <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Projects</h1>
-            <p className="text-gray-500">Manage your engineering projects</p>
-          </div>
+          <h1 className="text-2xl font-bold">Projects</h1>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Create Project
+              <Button onClick={handleDialogOpen}>
+                <Plus className="h-4 w-4 mr-2" /> Add Project
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-lg">
               <DialogHeader>
-                <DialogTitle>
-                  {editingProject ? "Edit Project" : "Create New Project"}
-                </DialogTitle>
+                <DialogTitle>{editingProject ? "Edit Project" : "Create New Project"}</DialogTitle>
                 <DialogDescription>
-                  {editingProject
-                    ? "Update the project details below"
-                    : "Fill in the details to create a new project"}
+                  {editingProject 
+                    ? "Update project details below." 
+                    : "Fill in the project details to create a new project."}
                 </DialogDescription>
               </DialogHeader>
               <ProjectForm
@@ -114,26 +99,29 @@ const ProjectsPage = () => {
           </Dialog>
         </div>
 
-        {projects.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-lg border border-dashed">
-            <h3 className="text-lg font-medium text-gray-900 mb-1">No projects</h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Get started by creating a new project
-            </p>
-            <Button onClick={() => setIsDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Project
-            </Button>
+        {isLoading ? (
+          <div className="flex justify-center items-center h-60">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : (
+        ) : projects.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {projects.map((project) => (
-              <ProjectCard 
-                key={project.id} 
-                project={project} 
-                onEdit={handleEditProject} 
+              <ProjectCard
+                key={project.id}
+                project={project}
+                onEdit={handleEditProject}
               />
             ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 bg-slate-50 rounded-md">
+            <h3 className="text-lg font-medium mb-2">No projects yet</h3>
+            <p className="text-muted-foreground mb-4">
+              Create your first project to get started.
+            </p>
+            <Button onClick={handleDialogOpen}>
+              <Plus className="h-4 w-4 mr-2" /> Add Project
+            </Button>
           </div>
         )}
       </div>

@@ -67,12 +67,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const addProject = async (projectData: Partial<Project>) => {
     setLoading(true);
     try {
-      const newProject: Omit<Project, 'id'> = {
+      // Fix: Use snake_case for column names to match the database
+      const newProject = {
         name: projectData.name || "",
         type: projectData.type || "Child Welfare",
         details: projectData.details || "",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        // Don't include createdAt and updatedAt - the database will set these with default values
       };
       
       const { data, error } = await supabase
@@ -81,7 +81,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error("Error adding project:", error);
+        throw error;
+      }
       
       setProjectList((prev) => [...prev, data]);
       toast({
@@ -104,9 +107,12 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const updateProject = async (updatedProject: Project) => {
     setLoading(true);
     try {
+      // Fix: Only send fields that we want to update and match database column names
       const updates = {
-        ...updatedProject,
-        updatedAt: new Date().toISOString()
+        name: updatedProject.name,
+        type: updatedProject.type,
+        details: updatedProject.details,
+        // Don't include updated_at - let the database handle this
       };
       
       const { error } = await supabase
@@ -116,14 +122,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       if (error) throw error;
       
+      // Update local state
       setProjectList((prev) =>
         prev.map((project) =>
-          project.id === updatedProject.id ? updates : project
+          project.id === updatedProject.id ? {...project, ...updates} : project
         )
       );
       
       if (currentProject?.id === updatedProject.id) {
-        setCurrentProject(updates);
+        setCurrentProject({...currentProject, ...updates});
       }
       
       toast({
