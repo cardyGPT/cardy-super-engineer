@@ -20,11 +20,12 @@ interface ChatMessage {
 }
 
 const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([{
+    role: "assistant",
+    content: "Hello! I'm your data model assistant. I can help you understand your data model, explain relationships between entities, and answer questions about your project. How can I help you today?"
+  }]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState("");
-  const [apiKeySet, setApiKeySet] = useState(false);
   const [useDocuments, setUseDocuments] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
@@ -100,7 +101,6 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiKey,
           message: userMessage,
           dataModel: modelContext,
           documentsContext: documentsContext
@@ -123,153 +123,90 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
       });
       setMessages(prev => [...prev, { 
         role: "assistant", 
-        content: "I'm sorry, I encountered an error processing your request. Please check your API key and try again." 
+        content: "I'm sorry, I encountered an error processing your request. Please try again later." 
       }]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleApiKeySubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!apiKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid API key",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    setApiKeySet(true);
-    toast({
-      title: "API Key Set",
-      description: "Your OpenAI API key has been set for this session.",
-      duration: 3000,
-    });
-    
-    // Add initial welcome message
-    setMessages([{
-      role: "assistant",
-      content: "Hello! I'm your data model assistant. I can help you understand your data model, explain relationships between entities, and answer questions about your project. How can I help you today?"
-    }]);
-  };
-
   return (
     <div className="flex flex-col h-full">
-      {!apiKeySet ? (
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-md p-6">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <BrainCircuit className="h-12 w-12 text-primary" />
-              <h2 className="text-xl font-bold">Data Model AI Assistant</h2>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.length === 0 ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="text-center space-y-2">
+              <BrainCircuit className="mx-auto h-12 w-12 text-muted" />
               <p className="text-muted-foreground">
-                Chat with an AI assistant about your data model. Ask questions about entities, relationships, and more.
+                Start chatting with the AI assistant about your data model.
               </p>
-              <form onSubmit={handleApiKeySubmit} className="w-full space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="apiKey" className="text-sm font-medium">
-                    OpenAI API Key
-                  </label>
-                  <input
-                    id="apiKey"
-                    type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-..."
-                    className="w-full p-2 border rounded-md"
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Your API key is used only in this session and is not stored on our servers.
-                  </p>
-                </div>
-                <Button type="submit" className="w-full">
-                  Start Chat
-                </Button>
-              </form>
             </div>
-          </Card>
+          </div>
+        ) : (
+          messages.map((msg, index) => (
+            <div
+              key={index}
+              className={`flex ${
+                msg.role === "assistant" ? "justify-start" : "justify-end"
+              }`}
+            >
+              <div
+                className={`flex space-x-2 max-w-[80%] ${
+                  msg.role === "assistant"
+                    ? "bg-muted p-3 rounded-lg"
+                    : "bg-primary text-primary-foreground p-3 rounded-lg"
+                }`}
+              >
+                <div className="flex-shrink-0 mt-0.5">
+                  {msg.role === "assistant" ? (
+                    <Bot className="h-5 w-5" />
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
+                </div>
+                <div className="text-sm whitespace-pre-wrap">
+                  {msg.content}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex space-x-2 bg-muted p-3 rounded-lg">
+              <div className="flex-shrink-0 mt-0.5">
+                <Loader2 className="h-5 w-5 animate-spin" />
+              </div>
+              <div className="text-sm">Thinking...</div>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+      <div className="border-t p-4">
+        <div className="flex items-center mb-2">
+          <Switch 
+            id="use-documents" 
+            checked={useDocuments}
+            onCheckedChange={setUseDocuments}
+          />
+          <label htmlFor="use-documents" className="ml-2 text-sm text-muted-foreground">
+            Include other project documents in context
+          </label>
         </div>
-      ) : (
-        <>
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center space-y-2">
-                  <BrainCircuit className="mx-auto h-12 w-12 text-muted" />
-                  <p className="text-muted-foreground">
-                    Start chatting with the AI assistant about your data model.
-                  </p>
-                </div>
-              </div>
-            ) : (
-              messages.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    msg.role === "assistant" ? "justify-start" : "justify-end"
-                  }`}
-                >
-                  <div
-                    className={`flex space-x-2 max-w-[80%] ${
-                      msg.role === "assistant"
-                        ? "bg-muted p-3 rounded-lg"
-                        : "bg-primary text-primary-foreground p-3 rounded-lg"
-                    }`}
-                  >
-                    <div className="flex-shrink-0 mt-0.5">
-                      {msg.role === "assistant" ? (
-                        <Bot className="h-5 w-5" />
-                      ) : (
-                        <User className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div className="text-sm whitespace-pre-wrap">
-                      {msg.content}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="flex space-x-2 bg-muted p-3 rounded-lg">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  </div>
-                  <div className="text-sm">Thinking...</div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          <div className="border-t p-4">
-            <div className="flex items-center mb-2">
-              <Switch 
-                id="use-documents" 
-                checked={useDocuments}
-                onCheckedChange={setUseDocuments}
-              />
-              <label htmlFor="use-documents" className="ml-2 text-sm text-muted-foreground">
-                Include other project documents in context
-              </label>
-            </div>
-            <form onSubmit={handleSubmit} className="flex space-x-2">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask something about your data model..."
-                className="flex-1 resize-none"
-                disabled={isLoading}
-              />
-              <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
-                <SendHorizontal className="h-5 w-5" />
-              </Button>
-            </form>
-          </div>
-        </>
-      )}
+        <form onSubmit={handleSubmit} className="flex space-x-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Ask something about your data model..."
+            className="flex-1 resize-none"
+            disabled={isLoading}
+          />
+          <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
+            <SendHorizontal className="h-5 w-5" />
+          </Button>
+        </form>
+      </div>
     </div>
   );
 };

@@ -15,7 +15,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, LayoutGrid, LayoutList } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 const ProjectsPage = () => {
   const { projects, loading: projectsLoading, addProject } = useProject();
@@ -24,6 +25,7 @@ const ProjectsPage = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   useEffect(() => {
     // When projects are loaded from context, set loading to false
@@ -75,28 +77,38 @@ const ProjectsPage = () => {
       <div className="max-w-7xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">Projects</h1>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleDialogOpen}>
-                <Plus className="h-4 w-4 mr-2" /> Add Project
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>{editingProject ? "Edit Project" : "Create New Project"}</DialogTitle>
-                <DialogDescription>
-                  {editingProject 
-                    ? "Update project details below." 
-                    : "Fill in the project details to create a new project."}
-                </DialogDescription>
-              </DialogHeader>
-              <ProjectForm
-                initialData={editingProject || undefined}
-                onSuccess={handleCreateProject}
-                isSubmitting={isSubmitting}
-              />
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-4">
+            <ToggleGroup type="single" value={viewMode} onValueChange={(value) => value && setViewMode(value as "grid" | "list")}>
+              <ToggleGroupItem value="grid" aria-label="Grid view">
+                <LayoutGrid className="h-4 w-4" />
+              </ToggleGroupItem>
+              <ToggleGroupItem value="list" aria-label="List view">
+                <LayoutList className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleDialogOpen}>
+                  <Plus className="h-4 w-4 mr-2" /> Add Project
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>{editingProject ? "Edit Project" : "Create New Project"}</DialogTitle>
+                  <DialogDescription>
+                    {editingProject 
+                      ? "Update project details below." 
+                      : "Fill in the project details to create a new project."}
+                  </DialogDescription>
+                </DialogHeader>
+                <ProjectForm
+                  initialData={editingProject || undefined}
+                  onSuccess={handleCreateProject}
+                  isSubmitting={isSubmitting}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {isLoading ? (
@@ -104,15 +116,38 @@ const ProjectsPage = () => {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : projects.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <ProjectCard
-                key={project.id}
-                project={project}
-                onEdit={handleEditProject}
-              />
-            ))}
-          </div>
+          viewMode === "grid" ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  onEdit={handleEditProject}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-4">
+              {projects.map((project) => (
+                <div key={project.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h3 className="font-medium">{project.name}</h3>
+                      <p className="text-sm text-muted-foreground">{project.type}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleEditProject(project)}>
+                        Edit
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => window.location.href = `/projects/${project.id}`}>
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : (
           <div className="text-center py-12 bg-slate-50 rounded-md">
             <h3 className="text-lg font-medium mb-2">No projects yet</h3>
