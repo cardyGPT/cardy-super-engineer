@@ -1,5 +1,6 @@
 
 import { Bot, User, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface ChatMessageProps {
   content: string | any;  // Accept any type of content
@@ -8,6 +9,13 @@ interface ChatMessageProps {
 }
 
 const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => {
+  const [formattedContent, setFormattedContent] = useState<string>("");
+
+  useEffect(() => {
+    // Format the content when it changes
+    setFormattedContent(getSafeContent(content));
+  }, [content]);
+
   if (isLoading) {
     return (
       <div className="flex justify-start">
@@ -23,6 +31,10 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
 
   // Create a robust safe content formatter that handles all possible content types
   const getSafeContent = (rawContent: any): string => {
+    if (rawContent === null || rawContent === undefined) {
+      return "";
+    }
+    
     if (typeof rawContent === 'string') {
       return rawContent;
     }
@@ -31,7 +43,7 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
     if (rawContent && typeof rawContent === 'object' && 
         'type' in rawContent && 'version' in rawContent && 'content' in rawContent) {
       try {
-        return JSON.stringify(rawContent);
+        return JSON.stringify(rawContent, null, 2);
       } catch (e) {
         console.error("Error parsing Jira content object:", e);
         return "[Content formatting error]";
@@ -39,10 +51,11 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
     }
     
     // Handle any other object type
-    if (rawContent && typeof rawContent === 'object') {
+    if (typeof rawContent === 'object') {
       try {
-        return JSON.stringify(rawContent);
+        return JSON.stringify(rawContent, null, 2);
       } catch (e) {
+        console.error("Error stringifying content object:", e);
         return "[Invalid content format]";
       }
     }
@@ -50,8 +63,6 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
     // Handle any other type
     return String(rawContent || "");
   };
-
-  const safeContent = getSafeContent(content);
 
   return (
     <div className={`flex ${role === "assistant" ? "justify-start" : "justify-end"}`}>
@@ -65,7 +76,7 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
         <div className="flex-shrink-0 mt-0.5">
           {role === "assistant" ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
         </div>
-        <div className="text-sm whitespace-pre-wrap">{safeContent}</div>
+        <div className="text-sm whitespace-pre-wrap">{formattedContent}</div>
       </div>
     </div>
   );
