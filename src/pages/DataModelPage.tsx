@@ -139,8 +139,8 @@ const DataModelPage = () => {
                 
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                   <TabsList>
-                    <TabsTrigger value="diagram">SMART ER View</TabsTrigger>
-                    <TabsTrigger value="chat">AI Chat</TabsTrigger>
+                    <TabsTrigger value="diagram">Cardy ER360</TabsTrigger>
+                    <TabsTrigger value="chat">Cardy Mind</TabsTrigger>
                   </TabsList>
                 </Tabs>
               </div>
