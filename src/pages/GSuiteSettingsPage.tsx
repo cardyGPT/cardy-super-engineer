@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Mail, Save, Link, FileCheck } from "lucide-react";
+import { Mail, Save, Link, FileCheck, CheckCircle } from "lucide-react";
 
 const GSuiteSettingsPage: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>(() => {
@@ -23,8 +23,22 @@ const GSuiteSettingsPage: React.FC = () => {
     return localStorage.getItem("gsuite_connected") === "true";
   });
   const [isLoading, setIsLoading] = useState(false);
+  const [connectionSuccess, setConnectionSuccess] = useState(false);
   
   const { toast } = useToast();
+
+  // Reset the success message after a delay
+  useEffect(() => {
+    let timeoutId: number;
+    if (connectionSuccess) {
+      timeoutId = window.setTimeout(() => {
+        setConnectionSuccess(false);
+      }, 5000);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [connectionSuccess]);
 
   const handleSaveSettings = () => {
     setIsLoading(true);
@@ -38,10 +52,12 @@ const GSuiteSettingsPage: React.FC = () => {
       
       setIsConnected(true);
       setIsLoading(false);
+      setConnectionSuccess(true);
       
       toast({
-        title: "Settings Saved",
-        description: "Your GSuite integration settings have been saved successfully.",
+        title: "Connection Successful",
+        description: "Your GSuite integration settings have been saved and connected successfully.",
+        variant: "success",
       });
     }, 1000);
   };
@@ -58,6 +74,7 @@ const GSuiteSettingsPage: React.FC = () => {
       toast({
         title: "Disconnected",
         description: "Your GSuite account has been disconnected.",
+        variant: "default",
       });
     }, 1000);
   };
@@ -65,7 +82,22 @@ const GSuiteSettingsPage: React.FC = () => {
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <h1 className="text-3xl font-bold mb-6">GSuite Integration Settings</h1>
+        <h1 className="text-3xl font-bold mb-2 flex items-center">
+          GSuite Integration Settings
+          {isConnected && (
+            <span className="ml-3 inline-flex items-center bg-green-100 text-green-700 text-sm px-2.5 py-0.5 rounded">
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Connected
+            </span>
+          )}
+        </h1>
+        
+        {connectionSuccess && (
+          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
+            <CheckCircle className="h-5 w-5 mr-2" />
+            <span>Connection successful! Your GSuite account is now linked.</span>
+          </div>
+        )}
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <Card>

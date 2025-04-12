@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ const OpenAISettings: React.FC = () => {
       toast({
         title: "Settings Saved",
         description: "Your OpenAI API settings have been saved successfully.",
+        variant: "success",
       });
     }, 500);
   };
@@ -57,6 +58,7 @@ const OpenAISettings: React.FC = () => {
         toast({
           title: "API Key Verified",
           description: "Your OpenAI API key has been verified successfully.",
+          variant: "success",
         });
       } else {
         localStorage.setItem("openai_verified", "false");
@@ -83,7 +85,13 @@ const OpenAISettings: React.FC = () => {
 
   return (
     <Card>
-      <CardContent className="pt-6 space-y-4">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>OpenAI API Settings</span>
+          {isVerified && <CheckCircle className="h-5 w-5 text-green-500" />}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-2 space-y-4">
         <div className="space-y-2">
           <Label htmlFor="api-key">OpenAI API Key</Label>
           <div className="flex gap-2">

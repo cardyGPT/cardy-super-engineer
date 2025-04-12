@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { JiraCredentials } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
+import { CheckCircle } from "lucide-react";
 
 const JiraLogin: React.FC = () => {
   const { setCredentials } = useStories();
@@ -16,6 +17,7 @@ const JiraLogin: React.FC = () => {
   const [apiToken, setApiToken] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -55,16 +57,19 @@ const JiraLogin: React.FC = () => {
       
       // Credentials are valid, save them
       setCredentials(credentials);
+      setIsConnected(true);
       
       toast({
         title: "Connection Successful",
         description: `Connected to Jira as ${data.displayName || email}`,
+        variant: "success",
       });
       
       setIsLoading(false);
     } catch (error: any) {
       console.error("Login error:", error);
       setLoginError(error.message || "Failed to connect to Jira");
+      setIsConnected(false);
       setIsLoading(false);
       
       toast({
@@ -78,7 +83,10 @@ const JiraLogin: React.FC = () => {
   return (
     <Card className="w-full max-w-md mx-auto">
       <CardHeader>
-        <CardTitle>Connect to Jira</CardTitle>
+        <CardTitle className="flex items-center justify-between">
+          <span>Connect to Jira</span>
+          {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
+        </CardTitle>
         <CardDescription>
           Enter your Jira credentials to validate the connection
         </CardDescription>
@@ -142,7 +150,7 @@ const JiraLogin: React.FC = () => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Testing Connection..." : "Test Jira Connection"}
+            {isLoading ? "Testing Connection..." : isConnected ? "Update Connection" : "Test Jira Connection"}
           </Button>
         </CardFooter>
       </form>

@@ -6,7 +6,7 @@ export interface Toast {
   id: number;
   title?: string;
   description?: string;
-  variant?: "default" | "destructive";
+  variant?: "default" | "destructive" | "success";
   action?: React.ReactNode;
 }
 
@@ -16,7 +16,7 @@ export function useToast() {
   const toast = ({ title, description, variant = "default", action }: {
     title?: string;
     description?: string;
-    variant?: "default" | "destructive";
+    variant?: "default" | "destructive" | "success";
     action?: React.ReactNode;
   }) => {
     const newToast = { 
@@ -42,7 +42,7 @@ export function useToast() {
 export const toast = ({ title, description, variant = "default", action }: {
   title?: string;
   description?: string;
-  variant?: "default" | "destructive";
+  variant?: "default" | "destructive" | "success";
   action?: React.ReactNode;
 }) => {
   // This is a simplified version for direct import
