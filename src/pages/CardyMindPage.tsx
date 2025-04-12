@@ -5,7 +5,7 @@ import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info, RefreshCw } from "lucide-react";
+import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info, RefreshCw, AlertCircle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
