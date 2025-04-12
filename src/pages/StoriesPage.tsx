@@ -1,11 +1,11 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ExternalLink, RefreshCw, Settings } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -17,12 +17,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const StoriesPage: React.FC = () => {
   const { isAuthenticated, fetchTickets, tickets, loading } = useStories();
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isAuthenticated && Object.keys(tickets).length === 0) {
       fetchTickets();
     }
-  }, [isAuthenticated, fetchTickets]);
+  }, [isAuthenticated, fetchTickets, tickets]);
 
   // Group tickets by project
   const ticketsByProject = React.useMemo(() => {
@@ -38,6 +39,13 @@ const StoriesPage: React.FC = () => {
     
     return grouped;
   }, [tickets]);
+
+  const toggleProject = (projectKey: string) => {
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectKey]: !prev[projectKey]
+    }));
+  };
 
   return (
     <AppLayout>
@@ -81,7 +89,7 @@ const StoriesPage: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
-        ) : loading ? (
+        ) : loading && Object.keys(ticketsByProject).length === 0 ? (
           <div className="space-y-4">
             {[1, 2].map(i => (
               <Card key={i}>
@@ -115,9 +123,16 @@ const StoriesPage: React.FC = () => {
               </Card>
             ) : (
               Object.entries(ticketsByProject).map(([projectKey, projectTickets]) => (
-                <Collapsible key={projectKey} defaultOpen={true} className="border rounded-lg">
-                  <CollapsibleTrigger className="w-full flex justify-between items-center p-4 border-b hover:bg-slate-50">
+                <Collapsible key={projectKey} defaultOpen={false} className="border rounded-lg">
+                  <CollapsibleTrigger 
+                    className="w-full flex justify-between items-center p-4 border-b hover:bg-slate-50"
+                    onClick={() => toggleProject(projectKey)}
+                  >
                     <div className="font-medium text-left flex items-center">
+                      {expandedProjects[projectKey] ? 
+                        <ChevronDown className="h-4 w-4 mr-2" /> : 
+                        <ChevronRight className="h-4 w-4 mr-2" />
+                      }
                       {projectKey} ({projectTickets.length} stories)
                     </div>
                   </CollapsibleTrigger>

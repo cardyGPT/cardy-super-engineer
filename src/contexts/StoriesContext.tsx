@@ -47,14 +47,19 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials]);
 
-  // Fetch tickets from Jira
+  // Fetch tickets from Jira - optimized to reduce API calls
   const fetchTickets = useCallback(async () => {
     if (!credentials) return;
+    
+    // Don't fetch if already loading or if we already have tickets
+    if (loading) return;
     
     setLoading(true);
     setError(null);
     
     try {
+      console.log("Fetching Jira tickets...");
+      
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
           endpoint: 'search',
@@ -70,6 +75,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (error) throw new Error(error.message);
       
       if (data && data.issues) {
+        console.log(`Received ${data.issues.length} tickets from Jira`);
+        
         const formattedTickets: JiraTicket[] = data.issues.map((issue: any) => ({
           id: issue.id,
           key: issue.key,
@@ -86,20 +93,20 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         setTickets(formattedTickets);
       } else {
+        console.log("No tickets found in Jira response");
         setTickets([]);
       }
-      
-      setLoading(false);
     } catch (err: any) {
       console.error("Error fetching tickets:", err);
       setError(`Failed to fetch tickets: ${err.message}`);
-      setLoading(false);
       
       toast({
         title: "Error",
         description: `Failed to fetch tickets: ${err.message}`,
         variant: "destructive",
       });
+    } finally {
+      setLoading(false);
     }
   }, [credentials, toast]);
 
