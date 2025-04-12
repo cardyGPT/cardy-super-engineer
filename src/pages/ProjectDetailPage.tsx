@@ -12,7 +12,7 @@ import {
   Database,
   Trash2 
 } from "lucide-react";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { 
   Tabs, 
   TabsContent, 
@@ -81,6 +81,21 @@ const ProjectDetailPage = () => {
   const hasDataModel = projectDocuments.some((doc) => doc.type === "data-model");
   const dataModelDoc = projectDocuments.find(doc => doc.type === "data-model");
 
+  // Safely format dates with validation
+  const formatDateSafe = (dateString: string) => {
+    try {
+      const date = new Date(dateString);
+      if (!isValid(date)) {
+        console.warn("Invalid date detected:", dateString);
+        return "Unknown date";
+      }
+      return format(date, "MMMM d, yyyy");
+    } catch (error) {
+      console.error("Error formatting date:", error);
+      return "Unknown date";
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto">
@@ -102,9 +117,9 @@ const ProjectDetailPage = () => {
               </div>
               <div className="flex items-center text-sm text-gray-500 mb-4">
                 <Calendar className="h-4 w-4 mr-1" />
-                <span>Created {format(new Date(project.createdAt), "MMMM d, yyyy")}</span>
+                <span>Created {formatDateSafe(project.createdAt)}</span>
                 <span className="mx-2">•</span>
-                <span>Last updated {format(new Date(project.updatedAt), "MMMM d, yyyy")}</span>
+                <span>Last updated {formatDateSafe(project.updatedAt)}</span>
               </div>
               <p className="text-gray-700">{project.details}</p>
             </div>
@@ -212,7 +227,7 @@ const ProjectDetailPage = () => {
                     <div className="py-2 grid grid-cols-3 gap-4">
                       <dt className="text-sm font-medium text-gray-500">Created</dt>
                       <dd className="text-sm text-gray-900 col-span-2">
-                        {format(new Date(project.createdAt), "MMMM d, yyyy")}
+                        {formatDateSafe(project.createdAt)}
                       </dd>
                     </div>
                     <div className="py-2 grid grid-cols-3 gap-4">
@@ -243,7 +258,7 @@ const ProjectDetailPage = () => {
                     <div className="border rounded-md p-4 bg-gray-50">
                       <h3 className="text-md font-medium mb-2">Data Model: {dataModelDoc.name}</h3>
                       <p className="text-sm text-gray-500 mb-2">
-                        Uploaded on {format(new Date(dataModelDoc.uploadedAt), "MMMM d, yyyy")}
+                        Uploaded on {formatDateSafe(dataModelDoc.uploadedAt)}
                       </p>
                       
                       <div className="overflow-x-auto">
