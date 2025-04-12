@@ -197,6 +197,12 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     };
   };
 
+  const isCrossTypeRelationship = (sourceEntityId: string, targetEntityId: string) => {
+    const sourceEntity = dataModel.entities.find(e => e.id === sourceEntityId);
+    const targetEntity = dataModel.entities.find(e => e.id === targetEntityId);
+    return sourceEntity && targetEntity && sourceEntity.type !== targetEntity.type;
+  };
+
   return (
     <div className="h-full flex flex-col">
       <div className="bg-white sticky top-0 z-10 p-4 border-b">
@@ -492,12 +498,13 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                                 rel.sourceEntityId;
                               const otherEntity = dataModel.entities.find(e => e.id === otherEntityId);
                               const isSource = rel.sourceEntityId === entity.id;
+                              const crossTypeRelationship = isCrossTypeRelationship(rel.sourceEntityId, rel.targetEntityId);
                               
                               return (
                                 <div 
                                   key={rel.id}
                                   className={`flex items-center gap-1 text-xs p-1 rounded hover:bg-slate-100 ${
-                                    isCrossTypeRelationship ? "bg-blue-50" : ""
+                                    crossTypeRelationship ? "bg-blue-50" : ""
                                   }`}
                                 >
                                   <GitBranch className="h-3 w-3 flex-shrink-0" />
@@ -543,13 +550,13 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                 const sourceEntity = dataModel.entities.find(e => e.id === rel.sourceEntityId);
                 const targetEntity = dataModel.entities.find(e => e.id === rel.targetEntityId);
                 const isSource = rel.sourceEntityId === selectedEntity.id;
-                const isCrossTypeRelationship = sourceEntity?.type !== targetEntity?.type;
+                const crossTypeRelationship = isCrossTypeRelationship(rel.sourceEntityId, rel.targetEntityId);
                 
                 return (
                   <div 
                     key={rel.id} 
                     className={`text-sm p-2 rounded-md ${
-                      isCrossTypeRelationship 
+                      crossTypeRelationship 
                         ? "bg-blue-50 border border-blue-200" 
                         : "bg-muted"
                     }`}
@@ -574,7 +581,7 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
                       </span>
                     </div>
                     
-                    {isCrossTypeRelationship && (
+                    {crossTypeRelationship && (
                       <div className="mt-1 text-xs text-blue-600 font-medium">
                         Cross-type: {sourceEntity?.type} → {targetEntity?.type}
                       </div>
