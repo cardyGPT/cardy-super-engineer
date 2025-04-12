@@ -100,6 +100,19 @@ serve(async (req) => {
       // Log response status
       console.log(`Jira API response status: ${jiraResponse.status}`);
       
+      // Special handling for common Jira error scenarios
+      if (jiraResponse.status === 400 && endpoint.includes('board/') && endpoint.includes('/sprint')) {
+        // Handle case where board ID might be invalid or there's a permission issue
+        console.log(`Board sprint error: ${jiraApiUrl}`);
+        return new Response(
+          JSON.stringify({ values: [] }), // Return empty sprint array
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+      
       // For non-200 responses, try to get meaningful error messages
       if (!jiraResponse.ok) {
         let errorMessage = `Jira API returned status ${jiraResponse.status}`;
@@ -123,6 +136,18 @@ serve(async (req) => {
           if (jiraResponse.status === 404) {
             console.error(`404 Not Found: ${jiraApiUrl}`, { errorData });
             errorMessage = `Resource not found: ${endpoint}. ${errorMessage}`;
+          }
+          
+          // Return a more sensible response for common Jira API errors
+          if (endpoint.includes('board') && (jiraResponse.status === 404 || jiraResponse.status === 403)) {
+            console.log("Board not found or permission denied - returning empty results");
+            return new Response(
+              JSON.stringify({ values: [] }),
+              { 
+                status: 200, 
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              }
+            );
           }
         } catch (e) {
           // If we can't parse JSON, try to get text

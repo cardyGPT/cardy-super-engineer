@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,21 +60,23 @@ const StoriesPage: React.FC = () => {
 
   const handleProjectChange = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
-    if (project && selectedProject?.id !== project.id) {
+    if (project && (!selectedProject || selectedProject.id !== project.id)) {
       setSelectedProject(project);
     }
   };
 
   const handleSprintChange = (sprintId: string) => {
-    const projectSprints = sprints[selectedProject?.id || ''] || [];
+    if (!selectedProject) return;
+    
+    const projectSprints = sprints[selectedProject.id] || [];
     const sprint = projectSprints.find(s => s.id === sprintId);
-    if (sprint && selectedSprint?.id !== sprint.id) {
+    if (sprint && (!selectedSprint || selectedSprint.id !== sprint.id)) {
       setSelectedSprint(sprint);
     }
   };
   
-  // Display any errors at the top
-  useEffect(() => {
+  // Show error toast only once
+  React.useEffect(() => {
     if (error) {
       toast({
         title: "Error",
@@ -83,6 +85,12 @@ const StoriesPage: React.FC = () => {
       });
     }
   }, [error, toast]);
+
+  // Helper to determine if we're waiting for sprints to load
+  const isLoadingSprints = loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
+  
+  // Helper to determine if we're waiting for tickets to load
+  const isLoadingTickets = loading && selectedSprint && tickets.length === 0;
 
   return (
     <AppLayout>
@@ -159,13 +167,13 @@ const StoriesPage: React.FC = () => {
                   <label htmlFor="sprint-select" className="text-sm font-medium">
                     Sprint
                   </label>
-                  {loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0) ? (
+                  {isLoadingSprints ? (
                     <Skeleton className="h-10 w-full rounded-md" />
                   ) : (
                     <Select 
                       value={selectedSprint?.id} 
                       onValueChange={handleSprintChange}
-                      disabled={loading || !selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
+                      disabled={!selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
                     >
                       <SelectTrigger id="sprint-select" className="w-full">
                         <SelectValue placeholder="Select a sprint" />
@@ -183,8 +191,8 @@ const StoriesPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Loading state */}
-            {loading && !selectedSprint ? (
+            {/* Loading state for tickets */}
+            {isLoadingTickets ? (
               <Card className="animate-pulse">
                 <CardHeader>
                   <Skeleton className="h-6 w-32" />
