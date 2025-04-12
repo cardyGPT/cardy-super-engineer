@@ -89,6 +89,15 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       });
       return;
     }
+    
+    if (!projectId) {
+      toast({
+        title: "Project required",
+        description: "A project ID is required to upload documents",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Special validation for data model files
     if (docType === "data-model") {
@@ -103,7 +112,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       }
     }
 
-    console.log("Starting upload process with file:", file.name);
+    console.log("Starting upload process with file:", file.name, "for project:", projectId);
     setUploading(true);
     
     try {
@@ -148,7 +157,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
             setFile(null);
           }}
         >
-          <SelectTrigger className="w-full">
+          <SelectTrigger id="project-select" className="w-full">
             <SelectValue placeholder="Select document type" />
           </SelectTrigger>
           <SelectContent>

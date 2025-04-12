@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
@@ -26,13 +25,25 @@ serve(async (req) => {
       );
     }
     
+    // Validate provider
+    const validProviders = ['openai', 'gsuite', 'jira'];
+    if (!validProviders.includes(provider.toLowerCase())) {
+      return new Response(
+        JSON.stringify({ error: `Invalid provider. Must be one of: ${validProviders.join(', ')}` }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
+        }
+      );
+    }
+    
     // Store API key securely as an environment variable
-    const key = `${provider.toUpperCase()}_API_KEY`;
+    const envVarName = `${provider.toUpperCase()}_API_KEY`;
     
     // Set the environment variable
-    Deno.env.set(key, apiKey);
+    Deno.env.set(envVarName, apiKey);
     
-    console.log(`API key for ${provider} stored successfully`);
+    console.log(`${provider.toUpperCase()} API key stored successfully`);
     
     return new Response(
       JSON.stringify({ success: true, message: `${provider} API key stored successfully` }),

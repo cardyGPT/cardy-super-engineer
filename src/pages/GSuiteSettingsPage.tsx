@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/use-toast";
-import { Mail, Save, Link, FileCheck, CheckCircle, Shield, ArrowLeft, FileDown } from "lucide-react";
+import { Mail, Save, Link, FileCheck, CheckCircle, Shield, ArrowLeft, FileDown, Factory } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
@@ -103,12 +102,19 @@ const GSuiteSettingsPage: React.FC = () => {
         console.log("API key stored successfully:", storedData);
       }
       
-      // Save other settings
-      const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
-        body: {
-          defaultDriveFolder,
-          autoSync: autoSyncEnabled
+      // Save other settings with metadata
+      const enhancedSettings = {
+        defaultDriveFolder,
+        autoSync: autoSyncEnabled,
+        metadata: {
+          lastUpdated: new Date().toISOString(),
+          version: "1.0",
+          status: "active"
         }
+      };
+      
+      const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
+        body: enhancedSettings
       });
       
       if (settingsError) {
@@ -181,29 +187,40 @@ const GSuiteSettingsPage: React.FC = () => {
   const handleBackToSettings = () => {
     navigate('/settings');
   };
+  
+  // Navigate to Jira stories
+  const navigateToStories = () => {
+    navigate('/stories');
+  };
 
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <div className="flex items-center mb-4">
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            onClick={handleBackToSettings} 
-            className="mr-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Settings
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleBackToSettings} 
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Settings
+            </Button>
+            <h1 className="text-3xl font-bold flex items-center">
+              GSuite Integration Settings
+              {isConnected && (
+                <span className="ml-3 inline-flex items-center bg-green-100 text-green-700 text-sm px-2.5 py-0.5 rounded">
+                  <CheckCircle className="w-4 h-4 mr-1" />
+                  Connected
+                </span>
+              )}
+            </h1>
+          </div>
+          <Button onClick={navigateToStories} variant="outline" className="flex items-center">
+            <Factory className="h-4 w-4 mr-2" />
+            Back to Jira Stories
           </Button>
-          <h1 className="text-3xl font-bold flex items-center">
-            GSuite Integration Settings
-            {isConnected && (
-              <span className="ml-3 inline-flex items-center bg-green-100 text-green-700 text-sm px-2.5 py-0.5 rounded">
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Connected
-              </span>
-            )}
-          </h1>
         </div>
         
         <Alert className="mb-6 bg-blue-50 border border-blue-200">

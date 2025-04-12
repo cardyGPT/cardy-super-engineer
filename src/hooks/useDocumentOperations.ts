@@ -21,7 +21,15 @@ export const useDocumentOperations = (
   const uploadDocument = async (documentData: Partial<ProjectDocument>, file: File) => {
     setLoading(true);
     try {
-      console.log("Starting document upload process:", { documentData, fileName: file.name });
+      console.log("Starting document upload process:", { 
+        documentData, 
+        fileName: file.name, 
+        projectId: documentData.projectId 
+      });
+      
+      if (!documentData.projectId) {
+        throw new Error("Project ID is required for document upload");
+      }
       
       // First upload the file to storage
       const fileExt = file.name.split('.').pop();
@@ -83,7 +91,7 @@ export const useDocumentOperations = (
       
       // Map client model to database columns
       const newDocument = {
-        project_id: documentData.projectId || "",
+        project_id: documentData.projectId,
         name: file.name,
         type: documentData.type || "system-requirements",
         file_url: urlData.publicUrl,

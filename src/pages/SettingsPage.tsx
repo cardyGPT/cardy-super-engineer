@@ -33,6 +33,7 @@ const SettingsPage: React.FC = () => {
   // General state
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState<string>("jira");
   
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -62,6 +63,8 @@ const SettingsPage: React.FC = () => {
         // Check GSuite connection
         const { data: gsuiteData, error: gsuiteError } = await supabase.functions.invoke('validate-gsuite', {});
         
+        console.log("GSuite validation response:", gsuiteData);
+        
         if (!gsuiteError && gsuiteData?.valid) {
           setGsuiteConnected(true);
           
@@ -69,6 +72,15 @@ const SettingsPage: React.FC = () => {
             setGsuiteDriveFolder(gsuiteData.settings.defaultDriveFolder || "");
             setGsuiteAutoSync(gsuiteData.settings.autoSync || false);
           }
+        } else if (gsuiteError) {
+          console.error("Error validating GSuite settings:", gsuiteError);
+          toast({
+            title: "Error",
+            description: "Failed to validate GSuite settings: " + gsuiteError.message,
+            variant: "destructive"
+          });
+        } else if (gsuiteData) {
+          console.log("GSuite not connected:", gsuiteData.message);
         }
       } catch (err) {
         console.error("Error loading settings:", err);
@@ -78,7 +90,7 @@ const SettingsPage: React.FC = () => {
     };
     
     loadSettings();
-  }, []);
+  }, [toast]);
 
   const saveJiraSettings = async () => {
     if (!jiraDomain || !jiraEmail || !jiraToken) {
@@ -206,6 +218,7 @@ const SettingsPage: React.FC = () => {
       
       // If API key provided, save it securely
       if (gsuiteApiKey.trim()) {
+        console.log("Saving GSuite API key");
         const { data: storeData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
           body: { 
             provider: 'gsuite',
@@ -216,9 +229,16 @@ const SettingsPage: React.FC = () => {
         if (storeError) {
           throw new Error(storeError.message);
         }
+        
+        console.log("API key stored response:", storeData);
       }
       
       // Save other GSuite settings
+      console.log("Saving GSuite settings:", {
+        defaultDriveFolder: gsuiteDriveFolder.trim(),
+        autoSync: gsuiteAutoSync
+      });
+      
       const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
         body: {
           defaultDriveFolder: gsuiteDriveFolder.trim(),
@@ -230,6 +250,8 @@ const SettingsPage: React.FC = () => {
         throw new Error(settingsError.message);
       }
       
+      console.log("Settings saved response:", settingsData);
+      
       // Verify that the settings were saved correctly
       const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-gsuite', {});
       
@@ -237,13 +259,16 @@ const SettingsPage: React.FC = () => {
         throw new Error(validationError.message);
       }
       
+      console.log("Validation response:", validationData);
+      
       setGsuiteConnected(validationData?.valid || false);
       setGsuiteApiKey(""); // Clear API key for security
       
       if (validationData?.valid) {
         toast({
           title: "GSuite Connected",
-          description: "Successfully connected to GSuite API"
+          description: "Successfully connected to GSuite API",
+          variant: "success"
         });
       } else if (gsuiteApiKey.trim()) {
         success = false;
@@ -363,12 +388,26 @@ const SettingsPage: React.FC = () => {
     }
   };
 
+  // Function to navigate back to Jira stories
+  const navigateToStories = () => {
+    navigate('/stories');
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <h1 className="text-3xl font-bold mb-6">Settings</h1>
+        <div className="flex justify-between items-center mb-6">
+          <h1 className="text-3xl font-bold">Settings</h1>
+          
+          {jiraConnected && (
+            <Button onClick={navigateToStories} variant="outline" className="flex items-center">
+              <Factory className="h-4 w-4 mr-2" />
+              Back to Jira Stories
+            </Button>
+          )}
+        </div>
         
-        <Tabs defaultValue="jira" className="space-y-6">
+        <Tabs defaultValue="jira" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid grid-cols-3 w-full max-w-md mb-4">
             <TabsTrigger value="jira" className="relative">
               Jira
@@ -642,12 +681,12 @@ const SettingsPage: React.FC = () => {
                   <Input 
                     id="gsuite-key" 
                     type="password" 
-                    placeholder="Your Google API key" 
+                    placeholder="Enter your Google API key" 
                     value={gsuiteApiKey}
                     onChange={(e) => setGsuiteApiKey(e.target.value)}
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     This API key must have access to Google Drive and Google Docs APIs
                   </p>
                 </div>
@@ -661,7 +700,7 @@ const SettingsPage: React.FC = () => {
                     onChange={(e) => setGsuiteDriveFolder(e.target.value)}
                     disabled={isLoading}
                   />
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Documents will be saved to this folder by default
                   </p>
                 </div>
@@ -714,7 +753,7 @@ const SettingsPage: React.FC = () => {
                   <Button 
                     className="w-full" 
                     onClick={() => handleSaveSettings("gsuite")} 
-                    disabled={isSaving || isLoading}
+                    disabled={isSaving || isLoading || (!gsuiteApiKey && !gsuiteConnected)}
                   >
                     {isSaving ? (
                       <span className="flex items-center gap-2">

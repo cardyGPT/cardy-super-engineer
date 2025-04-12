@@ -86,9 +86,14 @@ const StoryDetailWrapper: React.FC = () => {
 
   return (
     <div>
-      {/* Download buttons */}
+      {/* Original StoryDetail component wrapped in a div with ref */}
+      <div ref={detailRef}>
+        <StoryDetail />
+      </div>
+      
+      {/* Download buttons at the bottom */}
       {selectedTicket && (
-        <Card className="p-2 mb-4 flex flex-wrap gap-2 items-center justify-between">
+        <Card className="p-2 mt-4 flex flex-wrap gap-2 items-center justify-between">
           <div className="text-sm font-medium">Download Options:</div>
           <div className="flex flex-wrap gap-2">
             <TooltipProvider>
@@ -169,11 +174,6 @@ const StoryDetailWrapper: React.FC = () => {
           </div>
         </Card>
       )}
-      
-      {/* Original StoryDetail component wrapped in a div with ref */}
-      <div ref={detailRef}>
-        <StoryDetail />
-      </div>
     </div>
   );
 };
