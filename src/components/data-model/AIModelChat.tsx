@@ -190,6 +190,11 @@ const AIModelChat = ({ dataModel, documents }: AIModelChatProps) => {
       }
 
       const data = await response.json();
+      
+      if (!data.response) {
+        throw new Error('Invalid response format from API');
+      }
+      
       setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
     } catch (error) {
       console.error('Error in AI chat:', error);

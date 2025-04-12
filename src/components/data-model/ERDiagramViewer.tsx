@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from "react";
 import { DataModel, Entity, Relationship } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -25,6 +24,7 @@ import {
   ToggleGroupItem,
 } from "@/components/ui/toggle-group";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 
 interface ERDiagramViewerProps {
   dataModel: DataModel;
@@ -38,30 +38,114 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   const [layoutMode, setLayoutMode] = useState<"grid" | "flow">("grid");
   const [showHelp, setShowHelp] = useState(false);
   const [showRelationshipLines, setShowRelationshipLines] = useState(false);
+  const [relationshipLines, setRelationshipLines] = useState<JSX.Element[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const diagramRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   useEffect(() => {
     setSelectedEntity(null);
   }, [dataModel]);
 
-  // Added this effect to recalculate the relationship lines when toggle is changed
   useEffect(() => {
-    if (showRelationshipLines && selectedEntity) {
-      // Force a re-render by updating a ref
+    if (selectedEntity && showRelationshipLines) {
       const timer = setTimeout(() => {
-        // This forces a redraw of the SVG lines
-        if (canvasRef.current) {
-          const current = canvasRef.current.style.opacity;
-          canvasRef.current.style.opacity = '0.99';
-          setTimeout(() => {
-            if (canvasRef.current) canvasRef.current.style.opacity = current;
-          }, 10);
-        }
+        drawRelationshipLines();
       }, 100);
       return () => clearTimeout(timer);
+    } else {
+      setRelationshipLines([]);
     }
-  }, [showRelationshipLines, selectedEntity]);
+  }, [showRelationshipLines, selectedEntity, layoutMode, searchTerm, entityTypeFilter]);
+
+  const drawRelationshipLines = () => {
+    if (!selectedEntity || !canvasRef.current || !diagramRef.current) return;
+    
+    const relationships = getEntityRelationships(selectedEntity.id);
+    const svgElements: JSX.Element[] = [];
+    
+    relationships.forEach((rel) => {
+      const sourceEntity = selectedEntity.id === rel.sourceEntityId ? 
+        selectedEntity : 
+        dataModel.entities.find(e => e.id === rel.sourceEntityId);
+      const targetEntity = selectedEntity.id === rel.targetEntityId ? 
+        selectedEntity : 
+        dataModel.entities.find(e => e.id === rel.targetEntityId);
+      
+      if (!sourceEntity || !targetEntity) return;
+      
+      const sourceEl = document.getElementById(`entity-${sourceEntity.id}`);
+      const targetEl = document.getElementById(`entity-${targetEntity.id}`);
+      
+      if (!sourceEl || !targetEl) return;
+
+      const canvasRect = canvasRef.current.getBoundingClientRect();
+      const sourceRect = sourceEl.getBoundingClientRect();
+      const targetRect = targetEl.getBoundingClientRect();
+      
+      const sourceX = (sourceRect.left + sourceRect.width / 2) - canvasRect.left;
+      const sourceY = (sourceRect.top + sourceRect.height / 2) - canvasRect.top;
+      const targetX = (targetRect.left + targetRect.width / 2) - canvasRect.left;
+      const targetY = (targetRect.top + targetRect.height / 2) - canvasRect.top;
+      
+      const scaledSourceX = sourceX / zoom;
+      const scaledSourceY = sourceY / zoom;
+      const scaledTargetX = targetX / zoom;
+      const scaledTargetY = targetY / zoom;
+      
+      const lineColor = getRelationshipLineColor(rel, selectedEntity.id);
+      const lineStyle = getRelationshipLineStyle(sourceEntity.type, targetEntity.type);
+      
+      const angle = Math.atan2(scaledTargetY - scaledSourceY, scaledTargetX - scaledSourceX);
+      const arrowLength = 10;
+      
+      const arrowDist = 20;
+      const arrowX = scaledTargetX - arrowDist * Math.cos(angle);
+      const arrowY = scaledTargetY - arrowDist * Math.sin(angle);
+      
+      const arrowPoints = [
+        [arrowX, arrowY],
+        [arrowX - arrowLength * Math.cos(angle - Math.PI/6), arrowY - arrowLength * Math.sin(angle - Math.PI/6)],
+        [arrowX - arrowLength * Math.cos(angle + Math.PI/6), arrowY - arrowLength * Math.sin(angle + Math.PI/6)]
+      ];
+      
+      svgElements.push(
+        <g key={rel.id}>
+          <line 
+            x1={scaledSourceX} 
+            y1={scaledSourceY} 
+            x2={scaledTargetX} 
+            y2={scaledTargetY}
+            stroke={lineColor}
+            strokeWidth={lineStyle.strokeWidth}
+            strokeDasharray={lineStyle.strokeDasharray}
+          />
+          
+          <polygon 
+            points={arrowPoints.map(p => p.join(',')).join(' ')}
+            fill={lineColor}
+          />
+          
+          <foreignObject
+            x={(scaledSourceX + scaledTargetX) / 2 - 60} 
+            y={(scaledSourceY + scaledTargetY) / 2 - 15}
+            width="120"
+            height="30"
+            style={{ overflow: 'visible' }}
+          >
+            <div 
+              className="bg-white px-2 py-0.5 rounded border shadow-sm text-center text-xs"
+              style={{ display: 'inline-block', maxWidth: '100%', margin: '0 auto' }}
+            >
+              {rel.name || getRelationshipTypeDisplay(rel)}
+            </div>
+          </foreignObject>
+        </g>
+      );
+    });
+    
+    setRelationshipLines(svgElements);
+  };
   
   const filteredEntities = dataModel.entities.filter((entity) => {
     const matchesSearch = entity.name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -137,6 +221,11 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     linkElement.setAttribute('href', dataUri);
     linkElement.setAttribute('download', exportFileDefaultName);
     linkElement.click();
+    
+    toast({
+      title: "Diagram Exported",
+      description: `Your diagram has been exported as ${exportFileDefaultName}`
+    });
   };
 
   const getEntityTypeColor = (type: string): string => {
@@ -220,21 +309,6 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
     const sourceEntity = dataModel.entities.find(e => e.id === sourceEntityId);
     const targetEntity = dataModel.entities.find(e => e.id === targetEntityId);
     return sourceEntity && targetEntity && sourceEntity.type !== targetEntity.type;
-  };
-
-  // Added function to calculate element positions more reliably
-  const calculateElementPosition = (element: HTMLElement | null, container: HTMLElement | null) => {
-    if (!element || !container) return { x: 0, y: 0, width: 0, height: 0 };
-    
-    const elementRect = element.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    return {
-      x: (elementRect.left + elementRect.width / 2) - containerRect.left,
-      y: (elementRect.top + elementRect.height / 2) - containerRect.top,
-      width: elementRect.width,
-      height: elementRect.height
-    };
   };
 
   return (
@@ -385,83 +459,12 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
             </div>
           ) : (
             <>
-              {showRelationshipLines && selectedEntity && (
-                <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" style={{ zIndex: 1 }}>
-                  {getEntityRelationships(selectedEntity.id).map((rel) => {
-                    const sourceEntity = selectedEntity.id === rel.sourceEntityId ? 
-                      selectedEntity : 
-                      dataModel.entities.find(e => e.id === rel.sourceEntityId);
-                    const targetEntity = selectedEntity.id === rel.targetEntityId ? 
-                      selectedEntity : 
-                      dataModel.entities.find(e => e.id === rel.targetEntityId);
-                    
-                    if (!sourceEntity || !targetEntity) return null;
-                    
-                    const sourceEl = document.getElementById(`entity-${sourceEntity.id}`);
-                    const targetEl = document.getElementById(`entity-${targetEntity.id}`);
-                    
-                    if (!sourceEl || !targetEl) return null;
-
-                    // Use the new positioning calculation function
-                    const sourcePos = calculateElementPosition(sourceEl, canvasRef.current);
-                    const targetPos = calculateElementPosition(targetEl, canvasRef.current);
-                    
-                    // Calculate positions with proper scaling
-                    const scaledSourceX = sourcePos.x / zoom;
-                    const scaledSourceY = sourcePos.y / zoom;
-                    const scaledTargetX = targetPos.x / zoom;
-                    const scaledTargetY = targetPos.y / zoom;
-                    
-                    const lineColor = getRelationshipLineColor(rel, selectedEntity.id);
-                    const lineStyle = getRelationshipLineStyle(sourceEntity.type, targetEntity.type);
-                    
-                    const angle = Math.atan2(scaledTargetY - scaledSourceY, scaledTargetX - scaledSourceX);
-                    const arrowLength = 10;
-                    
-                    const arrowDist = 20;
-                    const arrowX = scaledTargetX - arrowDist * Math.cos(angle);
-                    const arrowY = scaledTargetY - arrowDist * Math.sin(angle);
-                    
-                    const arrowPoints = [
-                      [arrowX, arrowY],
-                      [arrowX - arrowLength * Math.cos(angle - Math.PI/6), arrowY - arrowLength * Math.sin(angle - Math.PI/6)],
-                      [arrowX - arrowLength * Math.cos(angle + Math.PI/6), arrowY - arrowLength * Math.sin(angle + Math.PI/6)]
-                    ];
-                    
-                    return (
-                      <g key={rel.id}>
-                        <line 
-                          x1={scaledSourceX} 
-                          y1={scaledSourceY} 
-                          x2={scaledTargetX} 
-                          y2={scaledTargetY}
-                          stroke={lineColor}
-                          strokeWidth={lineStyle.strokeWidth}
-                          strokeDasharray={lineStyle.strokeDasharray}
-                        />
-                        
-                        <polygon 
-                          points={arrowPoints.map(p => p.join(',')).join(' ')}
-                          fill={lineColor}
-                        />
-                        
-                        <foreignObject
-                          x={(scaledSourceX + scaledTargetX) / 2 - 60} 
-                          y={(scaledSourceY + scaledTargetY) / 2 - 15}
-                          width="120"
-                          height="30"
-                          style={{ overflow: 'visible' }}
-                        >
-                          <div 
-                            className="bg-white px-2 py-0.5 rounded border shadow-sm text-center text-xs"
-                            style={{ display: 'inline-block', maxWidth: '100%', margin: '0 auto' }}
-                          >
-                            {rel.name || getRelationshipTypeDisplay(rel)}
-                          </div>
-                        </foreignObject>
-                      </g>
-                    );
-                  })}
+              {showRelationshipLines && (
+                <svg 
+                  className="absolute top-0 left-0 w-full h-full pointer-events-none" 
+                  style={{ zIndex: 1 }}
+                >
+                  {relationshipLines}
                 </svg>
               )}
               
