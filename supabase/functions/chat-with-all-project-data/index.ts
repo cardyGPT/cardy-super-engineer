@@ -75,14 +75,13 @@ serve(async (req) => {
       based on the project's complete documentation.`
     };
     
-    // Call OpenAI API with the documents included
+    // Call OpenAI API with the documents included as context
     const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [systemMessage, ...messages],
       temperature: 0.5,
       max_tokens: 2500,
-      // Fix: Remove the tools parameter since we're not using function calling
-      // Instead include document content directly in the context
+      // Include document content directly in the context
       context: formattedDocuments.length > 0 ? { documents: formattedDocuments } : undefined
     });
     
