@@ -25,37 +25,64 @@ serve(async (req) => {
     console.log("API Key exists:", !!apiKey);
     console.log("Settings exist:", !!settingsJson);
     
-    const isValid = !!apiKey && apiKey.length > 10; // Simple validation to ensure API key exists and has reasonable length
+    // More detailed validation - API key should have reasonable length
+    const isApiKeyValid = !!apiKey && apiKey.length > 10;
     
     let settings = null;
+    let settingsValid = false;
+    
     if (settingsJson) {
       try {
         settings = JSON.parse(settingsJson);
         console.log("Parsed settings:", settings);
+        
+        // Validate that settings has required properties
+        settingsValid = !!settings && 
+          typeof settings === 'object' && 
+          settings.metadata && 
+          settings.metadata.lastUpdated;
+          
       } catch (e) {
         console.error("Error parsing GSuite settings:", e);
+        return new Response(
+          JSON.stringify({ 
+            valid: false, 
+            error: "Invalid GSuite settings format",
+            message: "Error parsing GSuite configuration: " + e.message
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400 
+          }
+        );
       }
     }
     
-    // For successful validation, both API key and settings should be present
-    const success = isValid && !!settings;
+    // For successful validation, both API key and settings should be present and valid
+    const success = isApiKeyValid && settingsValid;
     
     let message;
     if (!apiKey) {
       message = "GSuite API key is not configured";
+    } else if (!isApiKeyValid) {
+      message = "GSuite API key appears to be invalid";
     } else if (!settings) {
       message = "GSuite settings are not configured";
+    } else if (!settingsValid) {
+      message = "GSuite settings are incomplete";
     } else if (success) {
       message = "GSuite configuration is valid";
     } else {
-      message = "GSuite configuration is incomplete";
+      message = "GSuite configuration is incomplete or invalid";
     }
     
     return new Response(
       JSON.stringify({ 
         valid: success,
         settings: settings,
-        message: message
+        message: message,
+        hasApiKey: !!apiKey,
+        hasSettings: !!settings
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },

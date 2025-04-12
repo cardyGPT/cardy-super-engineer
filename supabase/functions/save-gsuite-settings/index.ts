@@ -46,6 +46,24 @@ serve(async (req) => {
     // Store settings securely as an environment variable
     const settingsStr = JSON.stringify(enhancedSettings);
     
+    // First verify we have an API key
+    const apiKey = Deno.env.get('GSUITE_API_KEY');
+    
+    if (!apiKey && !settings.skipApiKeyCheck) {
+      console.error("Cannot save settings: No GSuite API key found");
+      return new Response(
+        JSON.stringify({ 
+          error: "No GSuite API key found. Please save an API key first.", 
+          valid: false,
+          message: "GSuite API key is required before saving settings."
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
+        }
+      );
+    }
+    
     // Set the environment variable
     Deno.env.set('GSUITE_SETTINGS', settingsStr);
     
@@ -55,7 +73,8 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         message: "GSuite settings stored successfully",
-        settings: enhancedSettings 
+        settings: enhancedSettings,
+        valid: true
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -66,7 +85,11 @@ serve(async (req) => {
     console.error("Error storing GSuite settings:", err);
     
     return new Response(
-      JSON.stringify({ error: err.message }),
+      JSON.stringify({ 
+        error: err.message,
+        valid: false,
+        message: "Error storing GSuite settings: " + err.message
+      }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500 
