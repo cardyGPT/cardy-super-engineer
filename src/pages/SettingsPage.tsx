@@ -61,6 +61,10 @@ const SettingsPage = () => {
             used: total_used,
             available: total_available
           });
+        } else {
+          // If billing info isn't available but key is valid, show a message
+          setCreditBalance(null);
+          setValidationMessage('API key is valid, but billing information is not available');
         }
 
         if (!silent) {
@@ -222,23 +226,29 @@ const SettingsPage = () => {
                     </div>
                   )}
 
-                  {creditBalance && (
+                  {keyStatus === 'valid' && (
                     <div className="p-4 bg-slate-50 rounded-lg space-y-2">
-                      <h3 className="font-medium">API Credits</h3>
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-sm">
-                          <span>Total Credits:</span>
-                          <span>${creditBalance.total.toFixed(2)}</span>
+                      <h3 className="font-medium">API Credits Status</h3>
+                      {creditBalance ? (
+                        <div className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span>Total Credits:</span>
+                            <span>${creditBalance.total.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span>Used:</span>
+                            <span>${creditBalance.used.toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-medium">
+                            <span>Available:</span>
+                            <span>${creditBalance.available.toFixed(2)}</span>
+                          </div>
                         </div>
-                        <div className="flex justify-between text-sm">
-                          <span>Used:</span>
-                          <span>${creditBalance.used.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-sm font-medium">
-                          <span>Available:</span>
-                          <span>${creditBalance.available.toFixed(2)}</span>
-                        </div>
-                      </div>
+                      ) : (
+                        <p className="text-sm text-yellow-600">
+                          Credit information not available. This may happen with certain account types or due to API limitations.
+                        </p>
+                      )}
                     </div>
                   )}
                   

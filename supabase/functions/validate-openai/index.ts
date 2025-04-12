@@ -55,25 +55,54 @@ serve(async (req) => {
     }
 
     // Get billing information
-    const billingResponse = await fetch('https://api.openai.com/dashboard/billing/credit_grants', {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
     let billingInfo = null;
     
-    if (billingResponse.status === 200) {
-      try {
-        billingInfo = await billingResponse.json();
-        console.log("OpenAI billing info:", billingInfo);
-      } catch (err) {
-        console.error("Error parsing billing info:", err);
+    try {
+      const billingResponse = await fetch('https://api.openai.com/dashboard/billing/credit_grants', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (billingResponse.status === 200) {
+        try {
+          billingInfo = await billingResponse.json();
+          console.log("Retrieved OpenAI billing info successfully");
+        } catch (err) {
+          console.error("Error parsing billing info:", err);
+        }
+      } else {
+        // Try alternative billing endpoint
+        const usageResponse = await fetch('https://api.openai.com/dashboard/billing/usage', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            start_date: new Date(new Date().setDate(new Date().getDate() - 30)).toISOString().split('T')[0],
+            end_date: new Date().toISOString().split('T')[0],
+          }),
+        });
+        
+        if (usageResponse.status === 200) {
+          const usageData = await usageResponse.json();
+          console.log("Retrieved OpenAI usage info:", usageData);
+          
+          // Construct billing info from usage data
+          billingInfo = {
+            total_granted: usageData.total_usage || 0,
+            total_used: usageData.total_usage || 0,
+            total_available: 0 // We can't determine available balance from usage data
+          };
+        } else {
+          console.log("Could not fetch billing info, status:", billingResponse.status);
+        }
       }
-    } else {
-      console.log("Could not fetch billing info, status:", billingResponse.status);
+    } catch (err) {
+      console.error("Error fetching billing info:", err);
     }
     
     return new Response(
