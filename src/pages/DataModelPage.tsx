@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
-import { Database, FileUp, AlertTriangle, Info } from "lucide-react";
+import { Database, FileUp, AlertTriangle, Info, MessageSquare } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -19,8 +19,15 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 import DocumentUpload from "@/components/documents/DocumentUpload";
 import ERDiagramViewer from "@/components/data-model/ERDiagramViewer";
+import AIModelChat from "@/components/data-model/AIModelChat";
 import { DataModel } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +40,7 @@ const DataModelPage = () => {
   const [currentDataModel, setCurrentDataModel] = useState<DataModel | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("diagram");
   const { toast } = useToast();
   
   // Filter to only show data model documents
@@ -110,7 +118,7 @@ const DataModelPage = () => {
           <div>
             <h1 className="text-2xl font-bold">Data Models</h1>
             <p className="text-gray-500">
-              Visualize and explore entity-relationship diagrams
+              Visualize, explore, and chat with your data models
             </p>
           </div>
           
@@ -171,12 +179,22 @@ const DataModelPage = () => {
             )}
           </div>
         ) : (
-          <div className="bg-white rounded-lg border h-[calc(100vh-12rem)] overflow-hidden">
-            <div className="p-4 bg-muted border-b flex justify-between items-center">
-              <div className="flex items-center">
-                <Database className="h-5 w-5 mr-2 text-gray-500" />
-                <h2 className="text-lg font-semibold">ER Diagram Viewer</h2>
+          <div className="bg-white rounded-lg border h-[calc(100vh-12rem)] overflow-hidden flex flex-col">
+            <div className="p-4 bg-muted border-b flex flex-col md:flex-row gap-4 md:items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center">
+                  <Database className="h-5 w-5 mr-2 text-gray-500" />
+                  <h2 className="text-lg font-semibold">Data Model Explorer</h2>
+                </div>
+                
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+                  <TabsList>
+                    <TabsTrigger value="diagram">ER Diagram</TabsTrigger>
+                    <TabsTrigger value="chat">AI Chat</TabsTrigger>
+                  </TabsList>
+                </Tabs>
               </div>
+              
               <div className="flex items-center gap-2">
                 <label htmlFor="model-select" className="text-sm">
                   Data Model:
@@ -199,7 +217,7 @@ const DataModelPage = () => {
               </div>
             </div>
             
-            <div className="h-full">
+            <div className="flex-1 overflow-hidden">
               {error && (
                 <Alert variant="destructive" className="m-4">
                   <AlertTriangle className="h-4 w-4" />
@@ -208,27 +226,53 @@ const DataModelPage = () => {
                 </Alert>
               )}
               
-              {selectedDocument && currentDataModel ? (
-                <ERDiagramViewer dataModel={currentDataModel} />
-              ) : (
-                <div className="h-full flex items-center justify-center flex-col gap-4">
-                  <p className="text-gray-500">
-                    {selectedDocument 
-                      ? "Loading data model..." 
-                      : "Select a data model to view its ER diagram"}
-                  </p>
-                  
-                  {!selectedDocument && dataModelDocuments.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}
-                    >
-                      <Database className="h-4 w-4 mr-2" />
-                      Load First Data Model
-                    </Button>
+              <Tabs value={activeTab} className="h-full">
+                <TabsContent value="diagram" className="h-full m-0 border-none">
+                  {selectedDocument && currentDataModel ? (
+                    <ERDiagramViewer dataModel={currentDataModel} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center flex-col gap-4">
+                      <p className="text-gray-500">
+                        {selectedDocument 
+                          ? "Loading data model..." 
+                          : "Select a data model to view its ER diagram"}
+                      </p>
+                      
+                      {!selectedDocument && dataModelDocuments.length > 0 && (
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}
+                        >
+                          <Database className="h-4 w-4 mr-2" />
+                          Load First Data Model
+                        </Button>
+                      )}
+                    </div>
                   )}
-                </div>
-              )}
+                </TabsContent>
+                <TabsContent value="chat" className="h-full m-0 border-none">
+                  {currentDataModel ? (
+                    <AIModelChat dataModel={currentDataModel} documents={documents} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center flex-col gap-4">
+                      <MessageSquare className="h-12 w-12 text-gray-300" />
+                      <p className="text-gray-500">
+                        Select a data model to chat with the AI about it.
+                      </p>
+                      
+                      {dataModelDocuments.length > 0 && !selectedDocument && (
+                        <Button 
+                          variant="outline" 
+                          onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}
+                        >
+                          <Database className="h-4 w-4 mr-2" />
+                          Load Data Model
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           </div>
         )}
