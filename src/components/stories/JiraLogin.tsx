@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { JiraCredentials } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Save } from "lucide-react";
+import { CheckCircle, Save, AlertCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const JiraLogin: React.FC = () => {
   const { credentials, setCredentials } = useStories();
@@ -41,6 +42,10 @@ const JiraLogin: React.FC = () => {
         .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
         .replace(/\/+$/, ''); // Remove trailing slashes
       
+      if (!cleanDomain || !email.trim() || !apiToken.trim()) {
+        throw new Error("All fields are required");
+      }
+      
       // Create credentials object
       const credentials: JiraCredentials = {
         domain: cleanDomain,
@@ -50,11 +55,13 @@ const JiraLogin: React.FC = () => {
       
       console.log("Testing Jira connection with credentials:", { domain: credentials.domain, email: credentials.email });
       
-      // Validate credentials by making a test API call
+      // Validate credentials by making a test API call to get current user
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
-          endpoint: 'myself',
-          credentials
+          action: 'getProjects',
+          domain: credentials.domain,
+          email: credentials.email,
+          apiToken: credentials.apiToken
         }
       });
       
@@ -62,7 +69,13 @@ const JiraLogin: React.FC = () => {
       
       if (error || !data || data.error) {
         console.error("Jira login error:", error || data?.error);
-        throw new Error(error?.message || data?.error || "Invalid Jira credentials");
+        throw new Error(
+          error?.message || 
+          data?.error || 
+          data?.details?.message || 
+          data?.details?.errorMessages?.join(', ') || 
+          "Invalid Jira credentials"
+        );
       }
       
       // Credentials are valid, save them permanently
@@ -71,7 +84,7 @@ const JiraLogin: React.FC = () => {
       
       toast({
         title: "Connection Successful",
-        description: `Connected to Jira as ${data.displayName || email}`,
+        description: `Connected to Jira at ${cleanDomain}`,
         variant: "success",
       });
       
@@ -104,9 +117,10 @@ const JiraLogin: React.FC = () => {
       <form onSubmit={handleLogin}>
         <CardContent className="space-y-4">
           {loginError && (
-            <div className="bg-destructive/10 p-3 rounded-md text-destructive text-sm">
-              {loginError}
-            </div>
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{loginError}</AlertDescription>
+            </Alert>
           )}
           
           <div className="space-y-2">
@@ -160,7 +174,12 @@ const JiraLogin: React.FC = () => {
         </CardContent>
         <CardFooter>
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Testing Connection..." : (
+            {isLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Testing Connection...
+              </>
+            ) : (
               <>
                 {isConnected ? <Save className="h-4 w-4 mr-2" /> : null}
                 {isConnected ? "Save Connection" : "Test & Save Connection"}
