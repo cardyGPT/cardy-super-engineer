@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 interface ChatMessageListProps {
-  messages: { role: "user" | "assistant"; content: string }[];
+  messages: { role: "user" | "assistant"; content: any }[];  // Accept any content type
   isLoading: boolean;
   error: string | null;
   usedDocuments: string[];
@@ -21,35 +21,6 @@ const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMess
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isLoading]);
-
-  // Helper function to safely get content as string
-  const getMessageContent = (content: any): string => {
-    if (typeof content === 'string') {
-      return content;
-    }
-    
-    // Handle Jira document format if present
-    if (content && typeof content === 'object' && 'type' in content && 'version' in content && 'content' in content) {
-      try {
-        // Extract text from Jira document structure
-        return JSON.stringify(content);
-      } catch (e) {
-        console.error("Error parsing Jira content object:", e);
-        return "[Content formatting error]";
-      }
-    }
-    
-    // Fallback for other object types
-    if (content && typeof content === 'object') {
-      try {
-        return JSON.stringify(content);
-      } catch (e) {
-        return "[Invalid content format]";
-      }
-    }
-    
-    return String(content || "");
-  };
 
   return (
     <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -102,7 +73,7 @@ const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMess
         <ChatMessage 
           key={index} 
           role={msg.role} 
-          content={getMessageContent(msg.content)} 
+          content={msg.content} 
           isLoading={false} 
         />
       ))}

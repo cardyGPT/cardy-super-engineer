@@ -2,7 +2,7 @@
 import { Bot, User, Loader2 } from "lucide-react";
 
 interface ChatMessageProps {
-  content: string;
+  content: string | any;  // Accept any type of content
   role: "user" | "assistant";
   isLoading?: boolean;
 }
@@ -21,8 +21,37 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
     );
   }
 
-  // Ensure content is always a string
-  const safeContent = typeof content === 'string' ? content : String(content);
+  // Create a robust safe content formatter that handles all possible content types
+  const getSafeContent = (rawContent: any): string => {
+    if (typeof rawContent === 'string') {
+      return rawContent;
+    }
+    
+    // Handle Jira document format specifically
+    if (rawContent && typeof rawContent === 'object' && 
+        'type' in rawContent && 'version' in rawContent && 'content' in rawContent) {
+      try {
+        return JSON.stringify(rawContent);
+      } catch (e) {
+        console.error("Error parsing Jira content object:", e);
+        return "[Content formatting error]";
+      }
+    }
+    
+    // Handle any other object type
+    if (rawContent && typeof rawContent === 'object') {
+      try {
+        return JSON.stringify(rawContent);
+      } catch (e) {
+        return "[Invalid content format]";
+      }
+    }
+    
+    // Handle any other type
+    return String(rawContent || "");
+  };
+
+  const safeContent = getSafeContent(content);
 
   return (
     <div className={`flex ${role === "assistant" ? "justify-start" : "justify-end"}`}>

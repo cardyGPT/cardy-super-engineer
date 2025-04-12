@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
 import { JiraCredentials, StoriesContextType, JiraTicket, JiraProject, JiraSprint, JiraGenerationRequest, JiraGenerationResponse } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
@@ -542,6 +543,24 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [selectedProject, sprints, selectedSprint]);
 
+  // Helper function to safely convert any content to string
+  const safeStringify = (content: any): string => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (content && typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content:", e);
+        return "[Content conversion error]";
+      }
+    }
+    
+    return String(content || "");
+  };
+
   const generateContent = useCallback(async (request: JiraGenerationRequest) => {
     if (!credentials || isGenerating) return;
     
@@ -569,9 +588,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (data) {
         console.log("Content generation successful");
         
+        // Ensure all response data is converted to strings
+        let responseStr = typeof data.response === 'string' ? 
+          data.response : safeStringify(data.response);
+        
         const response: JiraGenerationResponse = {
-          response: data.response,
-          [request.type]: data.response
+          response: responseStr,
+          [request.type]: responseStr
         };
         
         setGeneratedContent(response);
@@ -605,13 +628,16 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     try {
       console.log(`Pushing content to Jira ticket ${ticketId}...`);
       
+      // Ensure content is a string before sending to Jira
+      const safeContent = typeof content === 'string' ? content : safeStringify(content);
+      
       const { data, error: apiError } = await supabase.functions.invoke('jira-api', {
         body: {
           endpoint: `issue/${ticketId}/comment`,
           method: 'POST',
           credentials,
           data: {
-            body: content
+            body: safeContent
           }
         }
       });

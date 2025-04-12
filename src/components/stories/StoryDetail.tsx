@@ -31,19 +31,39 @@ const StoryDetail: React.FC = () => {
     );
   }
 
-  // Helper function to safely get content
+  // Helper function to safely get content - robust implementation
   const safeGetContent = (content: any): string => {
+    if (content === null || content === undefined) {
+      return "";
+    }
+    
     if (typeof content === 'string') {
       return content;
     }
-    if (content && typeof content === 'object') {
+    
+    // Handle Jira document format specifically
+    if (content && typeof content === 'object' && 
+        'type' in content && 'version' in content && 'content' in content) {
       try {
         return JSON.stringify(content);
       } catch (e) {
+        console.error("Error parsing Jira content object:", e);
+        return "[Content formatting error]";
+      }
+    }
+    
+    // Handle any other object type
+    if (typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content object:", e);
         return "[Invalid content format]";
       }
     }
-    return String(content || "");
+    
+    // Handle any other type
+    return String(content);
   };
 
   const handleGenerate = async (type: "lld" | "code" | "tests" | "all") => {
@@ -72,10 +92,22 @@ const StoryDetail: React.FC = () => {
   const handlePushToJira = async () => {
     if (!selectedTicket) return;
     
-    const content = editedContent[activeTab] || 
-                    (generatedContent && typeof generatedContent[activeTab as keyof typeof generatedContent] === 'string' 
-                      ? generatedContent[activeTab as keyof typeof generatedContent] as string 
-                      : generatedContent?.response as string) || "";
+    // Get content for the active tab, with robust fallbacks
+    let content: string;
+    
+    if (editedContent[activeTab]) {
+      content = editedContent[activeTab];
+    } else if (generatedContent) {
+      if (typeof generatedContent[activeTab as keyof typeof generatedContent] === 'string') {
+        content = generatedContent[activeTab as keyof typeof generatedContent] as string;
+      } else if (generatedContent.response) {
+        content = safeGetContent(generatedContent.response);
+      } else {
+        content = "";
+      }
+    } else {
+      content = "";
+    }
     
     if (!content) {
       toast({
@@ -123,7 +155,7 @@ const StoryDetail: React.FC = () => {
           <CardTitle>Description</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-line">{ticket.description}</p>
+          <p className="whitespace-pre-line">{safeGetContent(ticket.description)}</p>
         </CardContent>
       </Card>
       
@@ -133,7 +165,7 @@ const StoryDetail: React.FC = () => {
             <CardTitle>Acceptance Criteria</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="whitespace-pre-line">{ticket.acceptance_criteria}</p>
+            <p className="whitespace-pre-line">{safeGetContent(ticket.acceptance_criteria)}</p>
           </CardContent>
         </Card>
       )}
