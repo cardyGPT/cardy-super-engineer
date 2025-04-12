@@ -46,65 +46,18 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
 
     setUploading(true);
     try {
-      const fakeFileUrl = `/uploads/${file.name}`;
-      
-      let fileContent = null;
-      if (docType === "data-model") {
-        try {
-          const text = await file.text();
-          try {
-            fileContent = JSON.parse(text);
-            
-            // Basic validation of data model structure
-            if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
-                !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
-              throw new Error("Invalid data model format");
-            }
-          } catch (parseError) {
-            toast({
-              title: "Error parsing JSON",
-              description: "The data model file is not valid JSON or has incorrect format.",
-              variant: "destructive",
-            });
-            setUploading(false);
-            return;
-          }
-        } catch (readError) {
-          toast({
-            title: "Error reading file",
-            description: "Could not read the file. Please try again.",
-            variant: "destructive",
-          });
-          setUploading(false);
-          return;
-        }
-      }
-      
       await uploadDocument({
         projectId,
-        name: file.name,
         type: docType,
-        fileUrl: fakeFileUrl,
-        fileType: file.type,
-        content: fileContent,
-      });
+      }, file);
       
       setFile(null);
-      toast({
-        title: "Upload successful",
-        description: `${file.name} has been uploaded successfully.`,
-      });
       
       if (onUploadComplete) {
         onUploadComplete();
       }
     } catch (error) {
       console.error("Error uploading document:", error);
-      toast({
-        title: "Upload failed",
-        description: "There was an error uploading your document. Please try again.",
-        variant: "destructive",
-      });
     } finally {
       setUploading(false);
     }

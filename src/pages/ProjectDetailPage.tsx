@@ -10,7 +10,6 @@ import {
   Edit, 
   FileUp, 
   Database,
-  ExternalLink,
   Trash2 
 } from "lucide-react";
 import { format } from "date-fns";
@@ -54,7 +53,7 @@ const ProjectDetailPage = () => {
   if (!project) {
     return (
       <AppLayout>
-        <div className="container mx-auto py-6">
+        <div className="container mx-auto">
           <Button
             variant="outline"
             className="mb-4"
@@ -84,7 +83,7 @@ const ProjectDetailPage = () => {
 
   return (
     <AppLayout>
-      <div className="container mx-auto py-6">
+      <div className="container mx-auto">
         <Button
           variant="outline"
           className="mb-4"
@@ -174,15 +173,55 @@ const ProjectDetailPage = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-2">
                 <div className="bg-white rounded-lg border p-6">
-                  <h2 className="text-xl font-semibold mb-4">Project Documents</h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-semibold">Project Documents</h2>
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <FileUp className="h-4 w-4 mr-2" />
+                          Upload
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Upload Document</DialogTitle>
+                          <DialogDescription>
+                            Select a document to upload to this project.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DocumentUpload projectId={project.id} />
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                   <DocumentList projectId={project.id} />
                 </div>
               </div>
               
               <div>
-                <div className="bg-white rounded-lg border p-6 sticky top-6">
-                  <h2 className="text-xl font-semibold mb-4">Upload Document</h2>
-                  <DocumentUpload projectId={project.id} />
+                <div className="bg-white rounded-lg border p-6">
+                  <h2 className="text-xl font-semibold mb-4">Project Information</h2>
+                  <dl className="divide-y divide-gray-100">
+                    <div className="py-2 grid grid-cols-3 gap-4">
+                      <dt className="text-sm font-medium text-gray-500">Name</dt>
+                      <dd className="text-sm text-gray-900 col-span-2">{project.name}</dd>
+                    </div>
+                    <div className="py-2 grid grid-cols-3 gap-4">
+                      <dt className="text-sm font-medium text-gray-500">Type</dt>
+                      <dd className="text-sm text-gray-900 col-span-2">{project.type}</dd>
+                    </div>
+                    <div className="py-2 grid grid-cols-3 gap-4">
+                      <dt className="text-sm font-medium text-gray-500">Created</dt>
+                      <dd className="text-sm text-gray-900 col-span-2">
+                        {format(new Date(project.createdAt), "MMMM d, yyyy")}
+                      </dd>
+                    </div>
+                    <div className="py-2 grid grid-cols-3 gap-4">
+                      <dt className="text-sm font-medium text-gray-500">Documents</dt>
+                      <dd className="text-sm text-gray-900 col-span-2">
+                        {projectDocuments.length}
+                      </dd>
+                    </div>
+                  </dl>
                 </div>
               </div>
             </div>
@@ -193,15 +232,27 @@ const ProjectDetailPage = () => {
               <h2 className="text-xl font-semibold p-6 border-b">Data Model Viewer</h2>
               {hasDataModel ? (
                 <div className="p-6">
-                  <p className="text-center text-gray-500 mb-4">
-                    This project has a data model uploaded.
-                  </p>
-                  <div className="flex justify-center">
+                  <div className="mb-4">
                     <Button onClick={() => navigate("/data-models")}>
                       <Database className="h-4 w-4 mr-2" />
                       View Full ER Diagram
                     </Button>
                   </div>
+                  
+                  {dataModelDoc && (
+                    <div className="border rounded-md p-4 bg-gray-50">
+                      <h3 className="text-md font-medium mb-2">Data Model: {dataModelDoc.name}</h3>
+                      <p className="text-sm text-gray-500 mb-2">
+                        Uploaded on {format(new Date(dataModelDoc.uploadedAt), "MMMM d, yyyy")}
+                      </p>
+                      
+                      <div className="overflow-x-auto">
+                        <pre className="text-xs bg-gray-100 p-4 rounded">
+                          {JSON.stringify(dataModelDoc.content, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="p-6 text-center">

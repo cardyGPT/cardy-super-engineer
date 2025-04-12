@@ -4,6 +4,7 @@ import {
   SidebarProvider,
   SidebarInset,
   SidebarRail,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 
@@ -18,7 +19,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <AppSidebar />
         <SidebarRail />
         <SidebarInset className="bg-slate-50">
-          <div className="min-h-screen">
+          <div className="flex items-center p-4 border-b">
+            <SidebarTrigger />
+            <div className="mx-4 flex items-center">
+              <h1 className="text-xl font-semibold">CSE Portal</h1>
+            </div>
+          </div>
+          <div className="p-4">
             {children}
           </div>
         </SidebarInset>

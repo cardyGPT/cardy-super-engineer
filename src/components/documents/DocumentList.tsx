@@ -80,64 +80,65 @@ const DocumentList = ({ projectId }: DocumentListProps) => {
   }
 
   return (
-    <Table>
-      <TableCaption>List of project documents</TableCaption>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Type</TableHead>
-          <TableHead>Name</TableHead>
-          <TableHead>Uploaded</TableHead>
-          <TableHead className="text-right">Actions</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {projectDocuments.map((doc) => (
-          <TableRow key={doc.id}>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                {getDocumentIcon(doc.type)}
-                <Badge variant="outline">{getDocumentTypeLabel(doc.type)}</Badge>
-              </div>
-            </TableCell>
-            <TableCell>{doc.name}</TableCell>
-            <TableCell>{format(new Date(doc.uploadedAt), "MMM d, yyyy")}</TableCell>
-            <TableCell className="text-right">
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.open(doc.fileUrl, "_blank")}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                </Button>
-                
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button size="sm" variant="destructive">
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Document</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete this document? This action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={() => deleteDocument(doc.id)}>
-                        Delete
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </TableCell>
+    <div className="overflow-hidden rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Document Type</TableHead>
+            <TableHead>Name</TableHead>
+            <TableHead>Uploaded</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {projectDocuments.map((doc) => (
+            <TableRow key={doc.id}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  {getDocumentIcon(doc.type)}
+                  <Badge variant="outline">{getDocumentTypeLabel(doc.type)}</Badge>
+                </div>
+              </TableCell>
+              <TableCell>{doc.name}</TableCell>
+              <TableCell>{format(new Date(doc.uploadedAt), "MMM d, yyyy")}</TableCell>
+              <TableCell className="text-right">
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => window.open(doc.fileUrl, "_blank")}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button size="sm" variant="destructive">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete this document? This action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => deleteDocument(doc.id)}>
+                          Delete
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 };
 
