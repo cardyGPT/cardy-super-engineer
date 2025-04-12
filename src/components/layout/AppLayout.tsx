@@ -1,19 +1,27 @@
 
-import { SidebarProvider } from "@/components/ui/sidebar";
-import AppSidebar from "./AppSidebar";
+import React from "react";
+import {
+  SidebarProvider,
+  SidebarInset,
+  SidebarRail,
+} from "@/components/ui/sidebar";
+import { AppSidebar } from "./AppSidebar";
 
 interface AppLayoutProps {
   children: React.ReactNode;
 }
 
-const AppLayout = ({ children }: AppLayoutProps) => {
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="flex min-h-screen w-full">
         <AppSidebar />
-        <main className="flex-1 overflow-x-hidden p-4 md:p-6">
-          {children}
-        </main>
+        <SidebarRail />
+        <SidebarInset className="bg-slate-50">
+          <div className="min-h-screen">
+            {children}
+          </div>
+        </SidebarInset>
       </div>
     </SidebarProvider>
   );

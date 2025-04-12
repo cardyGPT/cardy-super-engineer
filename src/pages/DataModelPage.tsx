@@ -119,13 +119,14 @@ const DataModelPage = () => {
                     projectId={projects[0]?.id || ""}
                     onUploadComplete={() => {
                       // Refresh the selected document to the latest uploaded one
-                      setSelectedDocumentId(
-                        documents
-                          .filter(doc => doc.type === "data-model")
-                          .sort((a, b) => 
-                            new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-                          )[0]?.id
-                      );
+                      const latestDoc = documents
+                        .filter(doc => doc.type === "data-model")
+                        .sort((a, b) => 
+                          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+                        )[0];
+                      if (latestDoc) {
+                        setSelectedDocumentId(latestDoc.id);
+                      }
                     }}
                   />
                 </div>
@@ -155,31 +156,22 @@ const DataModelPage = () => {
                   <DialogHeader>
                     <DialogTitle>Upload Data Model</DialogTitle>
                     <DialogDescription>
-                      Select a project to upload a data model JSON file
+                      Upload a JSON file containing your data model.
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="project" className="text-sm font-medium block mb-1">
-                        Select Project
-                      </label>
-                      <Select defaultValue={projects[0]?.id}>
-                        <SelectTrigger id="project">
-                          <SelectValue placeholder="Select a project" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {projects.map((project) => (
-                            <SelectItem key={project.id} value={project.id}>
-                              {project.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <DocumentUpload 
-                      projectId={projects[0]?.id || ""}
-                    />
-                  </div>
+                  <DocumentUpload 
+                    projectId={projects[0]?.id || ""}
+                    onUploadComplete={() => {
+                      const latestDoc = documents
+                        .filter(doc => doc.type === "data-model")
+                        .sort((a, b) => 
+                          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+                        )[0];
+                      if (latestDoc) {
+                        setSelectedDocumentId(latestDoc.id);
+                      }
+                    }}
+                  />
                 </DialogContent>
               </Dialog>
             )}

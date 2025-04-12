@@ -1,91 +1,87 @@
 
-import { 
-  Sidebar, 
-  SidebarContent, 
-  SidebarHeader, 
-  SidebarGroup, 
-  SidebarGroupContent,
-  SidebarGroupLabel,
+import { NavLink } from "react-router-dom";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
   SidebarMenu,
-  SidebarMenuItem,
   SidebarMenuButton,
-  SidebarTrigger
+  SidebarMenuItem,
+  SidebarProvider,
+  SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { 
-  FolderKanban, 
-  FileUp, 
+import { CardyLogo } from "./CardyLogo";
+import {
+  LayoutDashboard,
+  FileText,
   Database,
-  Home
+  User,
+  Settings,
 } from "lucide-react";
-import { Link, useLocation } from "react-router-dom";
 
-const AppSidebar = () => {
-  const location = useLocation();
+export function AppSidebar() {
+  const { state } = useSidebar();
   
-  const isActive = (path: string) => {
-    return location.pathname === path;
-  };
-
-  const menuItems = [
-    {
-      title: "Dashboard",
-      path: "/",
-      icon: Home
-    },
-    {
-      title: "Projects",
-      path: "/projects",
-      icon: FolderKanban
-    },
-    {
-      title: "Documents",
-      path: "/documents",
-      icon: FileUp
-    },
-    {
-      title: "Data Models",
-      path: "/data-models",
-      icon: Database
-    }
-  ];
-
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b border-border py-6">
-        <div className="flex items-center px-4">
+    <>
+      <Sidebar>
+        <SidebarHeader className="flex h-14 items-center border-b px-4">
           <div className="flex items-center gap-2">
-            <Database className="h-6 w-6 text-cardy-blue" />
-            <span className="font-semibold text-lg text-cardy-blue">Cardy Super Engineer</span>
+            <CardyLogo />
+            <span className="font-semibold">Cardy Super Engineer</span>
           </div>
-          <div className="ml-auto">
-            <SidebarTrigger />
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Projects">
+                <NavLink
+                  to="/projects"
+                  className={({ isActive }) =>
+                    isActive ? "text-primary" : ""
+                  }
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  <span>Projects</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Documents">
+                <NavLink
+                  to="/documents"
+                  className={({ isActive }) =>
+                    isActive ? "text-primary" : ""
+                  }
+                >
+                  <FileText className="h-5 w-5" />
+                  <span>Documents</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Data Models">
+                <NavLink
+                  to="/data-models"
+                  className={({ isActive }) =>
+                    isActive ? "text-primary" : ""
+                  }
+                >
+                  <Database className="h-5 w-5" />
+                  <span>Data Models</span>
+                </NavLink>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarContent>
+        <SidebarFooter className="border-t p-4">
+          <div className="text-xs text-muted-foreground">
+            Cardy Super Engineer v1.0
           </div>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Main Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton
-                    asChild
-                    className={isActive(item.path) ? "bg-sidebar-accent text-sidebar-accent-foreground" : ""}
-                  >
-                    <Link to={item.path}>
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
+        </SidebarFooter>
+      </Sidebar>
+    </>
   );
-};
-
-export default AppSidebar;
+}

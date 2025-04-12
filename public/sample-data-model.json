@@ -1,0 +1,90 @@
+
+{
+  "entities": [
+    {
+      "id": "e1",
+      "name": "Person",
+      "definition": "Individual in the system",
+      "type": "entity",
+      "attributes": [
+        {
+          "id": "a1",
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier"
+        },
+        {
+          "id": "a2",
+          "name": "firstName",
+          "type": "string",
+          "required": true,
+          "description": "Person's first name"
+        },
+        {
+          "id": "a3",
+          "name": "lastName",
+          "type": "string",
+          "required": true,
+          "description": "Person's last name"
+        }
+      ]
+    },
+    {
+      "id": "e2",
+      "name": "Address",
+      "definition": "Physical location information",
+      "type": "entity",
+      "attributes": [
+        {
+          "id": "a4",
+          "name": "id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier"
+        },
+        {
+          "id": "a5",
+          "name": "street",
+          "type": "string",
+          "required": true,
+          "description": "Street address"
+        },
+        {
+          "id": "a6",
+          "name": "city",
+          "type": "string",
+          "required": true,
+          "description": "City name"
+        },
+        {
+          "id": "a7",
+          "name": "state",
+          "type": "string",
+          "required": true,
+          "description": "State or province"
+        },
+        {
+          "id": "a8",
+          "name": "zipCode",
+          "type": "string",
+          "required": true,
+          "description": "Postal code"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "r1",
+      "name": "PersonAddress",
+      "sourceEntityId": "e1",
+      "targetEntityId": "e2",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A person can have multiple addresses"
+    }
+  ]
+}

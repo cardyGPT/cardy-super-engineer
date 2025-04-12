@@ -10,6 +10,7 @@ import {
   Edit, 
   FileUp, 
   Database,
+  ExternalLink,
   Trash2 
 } from "lucide-react";
 import { format } from "date-fns";
@@ -79,6 +80,7 @@ const ProjectDetailPage = () => {
   };
   
   const hasDataModel = projectDocuments.some((doc) => doc.type === "data-model");
+  const dataModelDoc = projectDocuments.find(doc => doc.type === "data-model");
 
   return (
     <AppLayout>
@@ -190,10 +192,17 @@ const ProjectDetailPage = () => {
             <div className="bg-white rounded-lg border overflow-hidden">
               <h2 className="text-xl font-semibold p-6 border-b">Data Model Viewer</h2>
               {hasDataModel ? (
-                <p className="p-6 text-center text-gray-500">
-                  This will show the ER diagram when a data model is uploaded and selected.
-                  Navigate to the Data Models page to view the full diagram.
-                </p>
+                <div className="p-6">
+                  <p className="text-center text-gray-500 mb-4">
+                    This project has a data model uploaded.
+                  </p>
+                  <div className="flex justify-center">
+                    <Button onClick={() => navigate("/data-models")}>
+                      <Database className="h-4 w-4 mr-2" />
+                      View Full ER Diagram
+                    </Button>
+                  </div>
+                </div>
               ) : (
                 <div className="p-6 text-center">
                   <p className="text-gray-500 mb-4">

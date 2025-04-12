@@ -12,13 +12,14 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Search, ZoomIn, ZoomOut, Filter, Download, Share2 } from "lucide-react";
+import { Search, ZoomIn, ZoomOut, Filter, Download, Share2, Info } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ERDiagramViewerProps {
   dataModel: DataModel;
@@ -30,6 +31,7 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
   const [zoom, setZoom] = useState(1);
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [layoutMode, setLayoutMode] = useState<"grid" | "flow">("grid");
+  const [showHelp, setShowHelp] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   
   // Reset selected entity when data model changes
@@ -176,8 +178,29 @@ const ERDiagramViewer = ({ dataModel }: ERDiagramViewerProps) => {
             >
               <Download className="h-4 w-4" />
             </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowHelp(!showHelp)}
+              title="Help"
+            >
+              <Info className="h-4 w-4" />
+            </Button>
           </div>
         </div>
+        
+        {showHelp && (
+          <Alert className="mt-4">
+            <Info className="h-4 w-4" />
+            <AlertTitle>Format Help</AlertTitle>
+            <AlertDescription>
+              To upload data models, use a JSON file with <code>entities</code> and <code>relationships</code> arrays. 
+              Each entity should have an id, name, definition, type, and attributes array. Each relationship should have 
+              source and target entity IDs and cardinality. Download a <a href="/sample-data-model.json" target="_blank" className="text-blue-500 underline">sample file</a>.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
       
       <div 

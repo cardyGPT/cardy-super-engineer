@@ -49,19 +49,30 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       const fakeFileUrl = `/uploads/${file.name}`;
       
       let fileContent = null;
-      if (docType === "data-model" && file.type === "application/json") {
+      if (docType === "data-model") {
         try {
           const text = await file.text();
-          fileContent = JSON.parse(text);
-          
-          if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
-              !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
-            throw new Error("Invalid data model format");
+          try {
+            fileContent = JSON.parse(text);
+            
+            // Basic validation of data model structure
+            if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
+                !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
+              throw new Error("Invalid data model format");
+            }
+          } catch (parseError) {
+            toast({
+              title: "Error parsing JSON",
+              description: "The data model file is not valid JSON or has incorrect format.",
+              variant: "destructive",
+            });
+            setUploading(false);
+            return;
           }
-        } catch (error) {
+        } catch (readError) {
           toast({
-            title: "Error parsing JSON",
-            description: "The data model file is not valid JSON or has incorrect format.",
+            title: "Error reading file",
+            description: "Could not read the file. Please try again.",
             variant: "destructive",
           });
           setUploading(false);
@@ -129,6 +140,11 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
           accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
           className="cursor-pointer"
         />
+        {docType === "data-model" && (
+          <p className="text-xs text-muted-foreground">
+            JSON file must contain 'entities' and 'relationships' arrays.
+          </p>
+        )}
       </div>
       
       <Button
