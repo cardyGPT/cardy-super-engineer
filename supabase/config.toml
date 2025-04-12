@@ -6,3 +6,6 @@ verify_jwt = true
 
 [functions.chat-with-documents]
 verify_jwt = true
+
+[functions.chat-with-all-project-data]
+verify_jwt = true

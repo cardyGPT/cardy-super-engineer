@@ -11,13 +11,14 @@ import {
   Panel,
   MarkerType,
   NodeTypes,
+  ConnectionLineType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { DataModel, Entity, Relationship } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Search, Filter, ZoomIn, ZoomOut, Info } from "lucide-react";
+import { Search, Filter, ZoomIn, ZoomOut, Info, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { 
   Select,
@@ -34,9 +35,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 // Custom node component for entity visualization
 const EntityNode = ({ data }: { data: any }) => {
+  const [expanded, setExpanded] = useState(false);
+  const displayAttributes = expanded ? data.entity.attributes : data.entity.attributes.slice(0, 4);
+  const hiddenCount = data.entity.attributes.length - 4;
+  
   return (
     <Card className={`w-64 shadow-md ${data.selected ? 'border-2 border-blue-500' : 'border border-gray-200'} ${data.type === 'sub-entity' ? 'bg-blue-50' : 'bg-white'}`}>
       <CardHeader className="py-2 px-3">
@@ -60,7 +66,7 @@ const EntityNode = ({ data }: { data: any }) => {
               </tr>
             </thead>
             <tbody>
-              {data.entity.attributes.slice(0, 4).map((attr: any) => (
+              {displayAttributes.map((attr: any) => (
                 <tr key={attr.id} className="border-t border-gray-100">
                   <td className="px-2 py-1 font-medium">{attr.name}</td>
                   <td className="px-2 py-1">{attr.type}</td>
@@ -71,10 +77,27 @@ const EntityNode = ({ data }: { data: any }) => {
                   </td>
                 </tr>
               ))}
-              {data.entity.attributes.length > 4 && (
+              {!expanded && hiddenCount > 0 && (
                 <tr>
-                  <td colSpan={4} className="px-2 py-1 text-center text-gray-500">
-                    +{data.entity.attributes.length - 4} more attributes
+                  <td colSpan={4} className="px-2 py-1 text-center">
+                    <button 
+                      onClick={() => setExpanded(true)} 
+                      className="text-blue-500 hover:underline text-xs flex items-center justify-center w-full"
+                    >
+                      + {hiddenCount} more attributes <ChevronDown className="h-3 w-3 ml-1" />
+                    </button>
+                  </td>
+                </tr>
+              )}
+              {expanded && (
+                <tr>
+                  <td colSpan={4} className="px-2 py-1 text-center">
+                    <button 
+                      onClick={() => setExpanded(false)}
+                      className="text-blue-500 hover:underline text-xs flex items-center justify-center w-full"
+                    >
+                      Show less <ChevronUp className="h-3 w-3 ml-1" />
+                    </button>
                   </td>
                 </tr>
               )}
@@ -117,6 +140,7 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
           entity: entity,
           selected: false
         },
+        dragHandle: '.drag-handle',
       };
     });
   }, [dataModel]);
@@ -136,15 +160,17 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
         label: relationship.name || `${relationship.sourceCardinality}:${relationship.targetCardinality}`,
         labelStyle: { fill: '#333', fontWeight: 500 },
         labelBgStyle: { fill: '#fff', fillOpacity: 0.8 },
+        type: 'smoothstep',
         style: { 
           stroke: isCrossType ? '#8b5cf6' : '#3b82f6',
-          strokeWidth: 2 
+          strokeWidth: 2,
+          strokeDasharray: '5,5',
         },
+        animated: false,
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isCrossType ? '#8b5cf6' : '#3b82f6',
         },
-        animated: false,
       };
     });
   }, [dataModel]);
@@ -235,7 +261,12 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
   }, [nodes, isInitialized, resetLayout]);
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, animated: true }, eds)),
+    (params) => setEdges((eds) => addEdge({
+      ...params,
+      type: 'smoothstep',
+      style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' },
+      animated: true
+    }, eds)),
     [setEdges]
   );
 
@@ -333,6 +364,12 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
+            defaultEdgeOptions={{
+              type: 'smoothstep',
+              style: { stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' }
+            }}
+            connectionLineType={ConnectionLineType.SmoothStep}
+            connectionLineStyle={{ stroke: '#3b82f6', strokeWidth: 2, strokeDasharray: '5,5' }}
             fitView
             minZoom={0.2}
             maxZoom={2}
