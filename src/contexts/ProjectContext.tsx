@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from "react";
+
+import React, { createContext, useState, useContext } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
-import { projects, documents, sampleDataModel } from "@/lib/mock-data";
 import { useToast } from "@/hooks/use-toast";
 
 interface ProjectContextType {
@@ -22,8 +22,8 @@ interface ProjectContextType {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [projectList, setProjectList] = useState<Project[]>(projects);
-  const [documentList, setDocumentList] = useState<ProjectDocument[]>(documents);
+  const [projectList, setProjectList] = useState<Project[]>([]);
+  const [documentList, setDocumentList] = useState<ProjectDocument[]>([]);
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [dataModel, setDataModel] = useState<DataModel | null>(null);
   const [loading, setLoading] = useState(false);
@@ -96,7 +96,6 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setLoading(true);
     try {
       setProjectList((prev) => prev.filter((project) => project.id !== id));
-      
       setDocumentList((prev) => prev.filter((doc) => doc.projectId !== id));
       
       if (currentProject?.id === id) {

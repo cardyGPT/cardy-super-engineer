@@ -46,18 +46,14 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
 
     setUploading(true);
     try {
-      // In a real app, we would upload the file to storage here
-      // and get back a URL. For now, we'll create a fake URL
       const fakeFileUrl = `/uploads/${file.name}`;
       
-      // For data models, parse the JSON content
       let fileContent = null;
       if (docType === "data-model" && file.type === "application/json") {
         try {
           const text = await file.text();
           fileContent = JSON.parse(text);
           
-          // Basic validation of data model structure
           if (!fileContent.entities || !Array.isArray(fileContent.entities) || 
               !fileContent.relationships || !Array.isArray(fileContent.relationships)) {
             throw new Error("Invalid data model format");
@@ -126,20 +122,13 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       
       <div className="space-y-2">
         <Label htmlFor="file">Select File</Label>
-        <div className="flex flex-col gap-1">
-          <Input
-            id="file"
-            type="file"
-            onChange={handleFileChange}
-            accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
-            className="cursor-pointer"
-          />
-          {docType === "data-model" && (
-            <p className="text-xs text-muted-foreground">
-              Upload a JSON file that follows the required structure with entities and relationships.
-            </p>
-          )}
-        </div>
+        <Input
+          id="file"
+          type="file"
+          onChange={handleFileChange}
+          accept={docType === "data-model" ? ".json" : ".pdf,.doc,.docx"}
+          className="cursor-pointer"
+        />
       </div>
       
       <Button
@@ -147,13 +136,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         disabled={!file || uploading}
         className="w-full"
       >
-        {uploading ? (
-          "Uploading..."
-        ) : (
-          <>
-            <Upload className="mr-2 h-4 w-4" /> Upload Document
-          </>
-        )}
+        {uploading ? "Uploading..." : <><Upload className="mr-2 h-4 w-4" /> Upload Document</>}
       </Button>
     </form>
   );
