@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,8 +59,26 @@ const StoryDetail: React.FC = () => {
     toast({
       title: "Copied to clipboard",
       description: `${type.toUpperCase()} content has been copied to your clipboard.`,
-      duration: 2000,
+      variant: "success",
     });
+  };
+
+  // Helper function to safely handle potential object content
+  const safeStringify = (content: any): string => {
+    if (content === null || content === undefined) return "";
+    
+    if (typeof content === 'string') return content;
+    
+    if (typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content object:", e);
+        return "[Content formatting error]";
+      }
+    }
+    
+    return String(content);
   };
 
   const handleGenerateContent = async (type: 'lld' | 'code' | 'tests') => {
@@ -82,13 +101,13 @@ const StoryDetail: React.FC = () => {
       
       if (type === 'lld') {
         systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
-        prompt = `Create a comprehensive low-level design document for this user story: "${selectedTicket.summary}"\n\nDescription: ${selectedTicket.description || "No description provided."}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations`;
+        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations`;
       } else if (type === 'code') {
         systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
-        prompt = `Generate production-ready code for this user story: "${selectedTicket.summary}"\n\nDescription: ${selectedTicket.description || "No description provided."}\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented.`;
+        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented.`;
       } else if (type === 'tests') {
         systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
-        prompt = `Create comprehensive test cases for this user story: "${selectedTicket.summary}"\n\nDescription: ${selectedTicket.description || "No description provided."}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations`;
+        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations`;
       }
       
       // Call the OpenAI API through our Edge Function
@@ -103,13 +122,16 @@ const StoryDetail: React.FC = () => {
       
       if (error) throw new Error(error.message || "Failed to generate content");
       
+      // Extract content from the response and ensure it's a string
+      const responseContent = safeStringify(data.content);
+      
       // Update the appropriate state based on the type
       if (type === 'lld') {
-        setLldContent(data.content);
+        setLldContent(responseContent);
       } else if (type === 'code') {
-        setCodeContent(data.content);
+        setCodeContent(responseContent);
       } else if (type === 'tests') {
-        setTestContent(data.content);
+        setTestContent(responseContent);
       }
       
       // Switch to the tab for the generated content
@@ -152,7 +174,7 @@ const StoryDetail: React.FC = () => {
 
     try {
       // Generate PDF and download
-      const ticketKey = selectedTicket.key || 'document';
+      const ticketKey = safeStringify(selectedTicket.key) || 'document';
       const timestamp = formatTimestampForFilename();
       const contentLabel = contentType === 'lld' ? 'LLD' : 
                            contentType === 'code' ? 'Code' : 'Tests';
@@ -463,3 +485,4 @@ const StoryDetail: React.FC = () => {
 };
 
 export default StoryDetail;
+

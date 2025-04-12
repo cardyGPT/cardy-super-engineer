@@ -32,6 +32,17 @@ const StoryList: React.FC = () => {
       return content;
     }
     
+    // Handle specific Jira document format
+    if (content && typeof content === 'object' && 
+        'type' in content && 'version' in content && 'content' in content) {
+      try {
+        return JSON.stringify(content, null, 2);
+      } catch (e) {
+        console.error("Error parsing Jira content object:", e);
+        return "[Content formatting error]";
+      }
+    }
+    
     if (typeof content === 'object') {
       try {
         return JSON.stringify(content);
@@ -165,12 +176,12 @@ const StoryList: React.FC = () => {
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-2">
-                    <Badge variant="outline">{ticket.key}</Badge>
+                    <Badge variant="outline">{safeGetContent(ticket.key)}</Badge>
                     <Badge 
                       variant={
-                        ticket.status === 'To Do' ? 'secondary' :
-                        ticket.status === 'In Progress' ? 'default' :
-                        ticket.status === 'Done' ? 'secondary' : 
+                        safeGetContent(ticket.status) === 'To Do' ? 'secondary' :
+                        safeGetContent(ticket.status) === 'In Progress' ? 'default' :
+                        safeGetContent(ticket.status) === 'Done' ? 'secondary' : 
                         'outline'
                       }
                     >
@@ -179,8 +190,8 @@ const StoryList: React.FC = () => {
                   </div>
                   <Badge 
                     variant={
-                      ticket.priority === 'High' ? 'destructive' :
-                      ticket.priority === 'Medium' ? 'default' :
+                      safeGetContent(ticket.priority) === 'High' ? 'destructive' :
+                      safeGetContent(ticket.priority) === 'Medium' ? 'default' :
                       'secondary'
                     }
                   >
@@ -194,7 +205,7 @@ const StoryList: React.FC = () => {
                 {ticket.labels && ticket.labels.length > 0 && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {ticket.labels.map((label) => (
-                      <Badge key={label} variant="outline" className="text-xs">
+                      <Badge key={safeGetContent(label)} variant="outline" className="text-xs">
                         {safeGetContent(label)}
                       </Badge>
                     ))}
@@ -214,7 +225,7 @@ const StoryList: React.FC = () => {
                         e.stopPropagation();
                         // Fix the URL format to prevent double domain
                         const cleanDomain = ticket.domain ? ticket.domain.replace(/^https?:\/\//i, '') : '';
-                        window.open(`https://${cleanDomain}/browse/${ticket.key}`, '_blank');
+                        window.open(`https://${cleanDomain}/browse/${safeGetContent(ticket.key)}`, '_blank');
                       }}
                     >
                       <ExternalLink className="h-3 w-3" />

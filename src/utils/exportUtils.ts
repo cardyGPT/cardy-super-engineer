@@ -10,7 +10,7 @@ import { jsPDF } from 'jspdf';
 export const downloadAsPDF = async (element: HTMLElement, fileName: string = 'document') => {
   if (!element) {
     console.error('No element provided for PDF download');
-    return;
+    return false;
   }
   
   try {
@@ -77,11 +77,18 @@ export const downloadAsPDF = async (element: HTMLElement, fileName: string = 'do
  * @param extension File extension (default: 'txt')
  */
 export const downloadAsTextFile = (
-  content: string, 
+  content: string | any, 
   fileName: string = 'document',
   extension: string = 'txt'
 ) => {
-  const blob = new Blob([content], { type: 'text/plain' });
+  // Ensure content is a string
+  const safeContent = typeof content === 'string' 
+    ? content 
+    : typeof content === 'object'
+      ? JSON.stringify(content, null, 2)
+      : String(content || '');
+  
+  const blob = new Blob([safeContent], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   

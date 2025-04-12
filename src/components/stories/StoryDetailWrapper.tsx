@@ -10,7 +10,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { downloadAsPDF, formatTimestampForFilename } from '@/utils/exportUtils';
+import { downloadAsPDF, formatTimestampForFilename, downloadAsTextFile } from '@/utils/exportUtils';
 import { useStories } from '@/contexts/StoriesContext';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -19,7 +19,25 @@ const StoryDetailWrapper: React.FC = () => {
   const { selectedTicket } = useStories();
   const { toast } = useToast();
 
-  const handleDownloadPDF = async (contentType: 'lld' | 'code' | 'tests') => {
+  // Helper function to safely convert any content to string
+  const safeStringify = (content: any): string => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (content && typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content:", e);
+        return "[Content conversion error]";
+      }
+    }
+    
+    return String(content || "");
+  };
+
+  const handleDownloadPDF = async (contentType: 'lld' | 'code' | 'tests' | 'all') => {
     if (!detailRef.current || !selectedTicket) {
       toast({
         title: "Download Error",
@@ -37,10 +55,11 @@ const StoryDetailWrapper: React.FC = () => {
 
     try {
       // Generate PDF and download
-      const ticketKey = selectedTicket.key || 'document';
+      const ticketKey = safeStringify(selectedTicket.key) || 'document';
       const timestamp = formatTimestampForFilename();
       const contentLabel = contentType === 'lld' ? 'LLD' : 
-                           contentType === 'code' ? 'Code' : 'Tests';
+                           contentType === 'code' ? 'Code' : 
+                           contentType === 'tests' ? 'Tests' : 'Full';
       
       const fileName = `${ticketKey}_${contentLabel}_${timestamp}`;
       
@@ -135,7 +154,7 @@ const StoryDetailWrapper: React.FC = () => {
                   <Button 
                     size="sm" 
                     variant="default"
-                    onClick={() => handleDownloadPDF('lld')}
+                    onClick={() => handleDownloadPDF('all')}
                     className="flex items-center bg-blue-600 hover:bg-blue-700"
                   >
                     <FileDown className="h-4 w-4 mr-1" />

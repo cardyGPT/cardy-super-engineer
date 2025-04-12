@@ -16,6 +16,24 @@ interface ChatMessageListProps {
 const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMessageListProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Helper function to safely convert any content to string
+  const safeStringify = (content: any): string => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    
+    if (content && typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        console.error("Error stringifying content:", e);
+        return "[Content conversion error]";
+      }
+    }
+    
+    return String(content || "");
+  };
+
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
@@ -27,7 +45,7 @@ const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMess
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertTriangle className="h-4 w-4 mr-2" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>{safeStringify(error)}</AlertDescription>
         </Alert>
       )}
 
@@ -39,15 +57,15 @@ const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMess
                 <span className="text-xs text-muted-foreground mr-1 mt-1">Using documents:</span>
                 {usedDocuments.length <= 3 ? (
                   usedDocuments.map(doc => (
-                    <Badge key={doc} variant="outline" className="text-xs">
-                      {doc}
+                    <Badge key={safeStringify(doc)} variant="outline" className="text-xs">
+                      {safeStringify(doc)}
                     </Badge>
                   ))
                 ) : (
                   <>
                     {usedDocuments.slice(0, 2).map(doc => (
-                      <Badge key={doc} variant="outline" className="text-xs">
-                        {doc}
+                      <Badge key={safeStringify(doc)} variant="outline" className="text-xs">
+                        {safeStringify(doc)}
                       </Badge>
                     ))}
                     <Badge variant="outline" className="text-xs">
@@ -61,7 +79,7 @@ const ChatMessageList = ({ messages, isLoading, error, usedDocuments }: ChatMess
               <p className="text-xs">All documents being used:</p>
               <ul className="text-xs list-disc pl-4 mt-1">
                 {usedDocuments.map(doc => (
-                  <li key={doc}>{doc}</li>
+                  <li key={safeStringify(doc)}>{safeStringify(doc)}</li>
                 ))}
               </ul>
             </TooltipContent>
