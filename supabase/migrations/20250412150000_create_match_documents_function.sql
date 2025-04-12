@@ -38,7 +38,12 @@ BEGIN
     -- Apply project filter if provided
     (
       (filter->>'project_id' IS NULL) OR
-      (pc.project_id::TEXT IN (SELECT jsonb_array_elements_text(filter->'project_id')))
+      (pc.project_id::TEXT = filter->>'project_id')
+    )
+    -- Apply document filter if provided
+    AND (
+      (NOT (filter->'document_ids')::jsonb ? 'document_ids' OR filter->'document_ids' IS NULL) OR
+      (pc.document_id::TEXT IN (SELECT jsonb_array_elements_text(filter->'document_ids')))
     )
     -- Only include results above the similarity threshold
     AND (1 - (pc.embedding <=> query_embedding)) > match_threshold

@@ -1,11 +1,10 @@
-
 import { useState, useEffect, useRef } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useProject } from "@/contexts/ProjectContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info, RefreshCw, AlertCircle } from "lucide-react";
+import { FileUp, Send, AlertTriangle, BrainCircuit, FileText, Loader2, Info, RefreshCw, AlertCircle, Check } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -15,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProjectDocument } from "@/types";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChatMessageList } from "@/components/data-model/chat/ChatMessageList";
 
 type Message = {
   role: "user" | "assistant" | "system";
@@ -48,26 +48,22 @@ const CardyMindPage = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
-  // Initialize with first project if available
   useEffect(() => {
     if (projects.length > 0 && !selectedProjectId) {
       setSelectedProjectId(projects[0].id);
     }
   }, [projects, selectedProjectId]);
   
-  // Filter documents based on selected project
   useEffect(() => {
     if (selectedProjectId) {
       const docs = documents.filter(doc => doc.projectId === selectedProjectId);
       setFilteredDocuments(docs);
-      // Reset selected documents when changing projects
       setSelectedDocuments([]);
     } else {
       setFilteredDocuments([]);
     }
   }, [selectedProjectId, documents]);
   
-  // Scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
@@ -87,24 +83,20 @@ const CardyMindPage = () => {
     setIsLoading(true);
     
     try {
-      // Check if the selected documents have been processed
       if (selectedDocuments.length > 0) {
         const unprocessedDocs = selectedDocuments.filter(id => !docProcessingStatus[id]);
         if (unprocessedDocs.length > 0) {
-          // Show a toast message that we're processing unindexed documents
           toast({
             title: "Processing documents",
             description: `Processing ${unprocessedDocs.length} unindexed documents first...`,
           });
           
-          // Trigger document processing for unindexed documents
           await Promise.all(unprocessedDocs.map(docId => 
             processIndividualDocument(docId, false)
           ));
         }
       }
       
-      // Call Supabase Edge Function with selected project and document IDs
       const { data, error } = await supabase.functions.invoke('chat-with-documents', {
         body: {
           message: input,
@@ -117,7 +109,6 @@ const CardyMindPage = () => {
         throw new Error(error.message);
       }
       
-      // Add assistant's response to messages with metadata
       setMessages(prev => [...prev, {
         role: "assistant",
         content: data.response,
@@ -135,7 +126,6 @@ const CardyMindPage = () => {
         variant: "destructive"
       });
       
-      // Add error message
       setMessages(prev => [...prev, {
         role: "assistant",
         content: "I'm sorry, I encountered an error processing your request. Please try again."
@@ -174,6 +164,7 @@ const CardyMindPage = () => {
         toast({
           title: "Processing document",
           description: "Indexing document for search capabilities...",
+          variant: "default"
         });
       }
       
@@ -195,7 +186,6 @@ const CardyMindPage = () => {
         return false;
       }
       
-      // Update status locally
       setDocProcessingStatus(prev => ({ ...prev, [docId]: true }));
       
       if (showToast) {
@@ -240,7 +230,6 @@ const CardyMindPage = () => {
       
       for (const doc of docsToProcess) {
         try {
-          // Add a short delay between each document to avoid rate limiting
           if (successCount + errorCount > 0) {
             await new Promise(resolve => setTimeout(resolve, 1000));
           }
@@ -258,7 +247,6 @@ const CardyMindPage = () => {
             newStatus[doc.id] = true;
             successCount++;
             
-            // Update the status as we go
             setDocProcessingStatus({...newStatus});
           }
         } catch (err) {
@@ -297,7 +285,6 @@ const CardyMindPage = () => {
     }
   };
 
-  // Fetch existing document processing status
   const fetchDocumentProcessingStatus = async () => {
     if (!selectedProjectId) return;
     
@@ -310,7 +297,6 @@ const CardyMindPage = () => {
         description: "Checking document indexing status...",
       });
 
-      // Query project_chunks to check which documents have been processed
       const { data, error } = await supabase
         .from('project_chunks')
         .select('document_id')
@@ -320,16 +306,13 @@ const CardyMindPage = () => {
       
       const newStatus: Record<string, boolean> = {};
       
-      // Mark documents as processed if they have chunks
       if (data && data.length > 0) {
-        // Get unique document IDs
         const processedDocIds = [...new Set(data.map(item => item.document_id))];
         
         filteredDocuments.forEach(doc => {
           newStatus[doc.id] = processedDocIds.includes(doc.id);
         });
       } else {
-        // No chunks found, all documents are unprocessed
         filteredDocuments.forEach(doc => {
           newStatus[doc.id] = false;
         });
@@ -355,7 +338,6 @@ const CardyMindPage = () => {
     }
   };
   
-  // Refresh document status
   const refreshDocumentStatus = () => {
     fetchDocumentProcessingStatus();
   };
@@ -370,14 +352,13 @@ const CardyMindPage = () => {
     <AppLayout>
       <div className="container mx-auto py-6">
         <div className="flex flex-col md:flex-row gap-6">
-          {/* Main chat area */}
           <div className="flex-1 flex flex-col">
             <div className="mb-6">
               <h1 className="text-2xl font-bold flex items-center">
                 <BrainCircuit className="mr-2 h-6 w-6 text-primary" />
                 Cardy Mind
               </h1>
-              <p className="text-muted-foreground">Ask questions about your project documents</p>
+              <p className="text-muted-foreground">Ask questions about your project documents using our RAG system</p>
             </div>
             
             <Card className="flex-1 flex flex-col">
@@ -502,8 +483,7 @@ const CardyMindPage = () => {
             </Card>
           </div>
           
-          {/* Sidebar */}
-          <div className="w-full md:w-72 space-y-6">
+          <div className="w-full md:w-80 space-y-6">
             <Card>
               <CardHeader className="pb-2">
                 <div className="flex justify-between items-center">
@@ -598,33 +578,43 @@ const CardyMindPage = () => {
                           {filteredDocuments.map(doc => (
                             <div 
                               key={doc.id} 
-                              className={`flex items-center p-2 rounded cursor-pointer ${
+                              className={`flex items-start p-2 rounded cursor-pointer ${
                                 selectedDocuments.includes(doc.id) ? "bg-muted" : "hover:bg-muted/50"
                               }`}
                               onClick={() => toggleDocumentSelection(doc.id)}
                             >
-                              <FileText className="h-4 w-4 mr-2 flex-shrink-0" />
-                              <div className="truncate flex-1 text-sm">
-                                {doc.name}
-                              </div>
-                              <div className="ml-1 flex-shrink-0">
-                                {isIndexing && selectedDocuments.includes(doc.id) ? (
-                                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                                    <Loader2 className="h-2 w-2 mr-1 animate-spin" />
-                                    Indexing
+                              <FileText className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5" />
+                              <div className="flex flex-col flex-1 min-w-0">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <p className="truncate text-sm font-medium mb-1">{doc.name}</p>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right">
+                                      <p>{doc.name}</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                                <div className="flex flex-wrap gap-1">
+                                  {isIndexing && selectedDocuments.includes(doc.id) ? (
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                                      <Loader2 className="h-2 w-2 mr-1 animate-spin" />
+                                      Indexing
+                                    </Badge>
+                                  ) : docProcessingStatus[doc.id] === true ? (
+                                    <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
+                                      <Check className="h-2 w-2 mr-1" />
+                                      Indexed
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
+                                      Not Indexed
+                                    </Badge>
+                                  )}
+                                  <Badge variant="outline" className="text-[10px]">
+                                    {doc.type}
                                   </Badge>
-                                ) : docProcessingStatus[doc.id] === true ? (
-                                  <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
-                                    Indexed
-                                  </Badge>
-                                ) : (
-                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
-                                    Not Indexed
-                                  </Badge>
-                                )}
-                                <Badge variant="outline" className="ml-1 text-[10px]">
-                                  {doc.type}
-                                </Badge>
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -638,9 +628,9 @@ const CardyMindPage = () => {
             
             <Alert>
               <AlertTriangle className="h-4 w-4" />
-              <AlertTitle>Document Processing</AlertTitle>
+              <AlertTitle>RAG-Powered Document Assistant</AlertTitle>
               <AlertDescription className="text-xs">
-                Cardy Mind uses AI to analyze your documents and provide answers. For PDF files, make sure they are properly indexed before asking questions. If responses show "I don't have access to the content," try re-indexing the document first.
+                Cardy Mind uses AI with Retrieval Augmented Generation (RAG) to analyze your documents. Documents are chunked, embedded with pgvector, and retrieved based on semantic similarity for accurate answers.
               </AlertDescription>
             </Alert>
           </div>
