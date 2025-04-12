@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -239,6 +238,12 @@ const StoryDetail: React.FC = () => {
       }
       
       setActiveTab(type);
+      
+      setTimeout(() => {
+        if (contentRef.current) {
+          contentRef.current.scrollIntoView({ behavior: 'smooth' });
+        }
+      }, 100);
       
       const storyId = safeStringify(selectedTicket.key);
       const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
