@@ -58,4 +58,3 @@ export const toast = ({ title, description, variant = "default", action }: {
   console.log(`Global Toast [${variant}]: ${title} - ${description}`);
   // Implementation will be handled by the Toaster component
 };
-

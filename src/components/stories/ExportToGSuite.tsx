@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -77,7 +76,7 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
         toast({
           title: 'Export successful',
           description: `Document "${docName}" has been created in Google Drive`,
-          variant: "default", // Changed from "success"
+          variant: "default",
         });
       } else {
         throw new Error(data.message || 'Export failed');
@@ -185,4 +184,3 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
 };
 
 export default ExportToGSuite;
-

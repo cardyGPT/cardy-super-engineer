@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useStories } from "@/contexts/StoriesContext";
@@ -20,7 +19,6 @@ const StoryDetailWrapper = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
 
-  // State for generated content
   const [lldContent, setLldContent] = useState("");
   const [codeContent, setCodeContent] = useState("");
   const [testContent, setTestContent] = useState("");
@@ -62,7 +60,7 @@ const StoryDetailWrapper = () => {
         toast({
           title: "Content loaded",
           description: "Previously generated content has been loaded",
-          variant: "success",
+          variant: "default",
         });
       }
     } catch (error) {

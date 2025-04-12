@@ -43,7 +43,6 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       
-      // Validate file type for data models
       if (docType === "data-model" && !selectedFile.name.toLowerCase().endsWith('.json')) {
         setValidationError("Data models must be JSON files");
       }
@@ -55,14 +54,11 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       const text = await file.text();
       const content = JSON.parse(text);
       
-      // Check for required structure
       if (!content || typeof content !== 'object') {
         setValidationError("Invalid JSON format");
         return false;
       }
       
-      // Allow different formats of JSON structure
-      // This will be normalized in the upload process
       if (Array.isArray(content)) {
         return true;
       }
@@ -102,7 +98,6 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       return;
     }
 
-    // Special validation for data model files
     if (docType === "data-model") {
       if (!file.name.toLowerCase().endsWith('.json')) {
         setValidationError("Data models must be JSON files");
@@ -147,15 +142,13 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       toast({
         title: "Upload successful",
         description: `${file.name} has been uploaded successfully.`,
-        variant: "default", // Changed from "success"
+        variant: "default",
       });
       
-      // Close the dialog automatically after successful upload
       if (onUploadComplete) {
         onUploadComplete();
       }
       
-      // Auto close dialog after 1.5 seconds
       setTimeout(() => {
         const closeButton = document.querySelector('[data-dialog-close]') as HTMLElement;
         if (closeButton) {
@@ -169,7 +162,6 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       let errorMessage = "There was an error uploading your document. Please try again.";
       
       if (error instanceof Error) {
-        // More specific error message if available
         if (error.message.includes("storage")) {
           errorMessage = "Storage error: Failed to store the file. Please try again.";
         } else if (error.message.includes("format")) {
