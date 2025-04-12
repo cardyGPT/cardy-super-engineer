@@ -19,7 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 const ProjectsPage = () => {
-  const { projects, addProject, deleteProject } = useProject();
+  const { projects, addProject, deleteProject, loading: projectsLoading } = useProject();
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
@@ -28,10 +28,10 @@ const ProjectsPage = () => {
 
   useEffect(() => {
     // When projects are loaded from context, set loading to false
-    if (projects.length > 0 || !useProject().loading) {
+    if (projects.length > 0 || !projectsLoading) {
       setIsLoading(false);
     }
-  }, [projects, useProject().loading]);
+  }, [projects, projectsLoading]);
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
