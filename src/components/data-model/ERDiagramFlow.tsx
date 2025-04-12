@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -12,6 +12,8 @@ import {
   MarkerType,
   NodeTypes,
   ConnectionLineType,
+  Node,
+  Edge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { DataModel, Entity, Relationship } from "@/types";
@@ -67,12 +69,12 @@ const EntityNode = ({ data }: { data: any }) => {
             </thead>
             <tbody>
               {displayAttributes.map((attr: any) => (
-                <tr key={attr.id} className="border-t border-gray-100">
+                <tr key={attr.id || attr.name} className="border-t border-gray-100">
                   <td className="px-2 py-1 font-medium">{attr.name}</td>
                   <td className="px-2 py-1">{attr.type}</td>
                   <td className="px-2 py-1 text-center">{attr.required ? "✓" : ""}</td>
                   <td className="px-2 py-1 text-center">
-                    {attr.isPrimaryKey ? "PK" : ""}
+                    {attr.isPrimaryKey || attr.key ? "PK" : ""}
                     {attr.isForeignKey ? "FK" : ""}
                   </td>
                 </tr>
@@ -124,6 +126,7 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
   const [showMiniMap, setShowMiniMap] = useState(true);
   const [showGrid, setShowGrid] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const flowRef = useRef(null);
   
   // Generate nodes from entities
   const initialNodes = useMemo(() => {
@@ -147,17 +150,21 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
 
   // Generate edges from relationships
   const initialEdges = useMemo(() => {
-    return dataModel.relationships.map((relationship) => {
+    return dataModel.relationships.map((relationship, index) => {
+      // Extract source and target IDs from relationship
+      let sourceId = relationship.sourceEntityId || relationship.source;
+      let targetId = relationship.targetEntityId || relationship.target;
+      
       // Determine relationship type for styling
-      const sourceEntity = dataModel.entities.find(e => e.id === relationship.sourceEntityId);
-      const targetEntity = dataModel.entities.find(e => e.id === relationship.targetEntityId);
+      const sourceEntity = dataModel.entities.find(e => e.id === sourceId);
+      const targetEntity = dataModel.entities.find(e => e.id === targetId);
       const isCrossType = sourceEntity?.type !== targetEntity?.type;
       
       return {
-        id: relationship.id,
-        source: relationship.sourceEntityId,
-        target: relationship.targetEntityId,
-        label: relationship.name || `${relationship.sourceCardinality}:${relationship.targetCardinality}`,
+        id: relationship.id || `edge-${index}`,
+        source: sourceId,
+        target: targetId,
+        label: relationship.name || `${relationship.sourceCardinality || '1'}:${relationship.targetCardinality || '1'}`,
         labelStyle: { fill: '#333', fontWeight: 500 },
         labelBgStyle: { fill: '#fff', fillOpacity: 0.8 },
         type: 'smoothstep',
@@ -166,7 +173,7 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
           strokeWidth: 2,
           strokeDasharray: '5,5',
         },
-        animated: false,
+        animated: true,
         markerEnd: {
           type: MarkerType.ArrowClosed,
           color: isCrossType ? '#8b5cf6' : '#3b82f6',
@@ -305,6 +312,10 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="entity">Entities</SelectItem>
                 <SelectItem value="sub-entity">Sub-Entities</SelectItem>
+                <SelectItem value="core">Core</SelectItem>
+                <SelectItem value="lookup">Lookup</SelectItem>
+                <SelectItem value="reference">Reference</SelectItem>
+                <SelectItem value="compliance">Compliance</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -357,6 +368,7 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
           </div>
         ) : (
           <ReactFlow
+            ref={flowRef}
             nodes={nodes}
             edges={edges}
             onNodesChange={onNodesChange}

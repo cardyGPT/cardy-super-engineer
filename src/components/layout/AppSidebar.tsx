@@ -1,4 +1,3 @@
-
 import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -19,12 +18,36 @@ import {
   User,
   Settings,
   BrainCircuit,
+  FolderKanban,
 } from "lucide-react";
 
 export function AppSidebar() {
   const { state } = useSidebar();
   const location = useLocation();
   
+  const sidebarItems = [
+    {
+      title: "Projects",
+      href: "/projects",
+      icon: <FolderKanban className="h-5 w-5" />,
+    },
+    {
+      title: "Documents",
+      href: "/documents",
+      icon: <FileText className="h-5 w-5" />,
+    },
+    {
+      title: "Data Models",
+      href: "/data-models",
+      icon: <Database className="h-5 w-5" />,
+    },
+    {
+      title: "Cardy Mind",
+      href: "/cardy-mind",
+      icon: <BrainCircuit className="h-5 w-5" />,
+    },
+  ];
+
   return (
     <>
       <Sidebar>
@@ -36,50 +59,19 @@ export function AppSidebar() {
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Projects">
-                <Link
-                  to="/projects"
-                  className={location.pathname === "/projects" ? "text-primary" : ""}
-                >
-                  <LayoutDashboard className="h-5 w-5" />
-                  <span>Projects</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Documents">
-                <Link
-                  to="/documents"
-                  className={location.pathname === "/documents" ? "text-primary" : ""}
-                >
-                  <FileText className="h-5 w-5" />
-                  <span>Documents</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Data Models">
-                <Link
-                  to="/data-models"
-                  className={location.pathname === "/data-models" ? "text-primary" : ""}
-                >
-                  <Database className="h-5 w-5" />
-                  <span>Data Models</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton asChild tooltip="Cardy Mind">
-                <Link
-                  to="/cardy-mind"
-                  className={location.pathname === "/cardy-mind" ? "text-primary" : ""}
-                >
-                  <BrainCircuit className="h-5 w-5" />
-                  <span>Cardy Mind</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
+            {sidebarItems.map((item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild tooltip={item.title}>
+                  <Link
+                    to={item.href}
+                    className={location.pathname === item.href ? "text-primary" : ""}
+                  >
+                    {item.icon}
+                    <span>{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter className="border-t p-4">

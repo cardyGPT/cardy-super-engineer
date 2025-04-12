@@ -19,6 +19,7 @@ serve(async (req) => {
     
     console.log("Processing chat request with all project data");
     console.log(`Number of documents: ${documents?.length || 0}`);
+    console.log(`Messages: ${JSON.stringify(messages)}`);
     
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(
@@ -32,13 +33,9 @@ serve(async (req) => {
       let content = "";
       
       if (typeof doc.content === "string") {
-        try {
-          content = doc.content;
-        } catch (e) {
-          content = doc.content;
-        }
+        content = doc.content;
       } else if (doc.content) {
-        content = JSON.stringify(doc.content);
+        content = JSON.stringify(doc.content, null, 2);
       }
       
       return {
@@ -59,15 +56,19 @@ serve(async (req) => {
       You help users analyze their documents and data models, answer questions, and provide insights.
       Your responses should be clear, informative, and helpful.
       When referencing specific documents or data models, mention them by name.
-      You have complete access to read and analyze all project documents and database structures.`
+      You have complete access to read and analyze all project documents and database structures.
+      
+      If you encounter JSON data, process it carefully and extract meaningful information from it.
+      For data models, you can analyze the entities, relationships, and attributes.
+      Be thorough in your analysis of documents and try to provide helpful insights.`
     };
     
     // Call OpenAI API with the documents included
     const response = await openai.chat.completions.create({
-      model: "gpt-4-turbo",
+      model: "gpt-4o-mini",
       messages: [systemMessage, ...messages],
-      temperature: 0.7,
-      max_tokens: 2000,
+      temperature: 0.5,
+      max_tokens: 2500,
       tools: [
         {
           type: "retrieval"
