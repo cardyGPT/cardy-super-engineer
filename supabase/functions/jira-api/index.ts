@@ -49,20 +49,29 @@ serve(async (req) => {
       .replace(/\.atlassian\.net\.atlassian\.net$/, '.atlassian.net'); // Fix double domain suffix
     
     // Construct Jira API URL properly
-    let jiraApiUrl = `https://${cleanDomain}/rest/api/3/${endpoint}`;
+    let jiraApiUrl;
     
-    // Handle agile endpoints correctly
+    // Handle different API paths properly
     if (endpoint.startsWith('agile/')) {
-      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // Remove 'api/3/' for agile endpoints
+      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // agile endpoints use different path
+    } else if (endpoint.startsWith('api/2/') || endpoint.startsWith('api/3/')) {
+      jiraApiUrl = `https://${cleanDomain}/rest/${endpoint}`; // Handle explicitly specified api versions
+    } else {
+      jiraApiUrl = `https://${cleanDomain}/rest/api/3/${endpoint}`; // Default to api/3
     }
     
     // Add URL parameters if provided
     if (params) {
       const urlParams = new URLSearchParams();
       for (const key in params) {
-        urlParams.append(key, params[key]);
+        if (params[key] !== undefined && params[key] !== null) {
+          urlParams.append(key, params[key]);
+        }
       }
-      jiraApiUrl += `?${urlParams.toString()}`;
+      const queryString = urlParams.toString();
+      if (queryString) {
+        jiraApiUrl += `?${queryString}`;
+      }
     }
     
     console.log(`Calling Jira API: ${method || 'GET'} ${jiraApiUrl}`);
@@ -108,6 +117,12 @@ serve(async (req) => {
             errorMessage = errorParts.join('. ');
           } else if (errorData.message) {
             errorMessage = errorData.message;
+          }
+          
+          // Add more diagnostic info for 404s
+          if (jiraResponse.status === 404) {
+            console.error(`404 Not Found: ${jiraApiUrl}`, { errorData });
+            errorMessage = `Resource not found: ${endpoint}. ${errorMessage}`;
           }
         } catch (e) {
           // If we can't parse JSON, try to get text

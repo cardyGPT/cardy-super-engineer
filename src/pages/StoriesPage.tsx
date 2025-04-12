@@ -1,11 +1,11 @@
 
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ExternalLink, RefreshCw, Settings, ChevronDown, ChevronRight } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, ChevronDown } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -21,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/components/ui/use-toast";
 
 const StoriesPage: React.FC = () => {
   const { 
@@ -33,18 +34,33 @@ const StoriesPage: React.FC = () => {
     setSelectedProject,
     selectedSprint, 
     setSelectedSprint,
-    fetchProjects
+    fetchProjects,
+    error
   } = useStories();
+  
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
 
-  useEffect(() => {
-    if (isAuthenticated && projects.length === 0) {
-      fetchProjects();
+  const handleRefresh = async () => {
+    if (loading || isRefreshing) return;
+    
+    setIsRefreshing(true);
+    try {
+      await fetchProjects();
+      setIsRefreshing(false);
+    } catch (err) {
+      setIsRefreshing(false);
+      toast({
+        title: "Error",
+        description: "Failed to refresh data",
+        variant: "destructive"
+      });
     }
-  }, [isAuthenticated, fetchProjects, projects.length]);
+  };
 
   const handleProjectChange = (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
-    if (project) {
+    if (project && selectedProject?.id !== project.id) {
       setSelectedProject(project);
     }
   };
@@ -52,10 +68,21 @@ const StoriesPage: React.FC = () => {
   const handleSprintChange = (sprintId: string) => {
     const projectSprints = sprints[selectedProject?.id || ''] || [];
     const sprint = projectSprints.find(s => s.id === sprintId);
-    if (sprint) {
+    if (sprint && selectedSprint?.id !== sprint.id) {
       setSelectedSprint(sprint);
     }
   };
+  
+  // Display any errors at the top
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error",
+        description: error,
+        variant: "destructive"
+      });
+    }
+  }, [error, toast]);
 
   return (
     <AppLayout>
@@ -68,11 +95,11 @@ const StoriesPage: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={fetchProjects} 
-                disabled={loading}
+                onClick={handleRefresh} 
+                disabled={loading || isRefreshing}
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'Loading...' : 'Refresh'}
+                <RefreshCw className={`h-4 w-4 mr-2 ${(loading || isRefreshing) ? 'animate-spin' : ''}`} />
+                {(loading || isRefreshing) ? 'Loading...' : 'Refresh'}
               </Button>
             )}
             
@@ -132,47 +159,48 @@ const StoriesPage: React.FC = () => {
                   <label htmlFor="sprint-select" className="text-sm font-medium">
                     Sprint
                   </label>
-                  <Select 
-                    value={selectedSprint?.id} 
-                    onValueChange={handleSprintChange}
-                    disabled={loading || !selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
-                  >
-                    <SelectTrigger id="sprint-select" className="w-full">
-                      <SelectValue placeholder="Select a sprint" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(sprints[selectedProject?.id || ''] || []).map(sprint => (
-                        <SelectItem key={sprint.id} value={sprint.id}>
-                          {sprint.name} ({sprint.state})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0) ? (
+                    <Skeleton className="h-10 w-full rounded-md" />
+                  ) : (
+                    <Select 
+                      value={selectedSprint?.id} 
+                      onValueChange={handleSprintChange}
+                      disabled={loading || !selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
+                    >
+                      <SelectTrigger id="sprint-select" className="w-full">
+                        <SelectValue placeholder="Select a sprint" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(sprints[selectedProject?.id || ''] || []).map(sprint => (
+                          <SelectItem key={sprint.id} value={sprint.id}>
+                            {sprint.name} ({sprint.state})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
+            {/* Loading state */}
             {loading && !selectedSprint ? (
-              <div className="space-y-4">
-                {[1, 2].map(i => (
-                  <Card key={i}>
-                    <CardHeader>
-                      <Skeleton className="h-6 w-32" />
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      {[1, 2, 3].map(j => (
-                        <div key={j} className="flex justify-between items-center p-2 border rounded">
-                          <div>
-                            <Skeleton className="h-4 w-20 mb-2" />
-                            <Skeleton className="h-5 w-48" />
-                          </div>
-                          <Skeleton className="h-8 w-8" />
-                        </div>
-                      ))}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+              <Card className="animate-pulse">
+                <CardHeader>
+                  <Skeleton className="h-6 w-32" />
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="flex justify-between items-center p-2 border rounded">
+                      <div>
+                        <Skeleton className="h-4 w-20 mb-2" />
+                        <Skeleton className="h-5 w-48" />
+                      </div>
+                      <Skeleton className="h-8 w-8" />
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
             ) : tickets.length === 0 && selectedSprint ? (
               <Card>
                 <CardHeader>
@@ -222,8 +250,10 @@ const StoriesPage: React.FC = () => {
                           size="icon" 
                           onClick={() => {
                             const domain = selectedProject?.domain || ticket.domain;
-                            const cleanDomain = domain?.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
-                            window.open(`https://${cleanDomain}/browse/${ticket.key}`, '_blank')
+                            if (domain) {
+                              const cleanDomain = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                              window.open(`https://${cleanDomain}/browse/${ticket.key}`, '_blank');
+                            }
                           }}
                         >
                           <ExternalLink className="h-4 w-4" />

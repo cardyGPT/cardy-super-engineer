@@ -1,5 +1,4 @@
-
-import React, { createContext, useState, useContext, useEffect, useCallback } from "react";
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
 import { JiraCredentials, StoriesContextType, JiraTicket, JiraProject, JiraSprint } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
@@ -46,9 +45,12 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   
+  const projectsFetchingRef = useRef(false);
+  const sprintsFetchingRef = useRef(false);
+  const ticketsFetchingRef = useRef(false);
+  
   const isAuthenticated = !!credentials;
 
-  // Save credentials to localStorage whenever they change
   useEffect(() => {
     if (credentials) {
       localStorage.setItem("jira_credentials", JSON.stringify(credentials));
@@ -63,14 +65,17 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials]);
 
-  // Fetch only active projects from Jira
   const fetchProjects = useCallback(async () => {
     if (!credentials) return;
     
-    if (loading) return;
+    if (projectsFetchingRef.current) {
+      console.log("Projects fetch already in progress, skipping");
+      return;
+    }
     
     setLoading(true);
     setError(null);
+    projectsFetchingRef.current = true;
     
     try {
       console.log("Fetching active Jira projects...");
@@ -101,7 +106,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         setProjects(formattedProjects);
         
-        // If projects are fetched and no project is selected, select the first one
         if (formattedProjects.length > 0 && !selectedProject) {
           setSelectedProject(formattedProjects[0]);
         }
@@ -120,10 +124,10 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
     } finally {
       setLoading(false);
+      projectsFetchingRef.current = false;
     }
-  }, [credentials, toast, loading, selectedProject]);
+  }, [credentials, toast, selectedProject]);
 
-  // Fetch only active sprints for a project
   const fetchSprints = useCallback(async (projectId?: string) => {
     if (!credentials) return;
     if (!projectId && !selectedProject) return;
@@ -131,99 +135,125 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const projectToUse = projectId || selectedProject?.id;
     if (!projectToUse) return;
     
+    if (sprintsFetchingRef.current) {
+      console.log("Sprints fetch already in progress, skipping");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
+    sprintsFetchingRef.current = true;
     
     try {
-      console.log(`Fetching active sprints for project ${projectToUse}...`);
+      console.log(`Fetching boards for project ${projectToUse}...`);
       
-      const { data, error } = await supabase.functions.invoke('jira-api', {
+      const { data: boardsData, error: boardsError } = await supabase.functions.invoke('jira-api', {
         body: {
-          endpoint: `agile/1.0/board/project/${projectToUse}`,
+          endpoint: 'agile/1.0/board',
           credentials,
+          params: {
+            projectKeyOrId: projectToUse
+          }
         }
       });
       
-      if (error) throw new Error(error.message);
+      if (boardsError) throw new Error(boardsError.message);
       
-      if (data && data.values && data.values.length > 0) {
-        // Get the first board for the project
-        const boardId = data.values[0].id;
-        
-        // Get only active sprints for this board
-        const sprintsResponse = await supabase.functions.invoke('jira-api', {
-          body: {
-            endpoint: `agile/1.0/board/${boardId}/sprint`,
-            credentials,
-            params: {
-              state: 'active' // Only get active sprints
-            }
-          }
-        });
-        
-        if (sprintsResponse.error) throw new Error(sprintsResponse.error.message);
-        
-        if (sprintsResponse.data && sprintsResponse.data.values) {
-          console.log(`Received ${sprintsResponse.data.values.length} active sprints for project ${projectToUse}`);
-          
-          const formattedSprints: JiraSprint[] = sprintsResponse.data.values.map((sprint: any) => ({
-            id: sprint.id,
-            name: sprint.name,
-            state: sprint.state,
-            startDate: sprint.startDate,
-            endDate: sprint.endDate,
-            boardId: boardId
-          }));
-          
-          setSprints(prev => ({
-            ...prev,
-            [projectToUse]: formattedSprints
-          }));
-          
-          // If there are active sprints, select the first one
-          if (formattedSprints.length > 0 && (!selectedSprint || selectedSprint.id !== formattedSprints[0].id)) {
-            setSelectedSprint(formattedSprints[0]);
-          } else if (formattedSprints.length === 0) {
-            // Clear the selected sprint if there are no active sprints
-            setSelectedSprint(null);
-            // Clear tickets if there are no active sprints
-            setTickets([]);
-          }
-        } else {
-          console.log("No active sprints found for this project");
-          setSprints(prev => ({
-            ...prev,
-            [projectToUse]: []
-          }));
-          setSelectedSprint(null);
-          // Clear tickets if there are no active sprints
-          setTickets([]);
-        }
-      } else {
+      if (!boardsData || !boardsData.values || boardsData.values.length === 0) {
         console.log("No boards found for this project");
         setSprints(prev => ({
           ...prev,
           [projectToUse]: []
         }));
         setSelectedSprint(null);
-        // Clear tickets if there are no boards
+        setTickets([]);
+        sprintsFetchingRef.current = false;
+        setLoading(false);
+        return;
+      }
+      
+      const boardId = boardsData.values[0].id;
+      console.log(`Found board with ID ${boardId} for project ${projectToUse}`);
+      
+      const { data: sprintsData, error: sprintsError } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: `agile/1.0/board/${boardId}/sprint`,
+          credentials,
+          params: {
+            state: 'active,future' // Get both active and upcoming sprints
+          }
+        }
+      });
+      
+      if (sprintsError) throw new Error(sprintsError.message);
+      
+      if (sprintsData && sprintsData.values && sprintsData.values.length > 0) {
+        console.log(`Received ${sprintsData.values.length} sprints for board ${boardId}`);
+        
+        const formattedSprints: JiraSprint[] = sprintsData.values
+          .map((sprint: any) => ({
+            id: sprint.id,
+            name: sprint.name,
+            state: sprint.state,
+            startDate: sprint.startDate,
+            endDate: sprint.endDate,
+            boardId: boardId
+          }))
+          .sort((a: JiraSprint, b: JiraSprint) => {
+            if (a.state === 'active' && b.state !== 'active') return -1;
+            if (a.state !== 'active' && b.state === 'active') return 1;
+            
+            if (a.startDate && b.startDate) {
+              return new Date(b.startDate).getTime() - new Date(a.startDate).getTime();
+            }
+            return 0;
+          });
+        
+        setSprints(prev => ({
+          ...prev,
+          [projectToUse]: formattedSprints
+        }));
+        
+        const activeSprints = formattedSprints.filter(s => s.state === 'active');
+        if (activeSprints.length > 0 && (!selectedSprint || selectedSprint.id !== activeSprints[0].id)) {
+          setSelectedSprint(activeSprints[0]);
+        } else if (formattedSprints.length > 0 && !selectedSprint) {
+          setSelectedSprint(formattedSprints[0]);
+        } else if (formattedSprints.length === 0) {
+          setSelectedSprint(null);
+          setTickets([]);
+        }
+      } else {
+        console.log("No sprints found for this board");
+        setSprints(prev => ({
+          ...prev,
+          [projectToUse]: []
+        }));
+        setSelectedSprint(null);
         setTickets([]);
       }
     } catch (err: any) {
       console.error("Error fetching sprints:", err);
       setError(`Failed to fetch sprints: ${err.message}`);
       
-      toast({
-        title: "Error",
-        description: `Failed to fetch sprints: ${err.message}`,
-        variant: "destructive",
-      });
+      if (!err.message.includes('404')) {
+        toast({
+          title: "Error",
+          description: `Failed to fetch sprints: ${err.message}`,
+          variant: "destructive",
+        });
+      }
+      
+      setSprints(prev => ({
+        ...prev,
+        [projectToUse]: []
+      }));
     } finally {
       setLoading(false);
+      sprintsFetchingRef.current = false;
     }
   }, [credentials, selectedProject, selectedSprint, toast]);
 
-  // Fetch tickets from Jira for a specific sprint
   const fetchTickets = useCallback(async (sprintId?: string) => {
     if (!credentials) return;
     if (!sprintId && !selectedSprint) return;
@@ -231,8 +261,14 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const sprintToUse = sprintId || selectedSprint?.id;
     if (!sprintToUse) return;
     
+    if (ticketsFetchingRef.current) {
+      console.log("Tickets fetch already in progress, skipping");
+      return;
+    }
+    
     setLoading(true);
     setError(null);
+    ticketsFetchingRef.current = true;
     
     try {
       console.log(`Fetching tickets for sprint ${sprintToUse}...`);
@@ -281,40 +317,61 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         description: `Failed to fetch tickets: ${err.message}`,
         variant: "destructive",
       });
+      
+      setTickets([]);
     } finally {
       setLoading(false);
+      ticketsFetchingRef.current = false;
     }
   }, [credentials, selectedSprint, toast]);
 
-  // Only fetch projects once on initial authentication
   useEffect(() => {
-    if (isAuthenticated && projects.length === 0) {
-      fetchProjects();
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (isAuthenticated && projects.length === 0 && !projectsFetchingRef.current) {
+      timeoutId = setTimeout(() => {
+        fetchProjects();
+      }, 500);
     }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [isAuthenticated, fetchProjects, projects.length]);
 
-  // Effect to fetch sprints when selected project changes
   useEffect(() => {
-    if (selectedProject) {
-      fetchSprints(selectedProject.id);
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (selectedProject && !sprintsFetchingRef.current) {
+      timeoutId = setTimeout(() => {
+        fetchSprints(selectedProject.id);
+      }, 500);
     }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [selectedProject, fetchSprints]);
 
-  // Effect to fetch tickets when selected sprint changes
   useEffect(() => {
-    if (selectedSprint) {
-      fetchTickets(selectedSprint.id);
+    let timeoutId: NodeJS.Timeout | null = null;
+    
+    if (selectedSprint && !ticketsFetchingRef.current) {
+      timeoutId = setTimeout(() => {
+        fetchTickets(selectedSprint.id);
+      }, 500);
     }
+    
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, [selectedSprint, fetchTickets]);
 
-  // Generate content using AI for a Jira ticket
   const generateContent = async () => {
-    // This will be implemented in future updates
     console.log("generateContent will be implemented later");
   };
 
   const pushToJira = async () => {
-    // This will be implemented in future updates
     console.log("pushToJira will be implemented later");
     return false;
   };
