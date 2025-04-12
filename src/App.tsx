@@ -12,6 +12,7 @@ import DocumentsPage from "./pages/DocumentsPage";
 import DataModelPage from "./pages/DataModelPage";
 import CardyMindPage from "./pages/CardyMindPage";
 import StoriesPage from "./pages/StoriesPage";
+import SettingsPage from "./pages/SettingsPage";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 
@@ -33,6 +34,7 @@ const App = () => (
               <Route path="/data-models" element={<DataModelPage />} />
               <Route path="/cardy-mind" element={<CardyMindPage />} />
               <Route path="/stories" element={<StoriesPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

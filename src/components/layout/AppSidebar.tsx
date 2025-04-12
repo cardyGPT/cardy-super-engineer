@@ -53,6 +53,11 @@ export function AppSidebar() {
       href: "/stories",
       icon: <ClipboardList className="h-5 w-5" />,
     },
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: <Settings className="h-5 w-5" />,
+    },
   ];
 
   return (
