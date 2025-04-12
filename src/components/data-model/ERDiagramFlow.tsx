@@ -152,8 +152,8 @@ const ERDiagramFlow = ({ dataModel, onEntitySelect }: ERDiagramFlowProps) => {
   const initialEdges = useMemo(() => {
     return dataModel.relationships.map((relationship, index) => {
       // Extract source and target IDs from relationship
-      let sourceId = relationship.sourceEntityId || relationship.source;
-      let targetId = relationship.targetEntityId || relationship.target;
+      let sourceId = relationship.sourceEntityId;
+      let targetId = relationship.targetEntityId;
       
       // Determine relationship type for styling
       const sourceEntity = dataModel.entities.find(e => e.id === sourceId);

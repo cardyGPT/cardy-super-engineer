@@ -33,8 +33,16 @@ serve(async (req) => {
       let content = "";
       
       if (typeof doc.content === "string") {
-        content = doc.content;
+        try {
+          // Try to parse JSON string to ensure it's properly formatted
+          const parsedContent = JSON.parse(doc.content);
+          content = JSON.stringify(parsedContent, null, 2);
+        } catch (e) {
+          // If it's not valid JSON, use the string directly
+          content = doc.content;
+        }
       } else if (doc.content) {
+        // If content is already an object, stringify it
         content = JSON.stringify(doc.content, null, 2);
       }
       
@@ -52,15 +60,24 @@ serve(async (req) => {
     // Prepare system message with access to all project data
     const systemMessage = {
       role: "system",
-      content: `You are Cardy Mind, an AI assistant with access to all project documents and data models. 
+      content: `You are Cardy Mind, an AI assistant with full access to all project documents and data models. 
       You help users analyze their documents and data models, answer questions, and provide insights.
       Your responses should be clear, informative, and helpful.
       When referencing specific documents or data models, mention them by name.
       You have complete access to read and analyze all project documents and database structures.
       
-      If you encounter JSON data, process it carefully and extract meaningful information from it.
-      For data models, you can analyze the entities, relationships, and attributes.
-      Be thorough in your analysis of documents and try to provide helpful insights.`
+      For data models:
+      - You can access all entities, their attributes, and relationships
+      - You can explain entity relationships and their cardinality
+      - You can suggest optimizations or identify potential issues
+      
+      For other documents:
+      - You can analyze content, extract key information
+      - You can compare information across multiple documents
+      - You can provide summaries or detailed explanations
+      
+      Always be thorough in your analysis and aim to provide meaningful insights
+      based on the project's complete documentation.`
     };
     
     // Call OpenAI API with the documents included
