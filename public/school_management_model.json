@@ -1,0 +1,293 @@
+
+{
+  "entities": [
+    {
+      "id": "school",
+      "name": "School",
+      "type": "entity",
+      "definition": "Main educational institution",
+      "attributes": [
+        {
+          "id": "school-id",
+          "name": "school_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the school"
+        },
+        {
+          "id": "school-name",
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Official name of the school"
+        },
+        {
+          "id": "school-address",
+          "name": "address",
+          "type": "string",
+          "required": true,
+          "description": "Physical location of the school"
+        },
+        {
+          "id": "school-founded",
+          "name": "founded_date",
+          "type": "date",
+          "required": false,
+          "description": "Date when the school was established"
+        }
+      ]
+    },
+    {
+      "id": "department",
+      "name": "Department",
+      "type": "sub-entity",
+      "definition": "Academic division within the school",
+      "attributes": [
+        {
+          "id": "dept-id",
+          "name": "department_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the department"
+        },
+        {
+          "id": "dept-name",
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Name of the department"
+        },
+        {
+          "id": "dept-head",
+          "name": "head_teacher",
+          "type": "string",
+          "required": false,
+          "description": "Head of the department"
+        },
+        {
+          "id": "dept-school-id",
+          "name": "school_id",
+          "type": "string",
+          "required": true,
+          "isForeignKey": true,
+          "description": "Reference to school this department belongs to"
+        }
+      ]
+    },
+    {
+      "id": "teacher",
+      "name": "Teacher",
+      "type": "entity",
+      "definition": "Educational professional employed by the school",
+      "attributes": [
+        {
+          "id": "teacher-id",
+          "name": "teacher_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the teacher"
+        },
+        {
+          "id": "teacher-name",
+          "name": "full_name",
+          "type": "string",
+          "required": true,
+          "description": "Full name of the teacher"
+        },
+        {
+          "id": "teacher-email",
+          "name": "email",
+          "type": "string",
+          "required": true,
+          "description": "Email address of the teacher"
+        },
+        {
+          "id": "teacher-hire-date",
+          "name": "hire_date",
+          "type": "date",
+          "required": false,
+          "description": "Date when the teacher was hired"
+        },
+        {
+          "id": "teacher-dept-id",
+          "name": "department_id",
+          "type": "string",
+          "required": true,
+          "isForeignKey": true,
+          "description": "Department this teacher belongs to"
+        }
+      ]
+    },
+    {
+      "id": "student",
+      "name": "Student",
+      "type": "entity",
+      "definition": "Person enrolled in the school",
+      "attributes": [
+        {
+          "id": "student-id",
+          "name": "student_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the student"
+        },
+        {
+          "id": "student-name",
+          "name": "full_name",
+          "type": "string",
+          "required": true,
+          "description": "Full name of the student"
+        },
+        {
+          "id": "student-dob",
+          "name": "date_of_birth",
+          "type": "date",
+          "required": true,
+          "description": "Student's date of birth"
+        },
+        {
+          "id": "student-grade",
+          "name": "grade_level",
+          "type": "number",
+          "required": true,
+          "description": "Current grade level of the student"
+        }
+      ]
+    },
+    {
+      "id": "course",
+      "name": "Course",
+      "type": "sub-entity",
+      "definition": "Academic subject taught in the school",
+      "attributes": [
+        {
+          "id": "course-id",
+          "name": "course_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the course"
+        },
+        {
+          "id": "course-name",
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Name of the course"
+        },
+        {
+          "id": "course-credits",
+          "name": "credits",
+          "type": "number",
+          "required": true,
+          "description": "Number of credits for the course"
+        },
+        {
+          "id": "course-dept-id",
+          "name": "department_id",
+          "type": "string",
+          "required": true,
+          "isForeignKey": true,
+          "description": "Department offering this course"
+        }
+      ]
+    },
+    {
+      "id": "enrollment",
+      "name": "Enrollment",
+      "type": "sub-entity",
+      "definition": "Record of a student enrolling in a course",
+      "attributes": [
+        {
+          "id": "enrollment-id",
+          "name": "enrollment_id",
+          "type": "string",
+          "required": true,
+          "isPrimaryKey": true,
+          "description": "Unique identifier for the enrollment"
+        },
+        {
+          "id": "enrollment-student-id",
+          "name": "student_id",
+          "type": "string",
+          "required": true,
+          "isForeignKey": true,
+          "description": "Reference to the enrolled student"
+        },
+        {
+          "id": "enrollment-course-id",
+          "name": "course_id",
+          "type": "string",
+          "required": true,
+          "isForeignKey": true,
+          "description": "Reference to the course"
+        },
+        {
+          "id": "enrollment-date",
+          "name": "enrollment_date",
+          "type": "date",
+          "required": true,
+          "description": "Date of enrollment"
+        },
+        {
+          "id": "enrollment-grade",
+          "name": "grade",
+          "type": "string",
+          "required": false,
+          "description": "Final grade received"
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel-school-department",
+      "name": "School has Departments",
+      "sourceEntityId": "school",
+      "targetEntityId": "department",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A school can have multiple departments"
+    },
+    {
+      "id": "rel-department-teacher",
+      "name": "Department employs Teachers",
+      "sourceEntityId": "department",
+      "targetEntityId": "teacher",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A department can have multiple teachers"
+    },
+    {
+      "id": "rel-department-course",
+      "name": "Department offers Courses",
+      "sourceEntityId": "department",
+      "targetEntityId": "course",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A department can offer multiple courses"
+    },
+    {
+      "id": "rel-student-enrollment",
+      "name": "Student Enrollments",
+      "sourceEntityId": "student",
+      "targetEntityId": "enrollment",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A student can have multiple enrollments"
+    },
+    {
+      "id": "rel-course-enrollment",
+      "name": "Course Enrollments",
+      "sourceEntityId": "course",
+      "targetEntityId": "enrollment",
+      "sourceCardinality": "1",
+      "targetCardinality": "*",
+      "description": "A course can have multiple enrollments"
+    }
+  ]
+}

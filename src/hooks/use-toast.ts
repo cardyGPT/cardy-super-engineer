@@ -27,6 +27,9 @@ export function useToast() {
       action
     };
     setToasts(prev => [...prev, newToast]);
+    
+    // Also log to console for debugging
+    console.log(`Toast [${variant}]: ${title} - ${description}`);
   };
 
   return { 
@@ -43,7 +46,6 @@ export const toast = ({ title, description, variant = "default", action }: {
   action?: React.ReactNode;
 }) => {
   // This is a simplified version for direct import
-  // The actual toast state is managed by the useToast hook
-  console.log("Toast:", { title, description, variant, action });
+  console.log(`Global Toast [${variant}]: ${title} - ${description}`);
   // Implementation will be handled by the Toaster component
 };
