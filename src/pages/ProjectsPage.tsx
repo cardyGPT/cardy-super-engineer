@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useProject } from "@/contexts/ProjectContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -7,6 +7,7 @@ import ProjectForm from "@/components/projects/ProjectForm";
 import { Button } from "@/components/ui/button";
 import { Plus, Pencil, Trash2, File, ArrowUpRight } from "lucide-react";
 import { Project } from "@/types";
+import ProjectCard from "@/components/projects/ProjectCard";
 import {
   Dialog,
   DialogContent,
@@ -15,33 +16,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const ProjectsPage = () => {
-  const { projects, deleteProject } = useProject();
+  const { projects, addProject, deleteProject } = useProject();
   const navigate = useNavigate();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // When projects are loaded from context, set loading to false
+    if (projects.length > 0 || !useProject().loading) {
+      setIsLoading(false);
+    }
+  }, [projects, useProject().loading]);
 
   const handleEditProject = (project: Project) => {
     setEditingProject(project);
@@ -52,6 +42,38 @@ const ProjectsPage = () => {
     setIsDialogOpen(false);
     setEditingProject(null);
   };
+
+  const handleCreateProject = async (formData: Partial<Project>) => {
+    try {
+      const newProject = await addProject(formData);
+      if (newProject) {
+        toast({
+          title: "Project created",
+          description: `Project ${newProject.name} has been created successfully.`,
+        });
+        handleDialogClose();
+      }
+    } catch (error) {
+      console.error("Error creating project:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto py-6">
+          <div className="flex justify-center items-center h-64">
+            <p className="text-lg text-gray-500">Loading projects...</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
@@ -93,92 +115,20 @@ const ProjectsPage = () => {
             <p className="text-sm text-gray-500 mb-6">
               Get started by creating a new project
             </p>
-            <Dialog>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Project
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Create New Project</DialogTitle>
-                  <DialogDescription>
-                    Fill in the details to create a new project
-                  </DialogDescription>
-                </DialogHeader>
-                <ProjectForm onSuccess={() => setIsDialogOpen(false)} />
-              </DialogContent>
-            </Dialog>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Project
+            </Button>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Project Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Last Updated</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-medium">{project.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{project.type}</Badge>
-                    </TableCell>
-                    <TableCell>{format(new Date(project.createdAt), "MMM d, yyyy")}</TableCell>
-                    <TableCell>{format(new Date(project.updatedAt), "MMM d, yyyy")}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => navigate(`/projects/${project.id}`)}
-                        >
-                          <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEditProject(project)}
-                        >
-                          <Pencil className="h-3.5 w-3.5 mr-1" />
-                          Edit
-                        </Button>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="destructive" size="sm">
-                              <Trash2 className="h-3.5 w-3.5 mr-1" />
-                              Delete
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                This will permanently delete the project and all associated documents.
-                                This action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => deleteProject(project.id)}>
-                                Delete
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {projects.map((project) => (
+              <ProjectCard 
+                key={project.id} 
+                project={project} 
+                onEdit={handleEditProject} 
+              />
+            ))}
           </div>
         )}
       </div>
