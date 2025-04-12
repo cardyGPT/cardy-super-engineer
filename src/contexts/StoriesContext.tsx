@@ -1,6 +1,5 @@
-
 import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
-import { JiraCredentials, StoriesContextType, JiraTicket, JiraProject, JiraSprint } from "@/types/jira";
+import { JiraCredentials, StoriesContextType, JiraTicket, JiraProject, JiraSprint, JiraGenerationRequest, JiraGenerationResponse } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/ui/use-toast";
 
@@ -41,33 +40,27 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [selectedProject, setSelectedProject] = useState<JiraProject | null>(null);
   const [selectedSprint, setSelectedSprint] = useState<JiraSprint | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<JiraTicket | null>(null);
-  const [generatedContent, setGeneratedContent] = useState(null);
+  const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
   const { toast } = useToast();
   
-  // Use refs to track fetch states and prevent concurrent fetches
   const projectsFetchingRef = useRef(false);
   const sprintsFetchingRef = useRef(false);
   const ticketsFetchingRef = useRef(false);
   
-  // Track last project and sprint IDs to prevent redundant fetches
   const lastProjectIdRef = useRef<string | null>(null);
   const lastSprintIdRef = useRef<string | null>(null);
   
-  // Track operation states to prevent setting state after component unmounts
   const isMountedRef = useRef(true);
-  
-  // Track initialization status
   const isInitializedRef = useRef(false);
   
-  // Track empty results to avoid repeated fetches
   const emptySprintsProjectsRef = useRef<Set<string>>(new Set());
   const emptyTicketsSprintsRef = useRef<Set<string>>(new Set());
   
   const isAuthenticated = !!credentials;
 
-  // Cleanup effect
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -86,7 +79,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setSelectedProject(null);
       setSelectedSprint(null);
       setSelectedTicket(null);
-      // Clear caches
       emptySprintsProjectsRef.current.clear();
       emptyTicketsSprintsRef.current.clear();
     }
@@ -113,19 +105,17 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           credentials,
           params: {
             expand: 'lead,description',
-            status: 'active' // Only fetch active projects
+            status: 'active'
           }
         }
       });
       
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       if (apiError) throw new Error(apiError.message);
       
       if (data) {
         if (data.message) {
-          // Server returned a message but no actual error - show as a toast notification
           toast({
             title: "Jira Projects",
             description: data.message
@@ -159,7 +149,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
       }
     } catch (err: any) {
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       console.error("Error fetching projects:", err);
@@ -172,7 +161,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         variant: "destructive",
       });
     } finally {
-      // Small delay before setting loading to false to prevent UI flicker
       setTimeout(() => {
         if (isMountedRef.current) {
           setLoading(false);
@@ -189,19 +177,16 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const projectToUse = projectId || selectedProject?.id;
     if (!projectToUse) return;
 
-    // Skip fetch if we already know this project has no sprints
     if (emptySprintsProjectsRef.current.has(projectToUse)) {
       console.log(`Project ${projectToUse} has no sprints (cached), skipping fetch`);
       return;
     }
 
-    // Prevent duplicate fetch of the same project's sprints
     if (projectToUse === lastProjectIdRef.current && sprints[projectToUse]?.length > 0) {
       console.log(`Sprints for project ${projectToUse} already loaded, skipping fetch`);
       return;
     }
     
-    // Update the last project ID ref
     lastProjectIdRef.current = projectToUse;
     
     if (sprintsFetchingRef.current) {
@@ -222,12 +207,11 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           credentials,
           params: {
             projectKeyOrId: projectToUse,
-            type: 'scrum' // Only get scrum boards, which support sprints
+            type: 'scrum'
           }
         }
       });
       
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       if (boardsError) throw new Error(boardsError.message);
@@ -238,7 +222,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           ...prev,
           [projectToUse]: []
         }));
-        // Remember this project has no sprints to avoid future requests
         emptySprintsProjectsRef.current.add(projectToUse);
         setSelectedSprint(null);
         setTickets([]);
@@ -247,16 +230,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           description: boardsData?.message || "This project doesn't have any Scrum boards configured.",
           variant: "default"
         });
-        setTimeout(() => {
-          if (isMountedRef.current) {
-            setLoading(false);
-            sprintsFetchingRef.current = false;
-          }
-        }, 300);
         return;
       }
       
-      // Find the first active scrum board
       const board = boardsData.values[0];
       const boardId = board.id;
       console.log(`Found board with ID ${boardId} for project ${projectToUse}`);
@@ -266,26 +242,23 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           endpoint: `agile/1.0/board/${boardId}/sprint`,
           credentials,
           params: {
-            state: 'active,future' // Get both active and upcoming sprints
+            state: 'active,future'
           }
         }
       });
       
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       if (sprintsError && !sprintsError.message.includes('404')) {
         throw new Error(sprintsError.message);
       }
       
-      // Handle case where no sprints found
       if (!sprintsData || !sprintsData.values || sprintsData.values.length === 0) {
         console.log(`No sprints found for board ${boardId}`);
         setSprints(prev => ({
           ...prev,
           [projectToUse]: []
         }));
-        // Remember this project has no sprints to avoid future requests
         emptySprintsProjectsRef.current.add(projectToUse);
         setSelectedSprint(null);
         setTickets([]);
@@ -296,8 +269,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         });
         return;
       }
-      
-      console.log(`Received ${sprintsData.values.length} sprints for board ${boardId}`);
       
       const formattedSprints: JiraSprint[] = sprintsData.values
         .map((sprint: any) => ({
@@ -335,12 +306,10 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setTickets([]);
       }
     } catch (err: any) {
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       console.error("Error fetching sprints:", err);
       
-      // Don't show toast for 404 errors, just log them
       if (!err.message.includes('404')) {
         setError(`Failed to fetch sprints: ${err.message}`);
         
@@ -363,13 +332,10 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         [projectToUse]: []
       }));
       
-      // Remember this project has no sprints to avoid future requests
       emptySprintsProjectsRef.current.add(projectToUse);
       
-      // Clear tickets when we can't get sprints
       setTickets([]);
     } finally {
-      // Only update state if component is still mounted
       setTimeout(() => {
         if (isMountedRef.current) {
           setLoading(false);
@@ -386,19 +352,16 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     const sprintToUse = sprintId || selectedSprint?.id;
     if (!sprintToUse) return;
     
-    // Skip fetch if we already know this sprint has no tickets
     if (emptyTicketsSprintsRef.current.has(sprintToUse)) {
       console.log(`Sprint ${sprintToUse} has no tickets (cached), skipping fetch`);
       return;
     }
     
-    // Prevent duplicate fetch of the same sprint's tickets
     if (sprintToUse === lastSprintIdRef.current && tickets.length > 0) {
       console.log(`Tickets for sprint ${sprintToUse} already loaded, skipping fetch`);
       return;
     }
     
-    // Update the last sprint ID ref
     lastSprintIdRef.current = sprintToUse;
     
     if (ticketsFetchingRef.current) {
@@ -424,7 +387,6 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       });
       
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       if (apiError) throw new Error(apiError.message);
@@ -433,10 +395,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         console.log(`Received ${data.issues.length} tickets from Jira`);
         
         if (data.issues.length === 0) {
-          // Remember this sprint has no tickets to avoid future requests
           emptyTicketsSprintsRef.current.add(sprintToUse);
           
-          // If we have a message from the server, show it
           if (data.message) {
             toast({
               title: "No Issues",
@@ -464,10 +424,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       } else {
         console.log("No tickets found in Jira response");
         setTickets([]);
-        // Remember this sprint has no tickets to avoid future requests
         emptyTicketsSprintsRef.current.add(sprintToUse);
         
-        // If we have a message from the server, show it
         if (data && data.message) {
           toast({
             title: "No Issues",
@@ -477,13 +435,12 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
         }
       }
     } catch (err: any) {
-      // Only update state if component is still mounted
       if (!isMountedRef.current) return;
       
       console.error("Error fetching tickets:", err);
+      
       setError(`Failed to fetch tickets: ${err.message}`);
       
-      // Skip showing error for "Sprint does not exist" scenarios
       if (!err.message.includes("does not exist") && !err.message.includes("No permission")) {
         toast({
           title: "Error",
@@ -500,10 +457,8 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
       }
       
       setTickets([]);
-      // Remember this sprint has no tickets to avoid future requests
       emptyTicketsSprintsRef.current.add(sprintToUse);
     } finally {
-      // Only update state if component is still mounted
       setTimeout(() => {
         if (isMountedRef.current) {
           setLoading(false);
@@ -513,16 +468,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   }, [credentials, selectedSprint, toast, tickets.length]);
 
-  // Reset cached empty results when credentials change
   useEffect(() => {
     emptySprintsProjectsRef.current.clear();
     emptyTicketsSprintsRef.current.clear();
   }, [credentials]);
 
-  // Load projects only once on initial authentication
   useEffect(() => {
     if (isAuthenticated && !isInitializedRef.current && !projectsFetchingRef.current) {
-      // Small delay to prevent race conditions
       const timeoutId = setTimeout(() => {
         if (isMountedRef.current) fetchProjects();
       }, 300);
@@ -535,16 +487,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {};
   }, [isAuthenticated, fetchProjects]);
 
-  // Load sprints when project changes
   useEffect(() => {
     if (selectedProject && !sprintsFetchingRef.current) {
-      // Skip fetch if we already know this project has no sprints
       if (emptySprintsProjectsRef.current.has(selectedProject.id)) {
         console.log(`Project ${selectedProject.id} has no sprints (cached), skipping fetch`);
         return;
       }
       
-      // Small delay to allow UI to update first
       const timeoutId = setTimeout(() => {
         if (isMountedRef.current) fetchSprints(selectedProject.id);
       }, 300);
@@ -557,16 +506,13 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {};
   }, [selectedProject, fetchSprints]);
 
-  // Load tickets when sprint changes
   useEffect(() => {
     if (selectedSprint && !ticketsFetchingRef.current) {
-      // Skip fetch if we already know this sprint has no tickets
       if (emptyTicketsSprintsRef.current.has(selectedSprint.id)) {
         console.log(`Sprint ${selectedSprint.id} has no tickets (cached), skipping fetch`);
         return;
       }
       
-      // Small delay to allow UI to update first
       const timeoutId = setTimeout(() => {
         if (isMountedRef.current) fetchTickets(selectedSprint.id);
       }, 300);
@@ -579,12 +525,9 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return () => {};
   }, [selectedSprint, fetchTickets]);
 
-  // Handle changes in selected project by resetting sprint selection
   useEffect(() => {
     if (selectedProject) {
       const projectSprints = sprints[selectedProject.id] || [];
-      // If we have sprints for this project but the selected sprint isn't among them,
-      // select the first active sprint or the first sprint if no active ones
       if (projectSprints.length > 0) {
         const validSprint = selectedSprint && projectSprints.some(s => s.id === selectedSprint.id);
         if (!validSprint) {
@@ -594,27 +537,122 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
           }
         }
       } else if (isMountedRef.current && projectSprints.length === 0 && selectedSprint) {
-        // Clear selected sprint if there are no sprints for the project
         setSelectedSprint(null);
       }
     }
   }, [selectedProject, sprints, selectedSprint]);
 
-  const generateContent = async () => {
-    console.log("generateContent will be implemented later");
-  };
+  const generateContent = useCallback(async (request: JiraGenerationRequest) => {
+    if (!credentials || isGenerating) return;
+    
+    setIsGenerating(true);
+    setGeneratedContent(null);
+    setLoading(true);
+    
+    try {
+      console.log(`Generating ${request.type} content for ticket ${request.jiraTicket.key}...`);
+      
+      const { data, error: apiError } = await supabase.functions.invoke('chat-with-jira', {
+        body: {
+          jiraTicket: request.jiraTicket,
+          dataModel: request.dataModel,
+          documentsContext: request.documentsContext,
+          request: request.type === 'lld' ? 'Generate a Low-Level Design document' : 
+                  request.type === 'code' ? 'Generate implementation code' :
+                  request.type === 'tests' ? 'Generate test cases' : 
+                  'Generate a Low-Level Design document, implementation code, and test cases'
+        }
+      });
+      
+      if (apiError) throw new Error(apiError.message);
+      
+      if (data) {
+        console.log("Content generation successful");
+        
+        const response: JiraGenerationResponse = {
+          response: data.response,
+          [request.type]: data.response
+        };
+        
+        setGeneratedContent(response);
+        
+        toast({
+          title: "Content Generated",
+          description: `Successfully generated ${request.type === 'all' ? 'all content' : request.type} for ${request.jiraTicket.key}`,
+        });
+      }
+    } catch (err: any) {
+      console.error("Error generating content:", err);
+      
+      setGeneratedContent({
+        error: `Failed to generate content: ${err.message}`
+      });
+      
+      toast({
+        title: "Generation Error",
+        description: `Failed to generate content: ${err.message}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsGenerating(false);
+      setLoading(false);
+    }
+  }, [credentials, toast, isGenerating]);
 
-  const pushToJira = async () => {
-    console.log("pushToJira will be implemented later");
-    return false;
-  };
+  const pushToJira = useCallback(async (ticketId: string, content: string): Promise<boolean> => {
+    if (!credentials) return false;
+    
+    try {
+      console.log(`Pushing content to Jira ticket ${ticketId}...`);
+      
+      const { data, error: apiError } = await supabase.functions.invoke('jira-api', {
+        body: {
+          endpoint: `issue/${ticketId}/comment`,
+          method: 'POST',
+          credentials,
+          data: {
+            body: {
+              type: "doc",
+              version: 1,
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: content
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      });
+      
+      if (apiError) throw new Error(apiError.message);
+      
+      console.log("Content successfully pushed to Jira");
+      return true;
+    } catch (err: any) {
+      console.error("Error pushing to Jira:", err);
+      
+      toast({
+        title: "Error",
+        description: `Failed to push content to Jira: ${err.message}`,
+        variant: "destructive",
+      });
+      
+      return false;
+    }
+  }, [credentials, toast]);
 
   const value = {
     credentials,
     setCredentials,
     isAuthenticated,
     tickets,
-    loading,
+    loading: loading || isGenerating,
     error,
     projects,
     sprints,
