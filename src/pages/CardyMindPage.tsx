@@ -1,14 +1,15 @@
 
 import React, { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, FileText, Check, ChevronDown, AlertTriangle } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { BrainCircuit } from "lucide-react";
 import { useProject } from "@/contexts/ProjectContext";
-import { Textarea } from "@/components/ui/textarea";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
+
+// Import the newly created components
+import DocumentSelection from "@/components/cardy-mind/DocumentSelection";
+import ConversationDisplay from "@/components/cardy-mind/ConversationDisplay";
+import ChatInputForm from "@/components/cardy-mind/ChatInputForm";
+import RagInfoCard from "@/components/cardy-mind/RagInfoCard";
 
 const CardyMindPage: React.FC = () => {
   const { projects, documents } = useProject();
@@ -174,189 +175,47 @@ const CardyMindPage: React.FC = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2">
-              <Card className="h-full">
-                <CardContent className="p-6">
-                  <div className="mb-4 flex justify-between items-center">
-                    <div>
-                      <h2 className="text-lg font-semibold mb-2">Conversation</h2>
-                      {selectedProjectName && (
-                        <div className="text-sm text-muted-foreground mb-4">
-                          Selected Project: {selectedProjectName}
-                        </div>
-                      )}
-                    </div>
-                    <Button variant="outline" size="sm" onClick={handleClearChat}>
-                      Clear Chat
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-4 mb-4 max-h-[400px] overflow-y-auto">
-                    {messages.map((message, index) => (
-                      <div key={index} className={`flex ${message.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
-                        <div className={`py-2 px-3 rounded-lg max-w-[80%] ${
-                          message.role === 'assistant' 
-                            ? 'bg-muted text-foreground' 
-                            : 'bg-primary text-primary-foreground'
-                        }`}>
-                          {message.content}
-                        </div>
-                      </div>
-                    ))}
-                    {isLoading && (
-                      <div className="flex justify-start">
-                        <div className="py-2 px-3 rounded-lg bg-muted text-foreground max-w-[80%]">
-                          <div className="flex items-center">
-                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                            <span>Thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div className="flex space-x-2 mb-4">
-                    <div className="relative flex-1">
-                      <Button
-                        variant="outline"
-                        className="w-full flex justify-between"
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                      >
-                        <span>{selectedProjectName || "All Projects"}</span>
-                        <ChevronDown className="h-4 w-4 ml-2" />
-                      </Button>
-                      {isDropdownOpen && (
-                        <div className="absolute top-full left-0 right-0 z-10 mt-1 bg-background border rounded-md shadow-lg">
-                          <div className="p-2">
-                            {projects.map(project => (
-                              <div 
-                                key={project.id}
-                                className="px-3 py-2 hover:bg-muted rounded cursor-pointer"
-                                onClick={() => handleSelectProject(project.id)}
-                              >
-                                {project.name}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <Button 
-                      variant="outline" 
-                      onClick={handleClearProject}
-                      disabled={!selectedProject}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                  
-                  <form onSubmit={handleSubmit}>
-                    <Textarea
-                      value={userInput}
-                      onChange={(e) => setUserInput(e.target.value)}
-                      placeholder="Ask a question about your documents..."
-                      className="mb-2"
-                      disabled={isLoading}
-                    />
-                    <div className="flex justify-end">
-                      <Button type="submit" disabled={isLoading || !userInput.trim()}>
-                        Send
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+              <ConversationDisplay 
+                messages={messages}
+                isLoading={isLoading}
+                selectedProjectName={selectedProjectName}
+                handleClearChat={handleClearChat}
+              />
             </div>
             
             <div className="lg:col-span-1">
-              <Card className="mb-4">
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="font-medium">Document Selection</h3>
-                    <div className="flex space-x-2">
-                      <Button variant="ghost" size="sm">
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        <span className="text-xs">Refresh</span>
-                      </Button>
-                      <Button variant="ghost" size="sm">
-                        <FileText className="h-4 w-4 mr-1" />
-                        <span className="text-xs">Index Docs</span>
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="text-sm text-muted-foreground mb-2">
-                    Using all indexed project documents
-                  </div>
-                  
-                  <div className="flex space-x-2 mb-2">
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="text-xs"
-                      onClick={handleSelectAllDocuments}
-                    >
-                      Select All
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      className="text-xs"
-                      onClick={handleClearAllDocuments}
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                  
-                  <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                    {documents
-                      .filter(doc => !selectedProject || doc.projectId === selectedProject)
-                      .filter(doc => doc.type !== "data-model")
-                      .map(doc => (
-                        <div key={doc.id} className="flex items-center space-x-2 p-2 border rounded text-sm">
-                          <Checkbox 
-                            id={`doc-${doc.id}`}
-                            checked={selectedDocuments.includes(doc.id)}
-                            onCheckedChange={(checked) => 
-                              handleDocumentToggle(doc.id, checked as boolean)
-                            }
-                            className="mr-2"
-                          />
-                          <FileText className="h-4 w-4 flex-shrink-0" />
-                          <span className="truncate flex-1">{doc.name}</span>
-                          <div className="flex items-center bg-green-100 text-green-800 rounded-full px-2 py-0.5 text-xs">
-                            <Check className="h-3 w-3 mr-1" />
-                            <span>Indexed</span>
-                          </div>
-                        </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+              <DocumentSelection 
+                documents={documents}
+                selectedProject={selectedProject}
+                selectedDocuments={selectedDocuments}
+                handleDocumentToggle={handleDocumentToggle}
+                handleSelectAllDocuments={handleSelectAllDocuments}
+                handleClearAllDocuments={handleClearAllDocuments}
+              />
               
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-start space-x-2">
-                    <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-                    <div>
-                      <h3 className="font-medium mb-1">RAG-Powered Document Assistant</h3>
-                      <p className="text-sm text-muted-foreground">
-                        Cardy Mind uses AI with Retrieval Augmented Generation (RAG) to analyze your documents.
-                        Documents are chunked, embedded with pgvector, and retrieved based on semantic
-                        similarity for accurate answers.
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <RagInfoCard />
             </div>
+          </div>
+          
+          <div className="lg:col-span-2">
+            <ChatInputForm 
+              projects={projects}
+              selectedProject={selectedProject}
+              selectedProjectName={selectedProjectName}
+              isLoading={isLoading}
+              isDropdownOpen={isDropdownOpen}
+              userInput={userInput}
+              setUserInput={setUserInput}
+              setIsDropdownOpen={setIsDropdownOpen}
+              handleSelectProject={handleSelectProject}
+              handleClearProject={handleClearProject}
+              handleSubmit={handleSubmit}
+            />
           </div>
         </div>
       </div>
     </AppLayout>
   );
 };
-
-// Need to add this import at the top
-import { BrainCircuit } from "lucide-react";
 
 export default CardyMindPage;
