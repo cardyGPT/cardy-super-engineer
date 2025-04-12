@@ -200,14 +200,7 @@ const DataModelPage = () => {
           </div>}
         
         <div className="mt-4">
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertTitle>Tips for Data Models</AlertTitle>
-            <AlertDescription>
-              Upload a JSON file with <code>entities</code> and <code>relationships</code> arrays. Each entity should have
-              an id, name, definition, type, and attributes array. Each relationship should have source and target entity IDs.
-            </AlertDescription>
-          </Alert>
+          
         </div>
       </div>
     </AppLayout>;
