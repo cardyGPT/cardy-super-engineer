@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import {
   Sidebar,
@@ -32,12 +33,12 @@ export function AppSidebar() {
       icon: <FolderKanban className="h-5 w-5" />,
     },
     {
-      title: "Documents",
+      title: "Docs & Data model",
       href: "/documents",
       icon: <FileText className="h-5 w-5" />,
     },
     {
-      title: "Data Models",
+      title: "Smart ER",
       href: "/data-models",
       icon: <Database className="h-5 w-5" />,
     },
