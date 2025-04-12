@@ -21,6 +21,9 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
     );
   }
 
+  // Ensure content is always a string
+  const safeContent = typeof content === 'string' ? content : String(content);
+
   return (
     <div className={`flex ${role === "assistant" ? "justify-start" : "justify-end"}`}>
       <div
@@ -33,7 +36,7 @@ const ChatMessage = ({ content, role, isLoading = false }: ChatMessageProps) => 
         <div className="flex-shrink-0 mt-0.5">
           {role === "assistant" ? <Bot className="h-5 w-5" /> : <User className="h-5 w-5" />}
         </div>
-        <div className="text-sm whitespace-pre-wrap">{content}</div>
+        <div className="text-sm whitespace-pre-wrap">{safeContent}</div>
       </div>
     </div>
   );

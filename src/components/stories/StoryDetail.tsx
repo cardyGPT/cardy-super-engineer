@@ -31,6 +31,21 @@ const StoryDetail: React.FC = () => {
     );
   }
 
+  // Helper function to safely get content
+  const safeGetContent = (content: any): string => {
+    if (typeof content === 'string') {
+      return content;
+    }
+    if (content && typeof content === 'object') {
+      try {
+        return JSON.stringify(content);
+      } catch (e) {
+        return "[Invalid content format]";
+      }
+    }
+    return String(content || "");
+  };
+
   const handleGenerate = async (type: "lld" | "code" | "tests" | "all") => {
     if (!selectedTicket) return;
     
@@ -57,7 +72,10 @@ const StoryDetail: React.FC = () => {
   const handlePushToJira = async () => {
     if (!selectedTicket) return;
     
-    const content = editedContent[activeTab] || generatedContent?.[activeTab as keyof typeof generatedContent] as string || "";
+    const content = editedContent[activeTab] || 
+                    (generatedContent && typeof generatedContent[activeTab as keyof typeof generatedContent] === 'string' 
+                      ? generatedContent[activeTab as keyof typeof generatedContent] as string 
+                      : generatedContent?.response as string) || "";
     
     if (!content) {
       toast({
@@ -196,7 +214,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.lld || generatedContent.response || ""}
+                    value={editedContent.lld || safeGetContent(generatedContent.response || "")}
                     onChange={(e) => handleEdit("lld", e.target.value)}
                   />
                 </CardContent>
@@ -214,7 +232,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.code || generatedContent.response || ""}
+                    value={editedContent.code || safeGetContent(generatedContent.response || "")}
                     onChange={(e) => handleEdit("code", e.target.value)}
                   />
                 </CardContent>
@@ -232,7 +250,7 @@ const StoryDetail: React.FC = () => {
                 <CardContent>
                   <Textarea 
                     className="min-h-[400px] font-mono"
-                    value={editedContent.tests || generatedContent.response || ""}
+                    value={editedContent.tests || safeGetContent(generatedContent.response || "")}
                     onChange={(e) => handleEdit("tests", e.target.value)}
                   />
                 </CardContent>
