@@ -15,6 +15,16 @@ const StoryList: React.FC = () => {
     fetchTickets();
   }, [fetchTickets]);
 
+  // Create a proper click handler that doesn't pass parameters
+  const handleRefreshClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    fetchTickets();
+  };
+
+  // Create a proper retry handler
+  const handleRetryClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    fetchTickets();
+  };
+
   if (loading && tickets.length === 0) {
     return (
       <div className="space-y-4">
@@ -57,7 +67,7 @@ const StoryList: React.FC = () => {
           <CardDescription>{error}</CardDescription>
         </CardHeader>
         <CardFooter>
-          <Button onClick={fetchTickets}>Try Again</Button>
+          <Button onClick={handleRetryClick}>Try Again</Button>
         </CardFooter>
       </Card>
     );
@@ -70,7 +80,7 @@ const StoryList: React.FC = () => {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={fetchTickets} 
+          onClick={handleRefreshClick} 
           disabled={loading}
         >
           <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -103,7 +113,7 @@ const StoryList: React.FC = () => {
                       variant={
                         ticket.status === 'To Do' ? 'secondary' :
                         ticket.status === 'In Progress' ? 'default' :
-                        ticket.status === 'Done' ? 'secondary' : // Changed from 'success' to 'secondary'
+                        ticket.status === 'Done' ? 'secondary' : 
                         'outline'
                       }
                     >
