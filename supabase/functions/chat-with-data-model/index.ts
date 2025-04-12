@@ -39,12 +39,13 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-4-1106-preview', // Using the latest model
         messages: [
           { role: 'system', content: 'You are a helpful AI assistant.' },
           { role: 'user', content: requestBody.message }
         ],
-        max_tokens: 1000
+        max_tokens: 1000,
+        temperature: 0.7
       }),
     });
 
@@ -52,7 +53,7 @@ serve(async (req) => {
       const errorText = await response.text();
       console.error("OpenAI API error:", errorText);
       return new Response(
-        JSON.stringify({ error: errorText }),
+        JSON.stringify({ error: 'Failed to get response from OpenAI' }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -61,9 +62,12 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const aiResponse = data.choices[0].message.content;
+    if (!data.choices || !data.choices[0]?.message?.content) {
+      throw new Error('Invalid response from OpenAI');
+    }
 
-    console.log("AI Response generated successfully");
+    const aiResponse = data.choices[0].message.content;
+    console.log("AI Response generated successfully:", aiResponse.substring(0, 100) + "...");
 
     return new Response(
       JSON.stringify({ response: aiResponse }),
