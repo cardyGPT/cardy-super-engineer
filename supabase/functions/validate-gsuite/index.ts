@@ -17,16 +17,19 @@ serve(async (req) => {
   }
 
   try {
-    // Check if GSuite API key is stored and valid
+    // Check if GSuite API key and client secret are stored and valid
     const apiKey = Deno.env.get('GSUITE_API_KEY');
+    const clientSecret = Deno.env.get('GSUITE_CLIENT_SECRET');
     const settingsJson = Deno.env.get('GSUITE_SETTINGS');
     
     console.log("Checking GSuite configuration...");
     console.log("API Key exists:", !!apiKey);
+    console.log("Client Secret exists:", !!clientSecret);
     console.log("Settings exist:", !!settingsJson);
     
-    // More detailed validation - API key should have reasonable length
+    // More detailed validation - API key and client secret should have reasonable length
     const isApiKeyValid = !!apiKey && apiKey.length > 10;
+    const isClientSecretValid = !!clientSecret && clientSecret.length > 10;
     
     let settings = null;
     let settingsValid = false;
@@ -58,14 +61,18 @@ serve(async (req) => {
       }
     }
     
-    // For successful validation, both API key and settings should be present and valid
-    const success = isApiKeyValid && settingsValid;
+    // For successful validation, API key, client secret, and settings should be present and valid
+    const success = isApiKeyValid && isClientSecretValid && settingsValid;
     
     let message;
     if (!apiKey) {
       message = "GSuite API key is not configured";
     } else if (!isApiKeyValid) {
       message = "GSuite API key appears to be invalid";
+    } else if (!clientSecret) {
+      message = "GSuite client secret is not configured";
+    } else if (!isClientSecretValid) {
+      message = "GSuite client secret appears to be invalid";
     } else if (!settings) {
       message = "GSuite settings are not configured";
     } else if (!settingsValid) {
@@ -82,6 +89,7 @@ serve(async (req) => {
         settings: settings,
         message: message,
         hasApiKey: !!apiKey,
+        hasClientSecret: !!clientSecret,
         hasSettings: !!settings
       }),
       { 

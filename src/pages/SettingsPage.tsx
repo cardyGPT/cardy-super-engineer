@@ -8,6 +8,7 @@ const SettingsPage: React.FC = () => {
   const [jiraConnected, setJiraConnected] = useState<boolean>(false);
   const [openAIConnected, setOpenAIConnected] = useState<boolean>(false);
   const [gsuiteConnected, setGsuiteConnected] = useState<boolean>(false);
+  const [bitbucketConnected, setBitbucketConnected] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<string>("jira");
   
@@ -21,6 +22,12 @@ const SettingsPage: React.FC = () => {
         const jiraCredentials = JSON.parse(localStorage.getItem("jira_credentials") || "null");
         if (jiraCredentials) {
           setJiraConnected(true);
+        }
+        
+        // Check Bitbucket connection
+        const bitbucketCredentials = JSON.parse(localStorage.getItem("bitbucket_credentials") || "null");
+        if (bitbucketCredentials) {
+          setBitbucketConnected(true);
         }
         
         // Note: OpenAI and GSuite status will be checked by their respective components
@@ -45,9 +52,11 @@ const SettingsPage: React.FC = () => {
           jiraConnected={jiraConnected}
           openAIConnected={openAIConnected}
           gsuiteConnected={gsuiteConnected}
+          bitbucketConnected={bitbucketConnected}
           setJiraConnected={setJiraConnected}
           setOpenAIConnected={setOpenAIConnected}
           setGsuiteConnected={setGsuiteConnected}
+          setBitbucketConnected={setBitbucketConnected}
         />
       </div>
     </AppLayout>

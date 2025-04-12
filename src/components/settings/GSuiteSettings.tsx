@@ -17,6 +17,7 @@ interface GSuiteSettingsProps {
 
 const GSuiteSettings: React.FC<GSuiteSettingsProps> = ({ onConfigChange }) => {
   const [apiKey, setApiKey] = useState('');
+  const [clientSecret, setClientSecret] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [defaultDriveFolder, setDefaultDriveFolder] = useState('');
@@ -79,7 +80,8 @@ const GSuiteSettings: React.FC<GSuiteSettingsProps> = ({ onConfigChange }) => {
         const { data: keyData, error: keyError } = await supabase.functions.invoke('store-api-keys', {
           body: { 
             provider: 'gsuite',
-            apiKey: apiKey.trim() 
+            apiKey: apiKey.trim(),
+            clientSecret: clientSecret.trim()
           }
         });
 
@@ -121,6 +123,7 @@ const GSuiteSettings: React.FC<GSuiteSettingsProps> = ({ onConfigChange }) => {
       
       // Clear sensitive data
       setApiKey('');
+      setClientSecret('');
 
       toast({
         title: "GSuite Settings Saved",
@@ -198,19 +201,35 @@ const GSuiteSettings: React.FC<GSuiteSettingsProps> = ({ onConfigChange }) => {
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
-              <Label htmlFor="gsuite-key">Google API Key</Label>
-              <Input
-                id="gsuite-key"
-                type="password"
-                placeholder="Enter your Google API key"
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-              />
-              <p className="text-sm text-muted-foreground">
-                This API key should have access to Google Drive and Google Docs APIs
-              </p>
-            </div>
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="gsuite-key">Google API Key</Label>
+                <Input
+                  id="gsuite-key"
+                  type="password"
+                  placeholder="Enter your Google API key"
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  This API key should have access to Google Drive and Google Docs APIs
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <Label htmlFor="client-secret">Client Secret</Label>
+                <Input
+                  id="client-secret"
+                  type="password"
+                  placeholder="Enter your Google Client Secret"
+                  value={clientSecret}
+                  onChange={(e) => setClientSecret(e.target.value)}
+                />
+                <p className="text-sm text-muted-foreground">
+                  Client secret is required to verify and authorize your Google API access
+                </p>
+              </div>
+            </>
           )}
 
           <div className="space-y-2">
@@ -267,7 +286,7 @@ const GSuiteSettings: React.FC<GSuiteSettingsProps> = ({ onConfigChange }) => {
             <Button
               type="submit"
               className="w-full"
-              disabled={isLoading || !apiKey.trim()}
+              disabled={isLoading || (!apiKey.trim() && !clientSecret.trim())}
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
