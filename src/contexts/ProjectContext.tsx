@@ -1,7 +1,6 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast"; 
 import { useProjectOperations } from "@/hooks/useProjectOperations";
 import { useDocumentOperations } from "@/hooks/useDocumentOperations";
 import { useDataModelOperations } from "@/hooks/useDataModelOperations";
@@ -30,9 +29,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [dataModel, setDataModel] = useState<DataModel | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
-  // Import hooks that contain the operations
+  // Import hooks that contain the operations - pass the toast function directly
   const { fetchProjects, addProject, updateProject, deleteProject } = 
     useProjectOperations(projectList, setProjectList, setLoading, toast);
     
