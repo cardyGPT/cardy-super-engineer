@@ -1,173 +1,203 @@
 
-import React, { useState } from "react";
-import AppLayout from "@/components/layout/AppLayout";
-import { useStories } from "@/contexts/StoriesContext";
-import JiraLogin from "@/components/stories/JiraLogin";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
+import { supabase } from "@/lib/supabase";
+import AppLayout from '@/components/layout/AppLayout';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { LogOut, CheckCircle2, AlertCircle } from "lucide-react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/components/ui/use-toast";
-import { supabase } from "@/lib/supabase";
+import { AlertCircle, CheckCircle2, X, Loader2 } from "lucide-react";
+import JiraLogin from '@/components/stories/JiraLogin';
+import { useStories } from '@/contexts/StoriesContext';
 
-const SettingsPage: React.FC = () => {
-  const { isAuthenticated, setCredentials, credentials } = useStories();
-  const [openAIKey, setOpenAIKey] = useState("");
-  const [isValidatingOpenAI, setIsValidatingOpenAI] = useState(false);
-  const [openAIStatus, setOpenAIStatus] = useState<{ valid: boolean; message: string } | null>(null);
+const SettingsPage = () => {
+  const { isAuthenticated, setCredentials } = useStories();
+  const [openAIKey, setOpenAIKey] = useState('');
+  const [isValidatingKey, setIsValidatingKey] = useState(false);
+  const [keyStatus, setKeyStatus] = useState<'idle' | 'valid' | 'invalid'>('idle');
+  const [validationMessage, setValidationMessage] = useState('');
+  const [creditBalance, setCreditBalance] = useState<{total: number, used: number, available: number} | null>(null);
   const { toast } = useToast();
 
-  const handleLogout = () => {
-    setCredentials(null);
-  };
+  // Load saved API key from localStorage on component mount
+  useEffect(() => {
+    const savedKey = localStorage.getItem('openai_api_key');
+    if (savedKey) {
+      setOpenAIKey(savedKey);
+      validateOpenAIKey(savedKey, true);
+    }
+  }, []);
 
-  const validateOpenAIKey = async () => {
-    if (!openAIKey.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter an OpenAI API key",
-        variant: "destructive",
-      });
+  // Validate OpenAI API key
+  const validateOpenAIKey = async (key: string, silent = false) => {
+    if (!key.trim()) {
+      setKeyStatus('idle');
+      setValidationMessage('');
       return;
     }
 
-    setIsValidatingOpenAI(true);
-    setOpenAIStatus(null);
+    setIsValidatingKey(true);
+    setKeyStatus('idle');
 
     try {
       const { data, error } = await supabase.functions.invoke('validate-openai', {
-        body: { apiKey: openAIKey }
+        body: { apiKey: key.trim() }
       });
 
       if (error) throw new Error(error.message);
 
-      if (data?.valid) {
-        setOpenAIStatus({ valid: true, message: "API key is valid" });
-        // Save the key to localStorage for demo purposes
-        localStorage.setItem("openai_key", openAIKey);
-        toast({
-          title: "Success",
-          description: "OpenAI API key is valid and has been saved",
-        });
+      if (data.valid) {
+        setKeyStatus('valid');
+        setValidationMessage(data.message || 'API key is valid');
+        localStorage.setItem('openai_api_key', key.trim());
+        
+        // Set credit balance if available
+        if (data.billing) {
+          const { total_granted, total_used, total_available } = data.billing;
+          setCreditBalance({
+            total: total_granted,
+            used: total_used,
+            available: total_available
+          });
+        }
+
+        if (!silent) {
+          toast({
+            title: "Success",
+            description: "OpenAI API key validated successfully",
+          });
+        }
       } else {
-        setOpenAIStatus({ valid: false, message: data?.message || "Invalid API key" });
+        setKeyStatus('invalid');
+        setValidationMessage(data.message || 'Invalid API key');
+        setCreditBalance(null);
+        
+        if (!silent) {
+          toast({
+            title: "Error",
+            description: data.message || "Invalid OpenAI API key",
+            variant: "destructive",
+          });
+        }
+      }
+    } catch (err: any) {
+      setKeyStatus('invalid');
+      setValidationMessage(err.message || 'Error validating API key');
+      setCreditBalance(null);
+      
+      if (!silent) {
         toast({
           title: "Error",
-          description: data?.message || "Failed to validate OpenAI API key",
+          description: err.message || "Failed to validate OpenAI API key",
           variant: "destructive",
         });
       }
-    } catch (err: any) {
-      console.error("Error validating OpenAI key:", err);
-      setOpenAIStatus({ valid: false, message: err.message });
-      toast({
-        title: "Error",
-        description: `Failed to validate OpenAI API key: ${err.message}`,
-        variant: "destructive",
-      });
     } finally {
-      setIsValidatingOpenAI(false);
+      setIsValidatingKey(false);
     }
   };
 
-  // Check if OpenAI key exists in localStorage on component mount
-  React.useEffect(() => {
-    const savedKey = localStorage.getItem("openai_key");
-    if (savedKey) {
-      setOpenAIKey(savedKey);
-      setOpenAIStatus({ valid: true, message: "API key loaded from storage" });
-    }
-  }, []);
+  const handleSubmitOpenAI = (e: React.FormEvent) => {
+    e.preventDefault();
+    validateOpenAIKey(openAIKey);
+  };
+
+  const handleClearOpenAI = () => {
+    setOpenAIKey('');
+    setKeyStatus('idle');
+    setValidationMessage('');
+    setCreditBalance(null);
+    localStorage.removeItem('openai_api_key');
+    
+    toast({
+      title: "Cleared",
+      description: "OpenAI API key has been cleared",
+    });
+  };
+
+  const handleDisconnectJira = () => {
+    setCredentials(null);
+    toast({
+      title: "Disconnected",
+      description: "Jira connection has been removed",
+    });
+  };
 
   return (
     <AppLayout>
-      <div className="container mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Settings</h1>
+      <div className="container mx-auto py-8">
+        <h1 className="text-3xl font-bold mb-8">Settings</h1>
         
-        <Tabs defaultValue="jira" className="w-full">
-          <TabsList>
+        <Tabs defaultValue="jira" className="space-y-6">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="jira">Jira Connection</TabsTrigger>
-            <TabsTrigger value="openai">OpenAI Connection</TabsTrigger>
+            <TabsTrigger value="openai">OpenAI API</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="jira">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Jira Connection</h2>
-              
-              {isAuthenticated && (
-                <Button variant="outline" onClick={handleLogout}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Disconnect Jira
-                </Button>
-              )}
-            </div>
-            
-            {!isAuthenticated ? (
-              <JiraLogin />
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <CheckCircle2 className="text-green-500 mr-2 h-6 w-6" />
-                    Connection Successful
-                  </CardTitle>
-                  <CardDescription>
-                    Successfully connected to your Jira account
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p><strong>Domain:</strong> {credentials?.domain}</p>
-                    <p><strong>Email:</strong> {credentials?.email}</p>
-                    <p><strong>Status:</strong> Connected</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="openai">
-            <div className="mb-4">
-              <h2 className="text-xl font-semibold">OpenAI Connection</h2>
-            </div>
-            
+          <TabsContent value="jira" className="space-y-4">
             <Card>
               <CardHeader>
-                <CardTitle className={`flex items-center ${openAIStatus?.valid ? 'text-green-500' : 'text-amber-500'}`}>
-                  {openAIStatus?.valid ? (
-                    <>
-                      <CheckCircle2 className="mr-2 h-6 w-6" />
-                      Connected
-                    </>
-                  ) : (
-                    <>
-                      {openAIStatus ? (
-                        <AlertCircle className="mr-2 h-6 w-6" />
-                      ) : null}
-                      {openAIStatus ? 'Connection Failed' : 'Not Configured'}
-                    </>
-                  )}
-                </CardTitle>
+                <CardTitle>Jira Integration</CardTitle>
                 <CardDescription>
-                  {openAIStatus?.message || "Set up OpenAI API key to enable AI-powered features"}
+                  Configure your Jira connection to fetch and manage stories
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                {isAuthenticated ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-2 text-sm">
+                      <CheckCircle2 className="h-5 w-5 text-green-500" />
+                      <span>Connected to Jira</span>
+                    </div>
+                    
+                    <Button variant="destructive" onClick={handleDisconnectJira}>
+                      Disconnect from Jira
+                    </Button>
+                  </div>
+                ) : (
+                  <JiraLogin />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          <TabsContent value="openai" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>OpenAI API Configuration</CardTitle>
+                <CardDescription>
+                  Set up your OpenAI API key for AI-powered features
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSubmitOpenAI} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="openai-key">OpenAI API Key</Label>
-                    <Input
-                      id="openai-key"
-                      type="password"
-                      placeholder="sk-..."
-                      value={openAIKey}
-                      onChange={(e) => setOpenAIKey(e.target.value)}
-                    />
+                    <div className="flex">
+                      <Input
+                        id="openai-key"
+                        type="password"
+                        value={openAIKey}
+                        onChange={(e) => setOpenAIKey(e.target.value)}
+                        placeholder="sk-..."
+                        className="flex-1"
+                      />
+                      {openAIKey && (
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon"
+                          onClick={handleClearOpenAI}
+                          className="ml-2"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                     <p className="text-sm text-muted-foreground">
-                      You can find your API key in your{" "}
+                      You can get your API key from the{" "}
                       <a 
                         href="https://platform.openai.com/api-keys" 
                         target="_blank" 
@@ -179,10 +209,54 @@ const SettingsPage: React.FC = () => {
                     </p>
                   </div>
                   
-                  <Button onClick={validateOpenAIKey} disabled={isValidatingOpenAI}>
-                    {isValidatingOpenAI ? "Validating..." : "Validate & Save API Key"}
+                  {keyStatus !== 'idle' && (
+                    <div className={`flex items-center space-x-2 text-sm ${
+                      keyStatus === 'valid' ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      {keyStatus === 'valid' ? (
+                        <CheckCircle2 className="h-5 w-5" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5" />
+                      )}
+                      <span>{validationMessage}</span>
+                    </div>
+                  )}
+
+                  {creditBalance && (
+                    <div className="p-4 bg-slate-50 rounded-lg space-y-2">
+                      <h3 className="font-medium">API Credits</h3>
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span>Total Credits:</span>
+                          <span>${creditBalance.total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span>Used:</span>
+                          <span>${creditBalance.used.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-sm font-medium">
+                          <span>Available:</span>
+                          <span>${creditBalance.available.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <Button 
+                    type="submit" 
+                    disabled={isValidatingKey || !openAIKey}
+                    className="w-full"
+                  >
+                    {isValidatingKey ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Validating...
+                      </>
+                    ) : (
+                      'Validate Key'
+                    )}
                   </Button>
-                </div>
+                </form>
               </CardContent>
             </Card>
           </TabsContent>

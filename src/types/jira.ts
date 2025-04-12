@@ -16,6 +16,23 @@ export interface JiraTicket {
   domain?: string;
 }
 
+export interface JiraProject {
+  id: string;
+  key: string;
+  name: string;
+  avatarUrl?: string;
+  domain?: string;
+}
+
+export interface JiraSprint {
+  id: string;
+  name: string;
+  state: string;
+  startDate?: string;
+  endDate?: string;
+  boardId: string;
+}
+
 export interface JiraCredentials {
   domain: string;
   email: string;
@@ -45,7 +62,15 @@ export interface StoriesContextType {
   tickets: JiraTicket[];
   loading: boolean;
   error: string | null;
-  fetchTickets: () => Promise<void>;
+  projects: JiraProject[];
+  sprints: Record<string, JiraSprint[]>;
+  selectedProject: JiraProject | null;
+  setSelectedProject: (project: JiraProject | null) => void;
+  selectedSprint: JiraSprint | null;
+  setSelectedSprint: (sprint: JiraSprint | null) => void;
+  fetchProjects: () => Promise<void>;
+  fetchSprints: (projectId?: string) => Promise<void>;
+  fetchTickets: (sprintId?: string) => Promise<void>;
   selectedTicket: JiraTicket | null;
   setSelectedTicket: (ticket: JiraTicket | null) => void;
   generatedContent: JiraGenerationResponse | null;

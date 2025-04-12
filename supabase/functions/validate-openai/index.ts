@@ -30,7 +30,7 @@ serve(async (req) => {
     }
 
     // Test the API key with a minimal OpenAI API call
-    const response = await fetch('https://api.openai.com/v1/models', {
+    const modelsResponse = await fetch('https://api.openai.com/v1/models', {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -38,23 +38,14 @@ serve(async (req) => {
       },
     });
 
-    if (response.status === 200) {
-      console.log("OpenAI API key is valid");
-      return new Response(
-        JSON.stringify({ valid: true, message: 'API key is valid' }),
-        { 
-          status: 200, 
-          headers: corsHeaders 
-        }
-      );
-    } else {
-      const error = await response.json();
+    if (modelsResponse.status !== 200) {
+      const error = await modelsResponse.json();
       console.error("OpenAI API key validation failed:", error);
       return new Response(
         JSON.stringify({ 
           valid: false, 
           message: error.error?.message || 'Invalid API key',
-          status: response.status
+          status: modelsResponse.status
         }),
         { 
           status: 200, 
@@ -62,6 +53,40 @@ serve(async (req) => {
         }
       );
     }
+
+    // Get billing information
+    const billingResponse = await fetch('https://api.openai.com/dashboard/billing/credit_grants', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    let billingInfo = null;
+    
+    if (billingResponse.status === 200) {
+      try {
+        billingInfo = await billingResponse.json();
+        console.log("OpenAI billing info:", billingInfo);
+      } catch (err) {
+        console.error("Error parsing billing info:", err);
+      }
+    } else {
+      console.log("Could not fetch billing info, status:", billingResponse.status);
+    }
+    
+    return new Response(
+      JSON.stringify({ 
+        valid: true, 
+        message: 'API key is valid',
+        billing: billingInfo
+      }),
+      { 
+        status: 200, 
+        headers: corsHeaders 
+      }
+    );
   } catch (error) {
     console.error('Error in validate-openai function:', error);
     return new Response(

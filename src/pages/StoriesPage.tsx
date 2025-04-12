@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,37 +14,47 @@ import {
 } from "@/components/ui/collapsible";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const StoriesPage: React.FC = () => {
-  const { isAuthenticated, fetchTickets, tickets, loading } = useStories();
-  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({});
+  const { 
+    isAuthenticated, 
+    loading, 
+    tickets, 
+    projects, 
+    sprints,
+    selectedProject, 
+    setSelectedProject,
+    selectedSprint, 
+    setSelectedSprint,
+    fetchProjects
+  } = useStories();
 
   useEffect(() => {
-    if (isAuthenticated && Object.keys(tickets).length === 0) {
-      fetchTickets();
+    if (isAuthenticated && projects.length === 0) {
+      fetchProjects();
     }
-  }, [isAuthenticated, fetchTickets, tickets]);
+  }, [isAuthenticated, fetchProjects, projects.length]);
 
-  // Group tickets by project
-  const ticketsByProject = React.useMemo(() => {
-    const grouped: Record<string, any[]> = {};
-    
-    tickets.forEach(ticket => {
-      const projectKey = ticket.key.split('-')[0];
-      if (!grouped[projectKey]) {
-        grouped[projectKey] = [];
-      }
-      grouped[projectKey].push(ticket);
-    });
-    
-    return grouped;
-  }, [tickets]);
+  const handleProjectChange = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId);
+    if (project) {
+      setSelectedProject(project);
+    }
+  };
 
-  const toggleProject = (projectKey: string) => {
-    setExpandedProjects(prev => ({
-      ...prev,
-      [projectKey]: !prev[projectKey]
-    }));
+  const handleSprintChange = (sprintId: string) => {
+    const projectSprints = sprints[selectedProject?.id || ''] || [];
+    const sprint = projectSprints.find(s => s.id === sprintId);
+    if (sprint) {
+      setSelectedSprint(sprint);
+    }
   };
 
   return (
@@ -58,7 +68,7 @@ const StoriesPage: React.FC = () => {
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={fetchTickets} 
+                onClick={fetchProjects} 
                 disabled={loading}
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -89,94 +99,159 @@ const StoriesPage: React.FC = () => {
               </Button>
             </CardContent>
           </Card>
-        ) : loading && Object.keys(ticketsByProject).length === 0 ? (
-          <div className="space-y-4">
-            {[1, 2].map(i => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-6 w-32" />
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {[1, 2, 3].map(j => (
-                    <div key={j} className="flex justify-between items-center p-2 border rounded">
-                      <div>
-                        <Skeleton className="h-4 w-20 mb-2" />
-                        <Skeleton className="h-5 w-48" />
-                      </div>
-                      <Skeleton className="h-8 w-8" />
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
         ) : (
           <div className="space-y-4">
-            {Object.entries(ticketsByProject).length === 0 ? (
+            <Card className="shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-lg">Select Project & Sprint</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label htmlFor="project-select" className="text-sm font-medium">
+                    Project
+                  </label>
+                  <Select 
+                    value={selectedProject?.id} 
+                    onValueChange={handleProjectChange}
+                    disabled={loading || projects.length === 0}
+                  >
+                    <SelectTrigger id="project-select" className="w-full">
+                      <SelectValue placeholder="Select a project" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map(project => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name} ({project.key})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label htmlFor="sprint-select" className="text-sm font-medium">
+                    Sprint
+                  </label>
+                  <Select 
+                    value={selectedSprint?.id} 
+                    onValueChange={handleSprintChange}
+                    disabled={loading || !selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
+                  >
+                    <SelectTrigger id="sprint-select" className="w-full">
+                      <SelectValue placeholder="Select a sprint" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(sprints[selectedProject?.id || ''] || []).map(sprint => (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                          {sprint.name} ({sprint.state})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {loading && !selectedSprint ? (
+              <div className="space-y-4">
+                {[1, 2].map(i => (
+                  <Card key={i}>
+                    <CardHeader>
+                      <Skeleton className="h-6 w-32" />
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      {[1, 2, 3].map(j => (
+                        <div key={j} className="flex justify-between items-center p-2 border rounded">
+                          <div>
+                            <Skeleton className="h-4 w-20 mb-2" />
+                            <Skeleton className="h-5 w-48" />
+                          </div>
+                          <Skeleton className="h-8 w-8" />
+                        </div>
+                      ))}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : tickets.length === 0 && selectedSprint ? (
               <Card>
                 <CardHeader>
                   <CardTitle>No Stories Found</CardTitle>
                   <CardDescription>
-                    No Jira stories were found for your account.
+                    No Jira stories were found for the selected sprint.
                   </CardDescription>
                 </CardHeader>
               </Card>
-            ) : (
-              Object.entries(ticketsByProject).map(([projectKey, projectTickets]) => (
-                <Collapsible key={projectKey} defaultOpen={false} className="border rounded-lg">
-                  <CollapsibleTrigger 
-                    className="w-full flex justify-between items-center p-4 border-b hover:bg-slate-50"
-                    onClick={() => toggleProject(projectKey)}
-                  >
-                    <div className="font-medium text-left flex items-center">
-                      {expandedProjects[projectKey] ? 
-                        <ChevronDown className="h-4 w-4 mr-2" /> : 
-                        <ChevronRight className="h-4 w-4 mr-2" />
-                      }
-                      {projectKey} ({projectTickets.length} stories)
-                    </div>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="p-2">
-                    <div className="space-y-2">
-                      {projectTickets.map(ticket => (
-                        <div key={ticket.id} className="flex justify-between items-center p-3 border rounded hover:bg-slate-50">
-                          <div className="flex items-center gap-3">
-                            <Checkbox id={ticket.id} />
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline">{ticket.key}</Badge>
-                                {ticket.status && (
-                                  <Badge 
-                                    variant={
-                                      ticket.status === 'To Do' ? 'secondary' :
-                                      ticket.status === 'In Progress' ? 'default' :
-                                      'secondary'
-                                    }
-                                    className="text-xs"
-                                  >
-                                    {ticket.status}
-                                  </Badge>
-                                )}
-                              </div>
-                              <label htmlFor={ticket.id} className="cursor-pointer block mt-1">
-                                {ticket.summary}
-                              </label>
+            ) : tickets.length > 0 ? (
+              <Collapsible defaultOpen={true} className="border rounded-lg">
+                <CollapsibleTrigger className="w-full flex justify-between items-center p-4 border-b hover:bg-slate-50">
+                  <div className="font-medium text-left flex items-center">
+                    <ChevronDown className="h-4 w-4 mr-2" />
+                    {selectedSprint?.name} ({tickets.length} stories)
+                  </div>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="p-2">
+                  <div className="space-y-2">
+                    {tickets.map(ticket => (
+                      <div key={ticket.id} className="flex justify-between items-center p-3 border rounded hover:bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <Checkbox id={ticket.id} />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{ticket.key}</Badge>
+                              {ticket.status && (
+                                <Badge 
+                                  variant={
+                                    ticket.status === 'To Do' ? 'secondary' :
+                                    ticket.status === 'In Progress' ? 'default' :
+                                    'secondary'
+                                  }
+                                  className="text-xs"
+                                >
+                                  {ticket.status}
+                                </Badge>
+                              )}
                             </div>
+                            <label htmlFor={ticket.id} className="cursor-pointer block mt-1">
+                              {ticket.summary}
+                            </label>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => window.open(`https://${ticket.domain || ticket.key.split('-')[0].toLowerCase()}.atlassian.net/browse/${ticket.key}`, '_blank')}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </Button>
                         </div>
-                      ))}
-                    </div>
-                  </CollapsibleContent>
-                </Collapsible>
-              ))
-            )}
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => {
+                            const domain = selectedProject?.domain || ticket.domain;
+                            const cleanDomain = domain?.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+                            window.open(`https://${cleanDomain}/browse/${ticket.key}`, '_blank')
+                          }}
+                        >
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            ) : selectedProject && !selectedSprint ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select a Sprint</CardTitle>
+                  <CardDescription>
+                    Please select a sprint to view stories.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            ) : !selectedProject ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Select a Project</CardTitle>
+                  <CardDescription>
+                    Please select a project to view sprints and stories.
+                  </CardDescription>
+                </CardHeader>
+              </Card>
+            ) : null}
           </div>
         )}
       </div>

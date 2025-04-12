@@ -24,9 +24,14 @@ const JiraLogin: React.FC = () => {
     setLoginError(null);
     
     try {
+      // Clean up domain to prevent double https:// issues
+      const cleanDomain = domain.trim()
+        .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
+        .replace(/\/+$/, ''); // Remove trailing slashes
+      
       // Create credentials object
       const credentials: JiraCredentials = {
-        domain: domain.trim(),
+        domain: cleanDomain,
         email: email.trim(),
         apiToken: apiToken.trim()
       };
