@@ -11,13 +11,17 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { downloadAsPDF, formatTimestampForFilename } from "@/utils/exportUtils";
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeHighlight from 'rehype-highlight';
-import remarkGfm from 'remark-gfm';
-import 'highlight.js/styles/github.css';
+import ContentDisplay from "./ContentDisplay";
 
-const StoryDetail: React.FC = () => {
+interface StoryDetailProps {
+  projectContext?: string | null;
+  selectedDocuments?: string[];
+}
+
+const StoryDetail: React.FC<StoryDetailProps> = ({ 
+  projectContext = null, 
+  selectedDocuments = [] 
+}) => {
   const { selectedTicket, pushToJira } = useStories();
   const [activeTab, setActiveTab] = useState("lld");
   const [lldContent, setLldContent] = useState("");
@@ -93,16 +97,12 @@ const StoryDetail: React.FC = () => {
           .from('story_artifacts')
           .select('*')
           .eq('story_id', safeStringify(selectedTicket.key))
-          .single();
+          .maybeSingle();
         
         if (error) {
-          if (error.code !== 'PGRST116') {
-            console.error("Error loading artifacts:", error);
-          } else {
-            console.log(`No existing artifacts found for story ${selectedTicket.key}`);
-          }
+          console.error("Error loading artifacts:", error);
         } else if (data) {
-          console.log(`Found existing artifacts for story ${selectedTicket.key}`);
+          console.log(`Found existing artifacts for story ${selectedTicket.key}`, data);
           setLldContent(data.lld_content || "");
           setCodeContent(data.code_content || "");
           setTestContent(data.test_content || "");
@@ -242,13 +242,29 @@ const StoryDetail: React.FC = () => {
       
       if (type === 'lld') {
         systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
-        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
+        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
       } else if (type === 'code') {
         systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
-        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
+        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
       } else if (type === 'tests') {
         systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
-        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
+        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
+      }
+
+      if (projectContext) {
+        prompt += `\n\nUse the context from project ID: ${projectContext}`;
+        
+        if (selectedDocuments && selectedDocuments.length > 0) {
+          prompt += `\nWith the following document contexts: ${selectedDocuments.join(", ")}`;
+        }
+      }
+
+      if (type === 'lld') {
+        prompt += `\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
+      } else if (type === 'code') {
+        prompt += `\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
+      } else if (type === 'tests') {
+        prompt += `\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
       }
       
       const { data, error } = await supabase.functions.invoke('generate-content', {
@@ -256,7 +272,9 @@ const StoryDetail: React.FC = () => {
           prompt,
           systemPrompt,
           maxTokens: 2500,
-          temperature: 0.7
+          temperature: 0.7,
+          projectContext,
+          selectedDocuments
         }
       });
       
@@ -290,7 +308,8 @@ const StoryDetail: React.FC = () => {
         formattedResponseContent, 
         storyId, 
         projectId, 
-        sprintId
+        sprintId,
+        projectContext
       );
       
       if (saveError) {
@@ -461,7 +480,14 @@ const StoryDetail: React.FC = () => {
     }
   };
 
-  const saveStoryArtifact = async (contentType: 'lld' | 'code' | 'tests', content: string, storyId: string, projectId: string | null, sprintId: string | null) => {
+  const saveStoryArtifact = async (
+    contentType: 'lld' | 'code' | 'tests', 
+    content: string, 
+    storyId: string, 
+    projectId: string | null, 
+    sprintId: string | null,
+    contextProjectId: string | null = null
+  ) => {
     try {
       const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
         body: {
@@ -469,7 +495,8 @@ const StoryDetail: React.FC = () => {
           projectId,
           sprintId,
           contentType,
-          content
+          content,
+          contextProjectId
         }
       });
       
@@ -627,51 +654,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <>
-                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
-                    <div className="prose max-w-none dark:prose-invert">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                      >
-                        {lldContent || "Generate a Low Level Design document based on the selected story."}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                  
-                  {lldContent && (
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCopyContent(lldContent, 'lld')}
-                      >
-                        {copiedState['lld'] ? (
-                          <Check className="h-4 w-4 mr-1" />
-                        ) : (
-                          <Copy className="h-4 w-4 mr-1" />
-                        )}
-                        {copiedState['lld'] ? 'Copied' : 'Copy'}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDownloadPDF('lld')}
-                      >
-                        <FileDown className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handlePushToJira('lld')}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Push to Jira
-                      </Button>
-                    </div>
-                  )}
-                </>
+                <ContentDisplay 
+                  content={lldContent} 
+                  type="lld" 
+                  title="Low Level Design" 
+                  ticketKey={safeStringify(selectedTicket.key)}
+                />
               )}
             </TabsContent>
             
@@ -719,51 +707,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <>
-                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
-                    <div className="prose max-w-none dark:prose-invert">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                      >
-                        {codeContent || "Generate code based on the selected story. Includes Angular.js frontend, Node.js backend, and PostgreSQL database scripts."}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                  
-                  {codeContent && (
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCopyContent(codeContent, 'code')}
-                      >
-                        {copiedState['code'] ? (
-                          <Check className="h-4 w-4 mr-1" />
-                        ) : (
-                          <Copy className="h-4 w-4 mr-1" />
-                        )}
-                        {copiedState['code'] ? 'Copied' : 'Copy'}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDownloadPDF('code')}
-                      >
-                        <FileDown className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handlePushToJira('code')}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Push to Jira
-                      </Button>
-                    </div>
-                  )}
-                </>
+                <ContentDisplay 
+                  content={codeContent} 
+                  type="code" 
+                  title="Implementation Code" 
+                  ticketKey={safeStringify(selectedTicket.key)}
+                />
               )}
             </TabsContent>
             
@@ -811,51 +760,12 @@ const StoryDetail: React.FC = () => {
                   <Skeleton className="h-4 w-3/4" />
                 </div>
               ) : (
-                <>
-                  <div className="border rounded-md p-4 min-h-[300px] overflow-auto max-h-[500px]">
-                    <div className="prose max-w-none dark:prose-invert">
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        rehypePlugins={[rehypeRaw, rehypeHighlight]}
-                      >
-                        {testContent || "Generate test cases based on the selected story."}
-                      </ReactMarkdown>
-                    </div>
-                  </div>
-                  
-                  {testContent && (
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleCopyContent(testContent, 'tests')}
-                      >
-                        {copiedState['tests'] ? (
-                          <Check className="h-4 w-4 mr-1" />
-                        ) : (
-                          <Copy className="h-4 w-4 mr-1" />
-                        )}
-                        {copiedState['tests'] ? 'Copied' : 'Copy'}
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handleDownloadPDF('tests')}
-                      >
-                        <FileDown className="h-4 w-4 mr-1" />
-                        Download
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => handlePushToJira('tests')}
-                      >
-                        <Upload className="h-4 w-4 mr-1" />
-                        Push to Jira
-                      </Button>
-                    </div>
-                  )}
-                </>
+                <ContentDisplay 
+                  content={testContent} 
+                  type="tests" 
+                  title="Test Cases" 
+                  ticketKey={safeStringify(selectedTicket.key)}
+                />
               )}
             </TabsContent>
           </Tabs>
