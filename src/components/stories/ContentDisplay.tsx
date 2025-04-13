@@ -48,6 +48,30 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, type, title, t
     }
   };
 
+  const formatContent = (content: string): string => {
+    if (!content) return "";
+    
+    let formattedContent = content;
+    
+    // Ensure headers have proper spacing
+    formattedContent = formattedContent.replace(/^(#{1,6})([^ ])/gm, '$1 $2');
+    
+    // Ensure code blocks are properly formatted
+    formattedContent = formattedContent.replace(/```(\w+)?(?!\n)/g, '```$1\n');
+    formattedContent = formattedContent.replace(/(?<!\n)```/g, '\n```');
+    
+    // Add title if it doesn't exist
+    if (type === 'lld' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Low Level Design for ${ticketKey}\n\n${formattedContent}`;
+    } else if (type === 'code' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Implementation Code for ${ticketKey}\n\n${formattedContent}`;
+    } else if (type === 'tests' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Test Cases for ${ticketKey}\n\n${formattedContent}`;
+    }
+    
+    return formattedContent;
+  };
+
   if (!content) {
     return (
       <div className="p-6 text-center text-muted-foreground">
@@ -58,7 +82,7 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, type, title, t
   }
 
   return (
-    <Card className="border-0 shadow-none">
+    <Card className="border border-muted rounded-lg shadow-sm">
       <CardContent className="p-0 relative">
         <div className="absolute top-2 right-2 z-10">
           <Button
@@ -86,7 +110,7 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, type, title, t
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw, [rehypeHighlight, { detect: true, ignoreMissing: true }]]}
           >
-            {content}
+            {formatContent(content)}
           </ReactMarkdown>
         </div>
       </CardContent>

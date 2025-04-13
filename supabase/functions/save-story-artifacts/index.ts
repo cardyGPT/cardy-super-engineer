@@ -42,7 +42,7 @@ serve(async (req) => {
     });
 
     // Extract data from request
-    const { storyId, projectId, sprintId, contentType, content } = requestBody;
+    const { storyId, projectId, sprintId, contentType, content, projectContext, documentContext } = requestBody;
     
     if (!storyId || !contentType || !content) {
       console.error("Missing required fields");
@@ -59,7 +59,7 @@ serve(async (req) => {
     const contentTypeMap = {
       'lld': 'lld_content',
       'code': 'code_content',
-      'tests': 'test_content'  // Ensure this matches the column name in the database
+      'tests': 'test_content'
     };
     
     const contentField = contentTypeMap[contentType];
@@ -79,16 +79,37 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     console.log("Supabase client initialized");
 
+    // Format content for better readability
+    let formattedContent = content;
+    
+    // Ensure headers have proper spacing
+    formattedContent = formattedContent.replace(/^(#{1,6})([^ ])/gm, '$1 $2');
+    
+    // Ensure code blocks are properly formatted
+    formattedContent = formattedContent.replace(/```(\w+)?(?!\n)/g, '```$1\n');
+    formattedContent = formattedContent.replace(/(?<!\n)```/g, '\n```');
+    
+    // Add title if it doesn't exist
+    if (contentType === 'lld' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Low Level Design for ${storyId}\n\n${formattedContent}`;
+    } else if (contentType === 'code' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Implementation Code for ${storyId}\n\n${formattedContent}`;
+    } else if (contentType === 'tests' && !formattedContent.startsWith('# ')) {
+      formattedContent = `# Test Cases for ${storyId}\n\n${formattedContent}`;
+    }
+
     // Prepare data for upsert
     const data: any = {
       story_id: storyId,
       updated_at: new Date().toISOString()
     };
     
-    data[contentField] = content;
+    data[contentField] = formattedContent;
     
     if (projectId) data.project_id = projectId;
     if (sprintId) data.sprint_id = sprintId;
+    if (projectContext) data.project_context = projectContext;
+    if (documentContext) data.document_context = JSON.stringify(documentContext);
 
     console.log(`Upserting ${contentType} content for story ${storyId}`);
 
@@ -115,9 +136,10 @@ serve(async (req) => {
     if (existingData?.id) {
       // If a record exists, update it
       console.log(`Updating existing record for story ${storyId}`);
+      const updateData = { ...data };
       result = await supabase
         .from('story_artifacts')
-        .update(data)
+        .update(updateData)
         .eq('id', existingData.id)
         .select();
     } else {

@@ -5,7 +5,7 @@ import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ExternalLink, RefreshCw, Settings, ChevronDown, AlertTriangle, FileText } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, ChevronDown, AlertTriangle, FileText, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Collapsible,
@@ -25,12 +25,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import StoryList from "@/components/stories/StoryList";
 import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
+import { supabase } from "@/lib/supabase";
 
 const StoriesPage: React.FC = () => {
   const { 
     isAuthenticated, 
     loading, 
-    projects, 
+    projects: jiraProjects, 
     sprints,
     selectedProject, 
     setSelectedProject,
@@ -46,10 +47,88 @@ const StoriesPage: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const { toast } = useToast();
   const [pageLoaded, setPageLoaded] = useState(false);
+  const [projectsForContext, setProjectsForContext] = useState<any[]>([]);
+  const [selectedProjectContext, setSelectedProjectContext] = useState<string | null>(null);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
+  const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
   useEffect(() => {
     setPageLoaded(true);
+    fetchProjectsForContext();
   }, []);
+
+  const fetchProjectsForContext = async () => {
+    setLoadingProjects(true);
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, type')
+        .order('name');
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setProjectsForContext(data);
+      }
+    } catch (err: any) {
+      console.error("Error fetching projects for context:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load projects for context",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
+  const fetchDocumentsForProject = async (projectId: string) => {
+    setLoadingDocuments(true);
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, name, type')
+        .eq('project_id', projectId)
+        .order('name');
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data) {
+        setAvailableDocuments(data);
+        setSelectedDocuments([]); // Reset selection when project changes
+      }
+    } catch (err: any) {
+      console.error("Error fetching documents:", err);
+      toast({
+        title: "Error",
+        description: "Failed to load project documents",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingDocuments(false);
+    }
+  };
+
+  const handleProjectContextChange = (projectId: string) => {
+    setSelectedProjectContext(projectId);
+    fetchDocumentsForProject(projectId);
+  };
+
+  const handleDocumentSelectionChange = (documentId: string) => {
+    setSelectedDocuments(prevSelected => {
+      if (prevSelected.includes(documentId)) {
+        return prevSelected.filter(id => id !== documentId);
+      } else {
+        return [...prevSelected, documentId];
+      }
+    });
+  };
 
   const handleRefresh = async () => {
     if (loading || isRefreshing) return;
@@ -69,7 +148,7 @@ const StoriesPage: React.FC = () => {
   };
 
   const handleProjectChange = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId);
+    const project = jiraProjects.find(p => p.id === projectId);
     if (project && (!selectedProject || selectedProject.id !== project.id)) {
       setSelectedProject(project);
       setSelectedSprint(null);
@@ -145,7 +224,7 @@ const StoriesPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
-              {loading && projects.length === 0 ? (
+              {loading && jiraProjects.length === 0 ? (
                 <Card className="animate-pulse">
                   <CardHeader>
                     <Skeleton className="h-6 w-40 mb-2" />
@@ -168,7 +247,7 @@ const StoriesPage: React.FC = () => {
                       <label htmlFor="project-select" className="text-sm font-medium">
                         Project
                       </label>
-                      {projects.length === 0 ? (
+                      {jiraProjects.length === 0 ? (
                         <Alert variant="destructive">
                           <AlertTriangle className="h-4 w-4" />
                           <AlertTitle>No Projects Found</AlertTitle>
@@ -180,13 +259,13 @@ const StoriesPage: React.FC = () => {
                         <Select 
                           value={selectedProject?.id || ""} 
                           onValueChange={handleProjectChange}
-                          disabled={loading || projects.length === 0}
+                          disabled={loading || jiraProjects.length === 0}
                         >
                           <SelectTrigger id="project-select" className="w-full">
                             <SelectValue placeholder="Select a project" />
                           </SelectTrigger>
                           <SelectContent>
-                            {projects.map(project => (
+                            {jiraProjects.map(project => (
                               <SelectItem key={project.id} value={project.id}>
                                 {project.name} ({project.key})
                               </SelectItem>
@@ -233,11 +312,102 @@ const StoriesPage: React.FC = () => {
                 </Card>
               )}
 
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-lg">Project Context for Generation</CardTitle>
+                  <CardDescription>
+                    Select project context to enhance artifact generation
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label htmlFor="context-project-select" className="text-sm font-medium">
+                      Project for Context
+                    </label>
+                    {loadingProjects ? (
+                      <Skeleton className="h-10 w-full rounded-md" />
+                    ) : projectsForContext.length === 0 ? (
+                      <Alert>
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>No Projects Found</AlertTitle>
+                        <AlertDescription>
+                          No projects available for context. Create a project first.
+                        </AlertDescription>
+                      </Alert>
+                    ) : (
+                      <Select 
+                        value={selectedProjectContext || ""} 
+                        onValueChange={handleProjectContextChange}
+                        disabled={loadingProjects || projectsForContext.length === 0}
+                      >
+                        <SelectTrigger id="context-project-select" className="w-full">
+                          <SelectValue placeholder="Select a project for context" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {projectsForContext.map(project => (
+                            <SelectItem key={project.id} value={project.id}>
+                              {project.name} ({project.type})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                  
+                  {selectedProjectContext && (
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium flex items-center">
+                        <Database className="h-4 w-4 mr-2" />
+                        Documents for Context
+                      </label>
+                      {loadingDocuments ? (
+                        <div className="space-y-2">
+                          <Skeleton className="h-6 w-full" />
+                          <Skeleton className="h-6 w-full" />
+                          <Skeleton className="h-6 w-full" />
+                        </div>
+                      ) : availableDocuments.length === 0 ? (
+                        <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
+                          No documents available for this project. Upload documents in the Documents page.
+                        </div>
+                      ) : (
+                        <div className="space-y-2 max-h-[200px] overflow-y-auto p-2 border rounded-md">
+                          {availableDocuments.map(doc => (
+                            <div key={doc.id} className="flex items-start space-x-2">
+                              <Checkbox 
+                                id={`doc-${doc.id}`} 
+                                checked={selectedDocuments.includes(doc.id)}
+                                onCheckedChange={() => handleDocumentSelectionChange(doc.id)}
+                              />
+                              <label 
+                                htmlFor={`doc-${doc.id}`} 
+                                className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                              >
+                                {doc.name}
+                                <span className="text-xs text-muted-foreground ml-1">({doc.type})</span>
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {selectedDocuments.length > 0 && (
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {selectedDocuments.length} document{selectedDocuments.length !== 1 ? 's' : ''} selected
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <StoryList />
             </div>
 
             <div className="space-y-4">
-              <StoryDetailWrapper />
+              <StoryDetailWrapper 
+                projectContext={selectedProjectContext} 
+                selectedDocuments={selectedDocuments}
+              />
             </div>
           </div>
         )}

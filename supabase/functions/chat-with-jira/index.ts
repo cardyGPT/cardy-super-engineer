@@ -1,27 +1,19 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.3.0";
 
-const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') ?? '';
 
 serve(async (req) => {
-  // Add request logging
-  console.log(`Edge function 'chat-with-jira' received ${req.method} request`);
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
-    return new Response(null, { 
-      headers: corsHeaders,
-      status: 204
-    });
+    return new Response(null, { headers: corsHeaders, status: 204 });
   }
 
   try {
-    // Validate OpenAI API key
+    // Validate OpenAI configuration
     if (!openAIApiKey) {
-      console.error("OpenAI API key is missing");
       return new Response(
         JSON.stringify({ error: 'OpenAI API key is not configured' }),
         { 
@@ -31,24 +23,12 @@ serve(async (req) => {
       );
     }
 
-    // Parse request body
-    const requestBody = await req.json();
+    // Parse request
+    const { jiraTicket, dataModel, documentsContext, request, projectContext, selectedDocuments } = await req.json();
     
-    // Log parsed request details for debugging
-    console.log("Request data received:", {
-      hasJiraTicket: !!requestBody.jiraTicket,
-      hasDataModel: !!requestBody.dataModel,
-      hasRequest: !!requestBody.request,
-      documentCount: requestBody.documentsContext?.length || 0
-    });
-
-    // Extract data from request
-    const { jiraTicket, dataModel, documentsContext, request } = requestBody;
-    
-    if (!jiraTicket || !request) {
-      console.error("Missing required fields: jiraTicket or request");
+    if (!jiraTicket) {
       return new Response(
-        JSON.stringify({ error: 'Jira ticket and request are required' }),
+        JSON.stringify({ error: 'Jira ticket information is required' }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -56,126 +36,80 @@ serve(async (req) => {
       );
     }
 
-    // Build a comprehensive prompt with the data model, jira ticket, and any documents
-    let entities = [];
-    let relationships = [];
-    
+    // Initialize OpenAI
+    const configuration = new Configuration({ apiKey: openAIApiKey });
+    const openai = new OpenAIApi(configuration);
+
+    // Prepare context for the model
+    let ticketContext = `
+Jira Ticket: ${jiraTicket.key}
+Summary: ${jiraTicket.summary || 'No summary provided'}
+Description: ${jiraTicket.description || 'No description provided'}
+Status: ${jiraTicket.status || 'Unknown'}
+Priority: ${jiraTicket.priority || 'Unknown'}
+`;
+
+    // Add any additional contexts
     if (dataModel) {
-      entities = dataModel.entities || [];
-      relationships = dataModel.relationships || [];
-      
-      console.log(`Processing data model with ${entities.length} entities and ${relationships.length} relationships`);
+      ticketContext += `\nData Model Context:\n${typeof dataModel === 'string' ? dataModel : JSON.stringify(dataModel, null, 2)}`;
     }
-    
-    // Construct the prompt in a structured way that's easy for GPT to understand
-    const fullPrompt = `
-# Jira Ticket Engineering Request
 
-## JIRA TICKET
-${JSON.stringify(jiraTicket, null, 2)}
+    if (documentsContext) {
+      ticketContext += `\nDocuments Context:\n${typeof documentsContext === 'string' ? documentsContext : JSON.stringify(documentsContext, null, 2)}`;
+    }
 
-## REQUEST
-${request}
+    if (projectContext) {
+      ticketContext += `\nProject Context:\n${typeof projectContext === 'string' ? projectContext : JSON.stringify(projectContext, null, 2)}`;
+    }
 
-## DATA MODEL (${entities.length} entities, ${relationships.length} relationships)
-${entities.length > 0 ? `
-### ENTITIES
-${entities.map(e => `
-#### ${e.name} (${e.type || 'entity'})
-Definition: ${e.definition || 'No definition provided'}
+    if (selectedDocuments && selectedDocuments.length > 0) {
+      ticketContext += `\nSelected Documents:\n${typeof selectedDocuments === 'string' ? selectedDocuments : JSON.stringify(selectedDocuments, null, 2)}`;
+    }
 
-Attributes:
-${e.attributes.map(a => `- ${a.name} (${a.type}${a.isPrimaryKey ? ', PK' : ''}${a.isForeignKey ? ', FK' : ''}): ${a.description || 'No description'}`).join('\n')}
-`).join('\n')}
+    // Determine prompt based on request type
+    let systemPrompt = "You are an AI assistant specialized in software development.";
+    let userPrompt = "";
 
-### RELATIONSHIPS
-${relationships.map(r => {
-  const sourceEntity = entities.find(e => e.id === r.sourceEntityId)?.name || r.sourceEntityId;
-  const targetEntity = entities.find(e => e.id === r.targetEntityId)?.name || r.targetEntityId;
-  return `- ${sourceEntity} → ${targetEntity}: ${r.name || 'Relationship'} (${r.sourceCardinality || '1'}:${r.targetCardinality || '1'}) - ${r.description || 'No description'}`;
-}).join('\n')}
-` : 'No data model provided.'}
+    if (request.includes('LLD') || request.includes('Low-Level Design')) {
+      systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
+      userPrompt = `Create a comprehensive low-level design document for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
+    } else if (request.includes('code') || request.includes('implementation')) {
+      systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
+      userPrompt = `Generate production-ready code for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nPlease include:\n1. Frontend AngularJS code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
+    } else if (request.includes('test') || request.includes('testing')) {
+      systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
+      userPrompt = `Create comprehensive test cases for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
+    } else {
+      userPrompt = `Based on the following Jira ticket information, generate the requested content:\n\n${ticketContext}\n\nRequest: ${request}`;
+    }
 
-${documentsContext ? `
-## RELATED DOCUMENTS
-${documentsContext}
-` : ''}
-
-Based on the Jira ticket, request, and the data model, please provide the following:
-1. A Low-Level Design (LLD) document
-2. Sample code implementation
-3. Test cases to validate the implementation
-4. Considerations for edge cases and error handling
-
-Your response should be thorough and consider the data model constraints.`;
-
-    console.log("Sending request to OpenAI");
-    console.log("Prompt length:", fullPrompt.length);
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          { 
-            role: 'system', 
-            content: 'You are an expert software engineer specialized in translating Jira tickets into detailed technical specifications and code. You write clear, maintainable code and thorough test cases. Your responses should follow software engineering best practices and consider all aspects of the implementation including error handling and edge cases.'
-          },
-          { role: 'user', content: fullPrompt }
-        ],
-        max_tokens: 4000,
-        temperature: 0.2
-      }),
+    // Call OpenAI API
+    const response = await openai.createChatCompletion({
+      model: "gpt-4",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt }
+      ],
+      temperature: 0.7,
+      max_tokens: 4000,
+      frequency_penalty: 0,
+      presence_penalty: 0.2,
     });
 
-    // Log the response status
-    console.log("OpenAI API response status:", response.status);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("OpenAI API error:", errorText);
-      return new Response(
-        JSON.stringify({ error: 'Failed to get response from OpenAI API', details: errorText }),
-        { 
-          status: response.status, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+    // Extract and return the response
+    const aiResponse = response.data.choices[0].message?.content || "No response generated";
 
-    const data = await response.json();
-    console.log("OpenAI response received successfully");
-    
-    if (!data.choices || !data.choices[0]?.message?.content) {
-      console.error("Invalid response format from OpenAI:", JSON.stringify(data).substring(0, 200));
-      return new Response(
-        JSON.stringify({ error: 'Invalid response from OpenAI' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    const aiResponse = data.choices[0].message.content;
-    console.log("AI Response generated, length:", aiResponse.length);
-
-    // Return the successful response
     return new Response(
       JSON.stringify({ response: aiResponse }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
-
   } catch (error) {
-    console.error('Unexpected error in chat-with-jira function:', error);
+    console.error("Error in chat-with-jira function:", error);
+    
     return new Response(
-      JSON.stringify({ error: error.message || 'Unexpected server error' }),
+      JSON.stringify({ error: error.message || "An error occurred processing the request" }),
       { 
         status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
