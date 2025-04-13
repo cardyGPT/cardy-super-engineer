@@ -3,7 +3,13 @@ import { useState, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { StoriesContextState, StoriesContextActions } from './types';
-import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, generateJiraContent, pushContentToJira } from './storiesApi';
+import { 
+  fetchJiraProjects, 
+  fetchJiraSprints, 
+  fetchJiraTickets, 
+  generateJiraContent, 
+  pushContentToJira 
+} from './api';
 
 export const useStoriesState = (): StoriesContextState & StoriesContextActions => {
   const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
