@@ -49,6 +49,32 @@ const StoryDetail: React.FC = () => {
     return String(content);
   };
 
+  const formatContent = (content: string, type: string): string => {
+    if (!content) return "";
+    
+    if (type === 'code') {
+      return content.replace(/```(\w+)?\s*\n([\s\S]*?)```/g, (match, language, code) => {
+        return `\n\n\`\`\`${language || 'javascript'}\n${code.trim()}\n\`\`\`\n\n`;
+      });
+    } else if (type === 'lld') {
+      let formattedContent = content;
+      if (!formattedContent.startsWith("# ")) {
+        formattedContent = `# Low Level Design\n\n${formattedContent}`;
+      }
+      formattedContent = formattedContent.replace(/^(#{1,6})\s*(.+)$/gm, '$1 $2');
+      return formattedContent;
+    } else if (type === 'tests') {
+      let formattedContent = content;
+      if (!formattedContent.startsWith("# ")) {
+        formattedContent = `# Test Cases\n\n${formattedContent}`;
+      }
+      formattedContent = formattedContent.replace(/^(#{1,6})\s*(.+)$/gm, '$1 $2');
+      return formattedContent;
+    }
+    
+    return content;
+  };
+
   useEffect(() => {
     setLldContent("");
     setCodeContent("");
@@ -216,13 +242,13 @@ const StoryDetail: React.FC = () => {
       
       if (type === 'lld') {
         systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
-        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations`;
+        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
       } else if (type === 'code') {
         systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
-        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented.`;
+        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
       } else if (type === 'tests') {
         systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
-        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations`;
+        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
       }
       
       const { data, error } = await supabase.functions.invoke('generate-content', {
@@ -236,14 +262,15 @@ const StoryDetail: React.FC = () => {
       
       if (error) throw new Error(error.message || "Failed to generate content");
       
-      const responseContent = safeStringify(data.content);
+      const rawResponseContent = safeStringify(data.content);
+      const formattedResponseContent = formatContent(rawResponseContent, type);
       
       if (type === 'lld') {
-        setLldContent(responseContent);
+        setLldContent(formattedResponseContent);
       } else if (type === 'code') {
-        setCodeContent(responseContent);
+        setCodeContent(formattedResponseContent);
       } else if (type === 'tests') {
-        setTestContent(responseContent);
+        setTestContent(formattedResponseContent);
       }
       
       setActiveTab(type);
@@ -260,7 +287,7 @@ const StoryDetail: React.FC = () => {
       
       const { error: saveError } = await saveStoryArtifact(
         type, 
-        responseContent, 
+        formattedResponseContent, 
         storyId, 
         projectId, 
         sprintId

@@ -55,8 +55,16 @@ serve(async (req) => {
       );
     }
 
-    // Validate content type
-    if (!['lld', 'code', 'tests'].includes(contentType)) {
+    // Validate content type and map to correct field name
+    const contentTypeMap = {
+      'lld': 'lld_content',
+      'code': 'code_content',
+      'tests': 'test_content'  // Ensure this matches the column name in the database
+    };
+    
+    const contentField = contentTypeMap[contentType];
+    
+    if (!contentField) {
       console.error("Invalid content type:", contentType);
       return new Response(
         JSON.stringify({ error: 'Content type must be one of: lld, code, tests' }),
@@ -72,7 +80,6 @@ serve(async (req) => {
     console.log("Supabase client initialized");
 
     // Prepare data for upsert
-    const contentField = `${contentType}_content`;
     const data: any = {
       story_id: storyId,
       updated_at: new Date().toISOString()

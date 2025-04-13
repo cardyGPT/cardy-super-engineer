@@ -168,6 +168,13 @@ const StoryDetailWrapper = () => {
     }
   };
 
+  const isContentGenerated = (type: 'lld' | 'code' | 'tests') => {
+    if (type === 'lld') return !!lldContent;
+    if (type === 'code') return !!codeContent;
+    if (type === 'tests') return !!testContent;
+    return false;
+  };
+
   if (loading || !selectedTicket) {
     return <div className="p-8">Loading...</div>;
   }
@@ -182,15 +189,15 @@ const StoryDetailWrapper = () => {
           <TabsList>
             <TabsTrigger value="lld" className="flex items-center">
               <FileText className="h-4 w-4 mr-2" />
-              LLD
+              LLD {isContentGenerated('lld') && <span className="ml-1 text-xs text-green-500">•</span>}
             </TabsTrigger>
             <TabsTrigger value="code" className="flex items-center">
               <Code className="h-4 w-4 mr-2" />
-              Code
+              Code {isContentGenerated('code') && <span className="ml-1 text-xs text-green-500">•</span>}
             </TabsTrigger>
             <TabsTrigger value="tests" className="flex items-center">
               <TestTube className="h-4 w-4 mr-2" />
-              Tests
+              Tests {isContentGenerated('tests') && <span className="ml-1 text-xs text-green-500">•</span>}
             </TabsTrigger>
           </TabsList>
           
