@@ -85,13 +85,44 @@ serve(async (req) => {
 
     console.log(`Upserting ${contentType} content for story ${storyId}`);
 
-    // Upsert data to story_artifacts table
-    const { data: savedData, error } = await supabase
+    // First, check if there's already a record for this story
+    const { data: existingData, error: findError } = await supabase
       .from('story_artifacts')
-      .upsert(data, {
-        onConflict: 'story_id'
-      })
-      .select();
+      .select('id')
+      .eq('story_id', storyId)
+      .maybeSingle();
+      
+    if (findError) {
+      console.error("Error checking for existing record:", findError);
+      return new Response(
+        JSON.stringify({ error: `Failed to check for existing record: ${findError.message}` }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
+    let result;
+    
+    if (existingData?.id) {
+      // If a record exists, update it
+      console.log(`Updating existing record for story ${storyId}`);
+      result = await supabase
+        .from('story_artifacts')
+        .update(data)
+        .eq('id', existingData.id)
+        .select();
+    } else {
+      // If no record exists, insert a new one
+      console.log(`Creating new record for story ${storyId}`);
+      result = await supabase
+        .from('story_artifacts')
+        .insert(data)
+        .select();
+    }
+    
+    const { data: savedData, error } = result;
 
     if (error) {
       console.error("Error saving to database:", error);

@@ -151,13 +151,44 @@ async function updateStoryArtifact(supabase, storyId: string, artifactType: stri
   const column = columnMap[artifactType];
   if (!column) return;
   
-  const { error } = await supabase
+  // First, check if there's already a record for this story
+  const { data: existingData, error: findError } = await supabase
     .from('story_artifacts')
-    .update({ [column]: docId })
-    .eq('story_id', storyId);
+    .select('id')
+    .eq('story_id', storyId)
+    .maybeSingle();
+    
+  if (findError) {
+    console.error(`Error checking for existing record for story ${storyId}:`, findError);
+    throw findError;
+  }
   
-  if (error) {
-    console.error(`Error updating story artifact ${storyId} with Google Doc ID:`, error);
-    throw error;
+  let updateError;
+  
+  if (existingData?.id) {
+    // If a record exists, update it
+    console.log(`Updating existing record for story ${storyId} with Google Doc ID`);
+    const { error } = await supabase
+      .from('story_artifacts')
+      .update({ [column]: docId })
+      .eq('id', existingData.id);
+      
+    updateError = error;
+  } else {
+    // If no record exists, insert a new one
+    console.log(`Creating new record for story ${storyId} with Google Doc ID`);
+    const { error } = await supabase
+      .from('story_artifacts')
+      .insert({ 
+        story_id: storyId,
+        [column]: docId 
+      });
+      
+    updateError = error;
+  }
+  
+  if (updateError) {
+    console.error(`Error updating story artifact ${storyId} with Google Doc ID:`, updateError);
+    throw updateError;
   }
 }
