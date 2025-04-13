@@ -46,6 +46,52 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
   }
 };
 
+// Function to evaluate Jira expressions for a specific issue
+export const evaluateJiraExpression = async (credentials: JiraCredentials, issueKey: string, expression: string) => {
+  const { domain, email, apiToken } = credentials;
+  
+  try {
+    console.log(`Evaluating Jira expression for issue ${issueKey}: ${expression}`);
+    
+    const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        path: 'expression/eval',
+        method: 'POST',
+        data: {
+          expression,
+          context: {
+            issue: {
+              key: issueKey
+            }
+          }
+        }
+      }
+    });
+
+    if (supabaseError) {
+      console.error('Supabase functions invoke error:', supabaseError);
+      throw new Error(supabaseError.message || 'Failed to evaluate Jira expression');
+    }
+
+    // Check if the response contains error information
+    if (responseData?.error) {
+      console.error('Jira Expression API returned an error:', responseData.error);
+      console.error('Error details:', responseData.details);
+      
+      // Throw a detailed error
+      throw new Error(responseData.error || 'Error from Jira Expression API');
+    }
+
+    return responseData?.value;
+  } catch (error) {
+    console.error('Error in evaluateJiraExpression:', error);
+    throw error;
+  }
+};
+
 // Helper function to save generated content to the database
 export const saveGeneratedContent = async (
   storyId: string, 

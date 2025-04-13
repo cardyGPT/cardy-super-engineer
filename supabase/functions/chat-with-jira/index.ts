@@ -16,7 +16,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request
-    const { jiraTicket, dataModel, documentsContext, request, projectContext, selectedDocuments } = await req.json();
+    const { jiraTicket, dataModel, documentsContext, request, projectContext, selectedDocuments, additionalContext } = await req.json();
     
     if (!jiraTicket) {
       return new Response(
@@ -45,6 +45,15 @@ Type: ${jiraTicket.issuetype?.name || 'Unknown'}
 
     if (documentsContext) {
       ticketContext += `\nDocuments Context:\n${typeof documentsContext === 'string' ? documentsContext : JSON.stringify(documentsContext, null, 2)}`;
+    }
+
+    // Include sprint and epic information if available
+    if (additionalContext?.sprint) {
+      ticketContext += `\nSprint Information:\n${JSON.stringify(additionalContext.sprint, null, 2)}`;
+    }
+    
+    if (additionalContext?.epic) {
+      ticketContext += `\nEpic Information:\n${JSON.stringify(additionalContext.epic, null, 2)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info

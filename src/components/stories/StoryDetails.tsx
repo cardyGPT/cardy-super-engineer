@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useStories } from "@/contexts/StoriesContext";
@@ -11,6 +11,7 @@ import StoryOverview from "./StoryOverview";
 import LoadingContent from "./LoadingContent";
 import StoryTabContent from "./StoryTabContent";
 import { useJiraArtifacts } from "@/hooks/useJiraArtifacts";
+import { evaluateJiraExpression } from "@/contexts/stories/api/apiUtils";
 
 interface StoryDetailsProps {
   projectContext?: string | null;
@@ -23,9 +24,12 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
   selectedDocuments = [],
   projectContextData = null
 }) => {
-  const { selectedTicket, generateContent, pushToJira, contentLoading } = useStories();
+  const { selectedTicket, generateContent, pushToJira, contentLoading, credentials } = useStories();
   const [activeTab, setActiveTab] = useState("overview");
   const [error, setError] = useState<string | null>(null);
+  const [sprintInfo, setSprintInfo] = useState<any>(null);
+  const [epicInfo, setEpicInfo] = useState<any>(null);
+  const [isLoadingAdditionalInfo, setIsLoadingAdditionalInfo] = useState(false);
   
   const {
     lldContent,
@@ -36,6 +40,40 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
     isTestsGenerated,
     refreshArtifacts
   } = useJiraArtifacts(selectedTicket);
+
+  // Fetch additional info using Jira expressions
+  useEffect(() => {
+    const fetchAdditionalInfo = async () => {
+      if (!selectedTicket || !credentials) return;
+      
+      setIsLoadingAdditionalInfo(true);
+      try {
+        // Fetch sprint info
+        const sprintData = await evaluateJiraExpression(
+          credentials,
+          selectedTicket.key,
+          'issue.sprint'
+        );
+        setSprintInfo(sprintData);
+        console.log('Sprint info from Jira expression:', sprintData);
+        
+        // Fetch epic info
+        const epicData = await evaluateJiraExpression(
+          credentials,
+          selectedTicket.key,
+          'issue.epic'
+        );
+        setEpicInfo(epicData);
+        console.log('Epic info from Jira expression:', epicData);
+      } catch (err) {
+        console.error('Error fetching additional issue info:', err);
+      } finally {
+        setIsLoadingAdditionalInfo(false);
+      }
+    };
+    
+    fetchAdditionalInfo();
+  }, [selectedTicket, credentials]);
 
   // Helper functions for content generation
   const handleGenerateLLD = async () => {
@@ -66,7 +104,11 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
         type,
         jiraTicket: selectedTicket,
         projectContext,
-        selectedDocuments
+        selectedDocuments,
+        additionalContext: {
+          sprint: sprintInfo,
+          epic: epicInfo
+        }
       });
       
       if (response) {
@@ -96,12 +138,20 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
     return <StoryDetailEmpty />;
   }
 
+  // Enhanced ticket with additional info
+  const enhancedTicket = {
+    ...selectedTicket,
+    sprintInfo,
+    epicInfo,
+    isLoadingAdditionalInfo
+  };
+
   return (
     <div className="space-y-4">
       <Card className="w-full h-fit">
         <CardHeader>
           <StoryHeader 
-            ticket={selectedTicket}
+            ticket={enhancedTicket}
             isLldGenerated={isLldGenerated}
             isCodeGenerated={isCodeGenerated}
             isTestsGenerated={isTestsGenerated}
@@ -119,8 +169,8 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
             
             <TabsContent value="overview">
               <StoryOverview
-                ticket={selectedTicket}
-                loading={contentLoading}
+                ticket={enhancedTicket}
+                loading={contentLoading || isLoadingAdditionalInfo}
                 error={error}
                 isLldGenerated={isLldGenerated}
                 isCodeGenerated={isCodeGenerated}

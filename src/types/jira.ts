@@ -20,6 +20,10 @@ export interface JiraTicket {
     id: string;
     name: string;
   };
+  // Additional fields from expressions
+  sprintInfo?: any;
+  epicInfo?: any;
+  isLoadingAdditionalInfo?: boolean;
 }
 
 export interface JiraProject {
@@ -53,6 +57,10 @@ export interface JiraGenerationRequest {
   documentsContext?: any;
   projectContext?: string | null;
   selectedDocuments?: string[];
+  additionalContext?: {
+    sprint?: any;
+    epic?: any;
+  };
 }
 
 export interface JiraGenerationResponse {

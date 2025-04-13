@@ -1,23 +1,29 @@
 
-import { JiraCredentials, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { supabase } from '@/lib/supabase';
-import { callJiraApi, saveGeneratedContent } from './apiUtils';
+import { JiraGenerationRequest, JiraGenerationResponse, JiraTicket, JiraCredentials } from '@/types/jira';
+import { DEV_MODE, callJiraApi } from './apiUtils';
 
+// Generate content for a specific Jira ticket
 export const generateJiraContent = async (
   ticket: JiraTicket,
   request: JiraGenerationRequest
 ): Promise<JiraGenerationResponse> => {
   try {
+    console.log(`Generating ${request.type} content for ${ticket.key}`);
+    
+    // Add ticket details to request object if not already present
+    if (!request.jiraTicket) {
+      request.jiraTicket = ticket;
+    }
+    
+    // Call the Supabase function to generate content
     const { data, error } = await supabase.functions.invoke('chat-with-jira', {
       body: {
         jiraTicket: ticket,
-        dataModel: request.dataModel || null,
-        documentsContext: request.documentsContext || null,
-        request: request.type === 'lld' ? 'Generate a Low-Level Design' :
-                request.type === 'code' ? 'Generate Implementation Code' :
-                request.type === 'tests' ? 'Generate Test Cases' : 'Generate all content',
-        projectContext: request.projectContext || null,
-        selectedDocuments: request.selectedDocuments || []
+        request: `Generate ${request.type} for this ticket`,
+        projectContext: request.projectContext,
+        selectedDocuments: request.selectedDocuments,
+        additionalContext: request.additionalContext
       }
     });
 
@@ -26,70 +32,63 @@ export const generateJiraContent = async (
       throw new Error(error.message || 'Failed to generate content');
     }
 
-    // Save the generated content to our database
-    try {
-      await saveGeneratedContent(ticket.key, ticket.projectId, ticket.sprintId, request.type, data.response);
-    } catch (saveError) {
-      console.error('Error saving generated content:', saveError);
-      // Continue even if saving fails
+    if (!data || !data.response) {
+      throw new Error('No response received from content generation service');
     }
-
-    // Return the response based on the request type
-    if (request.type === 'lld') {
-      return { lld: data.response };
-    } else if (request.type === 'code') {
-      return { code: data.response };
-    } else if (request.type === 'tests') {
-      return { tests: data.response };
-    } else {
-      // Split the response into sections for 'all' type
-      return {
-        response: data.response,
-        // Additional processing could be done here to extract sections
-      };
-    }
-  } catch (error) {
-    console.error('Error in generateJiraContent:', error);
-    throw error;
+    
+    const contentType = request.type === 'all' ? 'lld' : request.type;
+    
+    // Create a response object with the generated content
+    const response: JiraGenerationResponse = {
+      [contentType]: data.response
+    };
+    
+    return response;
+  } catch (err) {
+    console.error('Error in generateJiraContent:', err);
+    throw err;
   }
 };
 
+// Push content to Jira as a comment
 export const pushContentToJira = async (
   credentials: JiraCredentials,
   ticketId: string,
   content: string
 ): Promise<boolean> => {
   try {
-    // Format content for Jira's ADFV2 format
-    const formattedContent = {
-      body: {
-        version: 1,
-        type: 'doc',
-        content: [
-          {
-            type: 'paragraph',
-            content: [
-              {
-                type: 'text',
-                text: content
-              }
-            ]
-          }
-        ]
-      }
-    };
-
-    // Push to Jira as a comment
+    if (!ticketId || !content) {
+      throw new Error('Missing required parameters for pushing to Jira');
+    }
+    
+    console.log(`Pushing content to Jira ticket ${ticketId}`);
+    
+    // Convert markdown to Jira markup (a basic conversion)
+    const jiraContent = content
+      .replace(/^# (.*$)/gm, 'h1. $1')
+      .replace(/^## (.*$)/gm, 'h2. $1')
+      .replace(/^### (.*$)/gm, 'h3. $1')
+      .replace(/^#### (.*$)/gm, 'h4. $1')
+      .replace(/^##### (.*$)/gm, 'h5. $1')
+      .replace(/^###### (.*$)/gm, 'h6. $1')
+      .replace(/\*\*(.*?)\*\*/g, '*$1*')
+      .replace(/\*(.*?)\*/g, '_$1_')
+      .replace(/`{3}([\s\S]*?)`{3}/g, '{code}$1{code}')
+      .replace(/`([^`]+)`/g, '{{$1}}');
+    
+    // Call the Jira API to add a comment
     await callJiraApi(
       credentials,
       `issue/${ticketId}/comment`,
       'POST',
-      formattedContent
+      {
+        body: jiraContent
+      }
     );
-
+    
     return true;
-  } catch (error) {
-    console.error('Error pushing content to Jira:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error in pushContentToJira:', err);
+    throw err;
   }
 };

@@ -23,8 +23,12 @@ serve(async (req) => {
     // Ensure domain doesn't have trailing slash
     const domainWithoutTrailingSlash = domain.replace(/\/+$/, '');
 
-    // Build Jira API url
-    const apiUrl = `${domainWithoutTrailingSlash}/rest/api/3/${path.replace(/^\/+/, '')}`;
+    // Build Jira API url - handle special case for expression API
+    const apiUrl = path.startsWith('expression/') 
+      ? `${domainWithoutTrailingSlash}/rest/api/3/${path}`
+      : path.startsWith('agile/') 
+        ? `${domainWithoutTrailingSlash}/rest/${path}`
+        : `${domainWithoutTrailingSlash}/rest/api/3/${path.replace(/^\/+/, '')}`;
 
     console.log(`Making ${method} request to Jira API at: ${apiUrl}`);
 
