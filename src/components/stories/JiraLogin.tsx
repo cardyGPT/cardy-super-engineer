@@ -166,11 +166,11 @@ const JiraLogin: React.FC = () => {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="apiToken">API Token</Label>
+            <Label htmlFor="apiToken">Classic API Token</Label>
             <Input
               id="apiToken"
               type="password"
-              placeholder="Your Jira API token"
+              placeholder="Your Jira Classic API token"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
               required
@@ -183,7 +183,7 @@ const JiraLogin: React.FC = () => {
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
-                Generate an API token in your Atlassian account settings
+                Generate a Classic API token in your Atlassian account settings
               </a>
             </p>
           </div>

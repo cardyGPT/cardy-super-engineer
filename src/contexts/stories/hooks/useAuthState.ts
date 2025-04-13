@@ -28,6 +28,13 @@ export const useAuthState = () => {
             setCredentials(cleanedCreds);
             setIsAuthenticated(true);
             console.log("Loaded valid Jira credentials from localStorage");
+            
+            // Log the detected auth type based on token format (for debugging purposes)
+            if (parsedCreds.apiToken.length > 50) {
+              console.log("Detected PAT token format (long token)");
+            } else {
+              console.log("Detected Classic API token format (shorter token)");
+            }
           } else {
             console.log("Invalid credentials format in localStorage, removing");
             localStorage.removeItem('jira_credentials');

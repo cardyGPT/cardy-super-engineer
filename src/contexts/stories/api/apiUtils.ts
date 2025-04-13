@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase';
 import { JiraCredentials } from '@/types/jira';
 
 // Set this to true to enable test data when API calls fail
-export const DEV_MODE = true; 
+export const DEV_MODE = false;
 
 // Helper function to fetch from Jira API through our edge function
 export const callJiraApi = async (credentials: JiraCredentials, path: string, method: string = 'GET', data?: any) => {
@@ -11,6 +11,8 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
   
   try {
     console.log(`Calling Jira API with path: ${path}, method: ${method}`);
+    console.log(`Using credentials for domain: ${domain}, email: ${email}, token type: Classic API Token`);
+    
     const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,

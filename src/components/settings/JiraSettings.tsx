@@ -178,23 +178,23 @@ const JiraSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="apiToken">API Token</Label>
+            <Label htmlFor="apiToken">Classic API Token</Label>
             <Input
               id="apiToken"
               type="password"
-              placeholder="Your Jira API token"
+              placeholder="Your Jira Classic API token"
               value={apiToken}
               onChange={(e) => setApiToken(e.target.value)}
             />
             <p className="text-sm text-muted-foreground">
               <a
-                href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/"
+                href="https://id.atlassian.com/manage-profile/security/api-tokens"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline flex items-center"
               >
                 <ExternalLink className="h-3 w-3 mr-1" />
-                How to generate an API token
+                Create a Classic API token on the Atlassian Security page
               </a>
             </p>
           </div>
