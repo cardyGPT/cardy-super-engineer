@@ -134,16 +134,24 @@ const ToastContext = React.createContext<{
   dispatch: React.Dispatch<Action>
 } | undefined>(undefined)
 
+// Global dispatch function
+let dispatch: React.Dispatch<Action> = () => {}
+
 // Create a ToastProvider to wrap the application
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [state, dispatch] = React.useReducer(reducer, initialState)
+  const [state, dispatchAction] = React.useReducer(reducer, initialState)
   
-  return (
-    <ToastContext.Provider value={{ state, dispatch }}>
-      {children}
-    </ToastContext.Provider>
-  );
-};
+  // Set the global dispatch
+  React.useEffect(() => {
+    dispatch = dispatchAction
+  }, [dispatchAction])
+  
+  return React.createElement(
+    ToastContext.Provider,
+    { value: { state, dispatch: dispatchAction } },
+    children
+  )
+}
 
 // Create a context hook to use the toast context
 function useToastContext() {
@@ -201,6 +209,9 @@ function useToast() {
 // This is a function outside of a component to create a toast
 // without having to use the hook directly
 let toastCreator: ((props: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void }) | undefined
+
+// Listeners for the standalone toast function
+const listeners: Array<(state: State) => void> = []
 
 // Initialize toast function if needed
 function initializeToast() {
@@ -280,9 +291,6 @@ function initializeToast() {
   
   return toastCreator
 }
-
-// Listeners for the standalone toast function
-const listeners: Array<(state: State) => void> = []
 
 // Toast function for use outside of components
 export function toast(props: Toast) {
