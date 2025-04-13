@@ -74,8 +74,21 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
   // Sort sprints by state: active sprints first, then future, then closed
   const sortedSprints = [...availableSprints].sort((a, b) => {
     const stateOrder: Record<string, number> = { 'active': 0, 'future': 1, 'closed': 2 };
-    return (stateOrder[a.state] || 3) - (stateOrder[b.state] || 3);
+    // Make sure to compare states in lowercase for consistency
+    const stateA = (a.state || '').toLowerCase();
+    const stateB = (b.state || '').toLowerCase();
+    return (stateOrder[stateA] || 3) - (stateOrder[stateB] || 3);
   });
+
+  // Log all sprints state for debugging
+  if (selectedProject && availableSprints.length > 0) {
+    console.log('Available sprints:', availableSprints.map(s => ({ 
+      id: s.id, 
+      name: s.name, 
+      state: s.state,
+      stateType: typeof s.state
+    })));
+  }
 
   return (
     <Card className="shadow-sm">
@@ -172,11 +185,20 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   <SelectValue placeholder="Select a sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sortedSprints.map(sprint => (
-                    <SelectItem key={sprint.id} value={sprint.id}>
-                      {sprint.name} {sprint.state === 'active' ? '(active)' : sprint.state === 'future' ? '(future)' : '(closed)'}
-                    </SelectItem>
-                  ))}
+                  {sortedSprints.map(sprint => {
+                    // Normalize state to lowercase for display consistency
+                    const sprintState = (sprint.state || '').toLowerCase();
+                    const stateDisplay = 
+                      sprintState === 'active' ? '(active)' : 
+                      sprintState === 'future' ? '(future)' : 
+                      '(closed)';
+                    
+                    return (
+                      <SelectItem key={sprint.id} value={sprint.id}>
+                        {sprint.name} {stateDisplay}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
               <div className="flex justify-between mt-1">

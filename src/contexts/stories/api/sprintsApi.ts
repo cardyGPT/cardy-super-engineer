@@ -28,7 +28,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
               const boardSprints = sprintsData.values.map((sprint: any) => ({
                 id: sprint.id,
                 name: sprint.name,
-                state: sprint.state,
+                state: sprint.state.toLowerCase(), // Ensure state is lowercase for consistent comparison
                 startDate: sprint.startDate,
                 endDate: sprint.endDate,
                 boardId: board.id,
@@ -61,7 +61,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
         return data.values.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
-          state: sprint.state,
+          state: (sprint.state || '').toLowerCase(), // Ensure state is lowercase
           startDate: sprint.startDate,
           endDate: sprint.endDate,
           boardId: sprint.originBoardId,
@@ -81,7 +81,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
         return sprintsData.values.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
-          state: sprint.state,
+          state: (sprint.state || '').toLowerCase(), // Ensure state is lowercase
           startDate: sprint.startDate,
           endDate: sprint.endDate,
           boardId: sprint.originBoardId || 'unknown',
