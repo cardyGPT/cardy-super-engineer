@@ -1,15 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, GitBranch, Key, Lock } from "lucide-react";
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface BitbucketSettingsProps {
-  onConfigChange?: (configured: boolean) => void;
+  onConfigChange?: (connected: boolean) => void;
 }
 
 const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange }) => {
@@ -17,235 +18,259 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
   const [appPassword, setAppPassword] = useState('');
   const [workspace, setWorkspace] = useState('');
   const [repository, setRepository] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isValidating, setIsValidating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-
+  
+  // Load existing settings
   useEffect(() => {
-    // Check if Bitbucket is configured
-    const checkBitbucketStatus = () => {
+    const loadSettings = async () => {
+      setIsLoading(true);
       try {
-        const credentials = JSON.parse(localStorage.getItem("bitbucket_credentials") || "null");
-        if (credentials) {
-          setUsername(credentials.username || '');
-          setWorkspace(credentials.workspace || '');
-          setRepository(credentials.repository || '');
-          setIsConnected(true);
-          if (onConfigChange) onConfigChange(true);
-        } else {
+        // Fetch Bitbucket settings from supabase
+        const { data, error } = await supabase
+          .from('api_keys')
+          .select('*')
+          .eq('service', 'bitbucket')
+          .single();
+          
+        if (error) {
+          console.error('Error loading Bitbucket settings:', error);
+          if (error.code !== 'PGRST116') { // Not found error
+            toast({
+              title: "Error",
+              description: "Failed to load Bitbucket settings",
+              variant: "destructive",
+            });
+          }
           setIsConnected(false);
           if (onConfigChange) onConfigChange(false);
+          return;
+        }
+        
+        if (data) {
+          setUsername(data.username || '');
+          setAppPassword(data.api_key || '');
+          
+          // Parse domain field for workspace and repository
+          if (data.domain) {
+            try {
+              const [ws, repo] = data.domain.split('/');
+              setWorkspace(ws || '');
+              setRepository(repo || '');
+            } catch (e) {
+              console.error('Error parsing workspace/repository:', e);
+            }
+          }
+          
+          setIsConnected(true);
+          if (onConfigChange) onConfigChange(true);
         }
       } catch (err) {
-        console.error("Error loading Bitbucket credentials:", err);
-        setIsConnected(false);
-        if (onConfigChange) onConfigChange(false);
+        console.error('Error in loadSettings:', err);
+      } finally {
+        setIsLoading(false);
       }
     };
-
-    checkBitbucketStatus();
-  }, [onConfigChange]);
-
-  const handleSaveCredentials = async (e: React.FormEvent) => {
-    e.preventDefault();
+    
+    loadSettings();
+  }, [toast, onConfigChange]);
+  
+  const handleSaveSettings = async () => {
     setIsLoading(true);
-
+    setError(null);
+    
     try {
-      if (!username.trim() || !appPassword.trim() || !workspace.trim() || !repository.trim()) {
-        throw new Error("All fields are required");
+      if (!username || !appPassword || !workspace || !repository) {
+        throw new Error('All fields are required');
       }
-
-      // Store credentials in localStorage
-      const credentials = {
-        username: username.trim(),
-        appPassword: appPassword.trim(),
-        workspace: workspace.trim(),
-        repository: repository.trim(),
-        timestamp: new Date().toISOString()
-      };
-
-      // Validate the credentials by making a test API call to Bitbucket
-      // We'll simulate this for now, but in a real app you would call Bitbucket API
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      localStorage.setItem("bitbucket_credentials", JSON.stringify({
-        username: credentials.username,
-        workspace: credentials.workspace,
-        repository: credentials.repository,
-        timestamp: credentials.timestamp
-      }));
+      
+      // Save Bitbucket settings to supabase
+      const { error } = await supabase.functions.invoke('store-api-keys', {
+        body: {
+          service: 'bitbucket',
+          apiKey: appPassword,
+          domain: `${workspace}/${repository}`,
+          username: username
+        }
+      });
+      
+      if (error) {
+        console.error('Error saving Bitbucket settings:', error);
+        throw new Error(error.message || 'Failed to save Bitbucket settings');
+      }
+      
+      toast({
+        title: "Settings Saved",
+        description: "Bitbucket settings have been saved successfully",
+        variant: "default",
+      });
       
       setIsConnected(true);
       if (onConfigChange) onConfigChange(true);
-      setAppPassword(''); // Clear password for security
-
-      toast({
-        title: "Bitbucket Connected",
-        description: "Your Bitbucket credentials have been saved successfully",
-        variant: "success",
-      });
-    } catch (error: any) {
+      
+    } catch (err: any) {
+      console.error('Error in handleSaveSettings:', err);
+      setError(err.message || 'Failed to save settings');
       toast({
         title: "Error",
-        description: error.message || "Failed to save Bitbucket credentials",
+        description: err.message || "Failed to save Bitbucket settings",
         variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleDisconnect = () => {
-    localStorage.removeItem("bitbucket_credentials");
-    setIsConnected(false);
-    setUsername('');
-    setWorkspace('');
-    setRepository('');
-    if (onConfigChange) onConfigChange(false);
+  
+  const handleValidateConnection = async () => {
+    setIsValidating(true);
+    setError(null);
     
-    toast({
-      title: "Disconnected",
-      description: "Your Bitbucket credentials have been removed",
-    });
+    try {
+      if (!username || !appPassword || !workspace || !repository) {
+        throw new Error('All fields are required');
+      }
+      
+      // Simple validation - just check if we can get the repository info
+      const auth = btoa(`${username}:${appPassword}`);
+      const response = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repository}`, {
+        headers: {
+          'Authorization': `Basic ${auth}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to connect to Bitbucket: ${response.status} ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data && data.name) {
+        toast({
+          title: "Connection Valid",
+          description: `Successfully connected to ${data.name}`,
+          variant: "success",
+        });
+        setIsConnected(true);
+        if (onConfigChange) onConfigChange(true);
+      } else {
+        throw new Error('Invalid response from Bitbucket');
+      }
+    } catch (err: any) {
+      console.error('Error in handleValidateConnection:', err);
+      setError(err.message || 'Failed to validate connection');
+      toast({
+        title: "Validation Error",
+        description: err.message || "Failed to validate Bitbucket connection",
+        variant: "destructive",
+      });
+      setIsConnected(false);
+      if (onConfigChange) onConfigChange(false);
+    } finally {
+      setIsValidating(false);
+    }
   };
-
+  
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Bitbucket Integration</span>
-          {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
+          <span>Bitbucket Settings</span>
+          {isConnected ? <CheckCircle className="h-5 w-5 text-green-500" /> : null}
         </CardTitle>
         <CardDescription>
-          {isConnected
-            ? "Your Bitbucket account is connected"
-            : "Connect to Bitbucket to manage your code repositories"}
+          Configure your Bitbucket integration for code syncing
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSaveCredentials}>
-        <CardContent className="space-y-4">
-          {isConnected ? (
-            <div className="bg-green-50 border border-green-200 rounded-md p-4">
-              <div className="flex">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
-                <div>
-                  <p className="text-green-800 font-medium">Connected to Bitbucket</p>
-                  <p className="text-green-700 text-sm mt-1">
-                    Repository: {workspace}/{repository}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="bitbucket-username">Username</Label>
-                <div className="flex items-center space-x-2">
-                  <GitBranch className="h-4 w-4 text-gray-500" />
-                  <Input
-                    id="bitbucket-username"
-                    placeholder="Your Bitbucket username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="bitbucket-app-password">App Password</Label>
-                <div className="flex items-center space-x-2">
-                  <Key className="h-4 w-4 text-gray-500" />
-                  <Input
-                    id="bitbucket-app-password"
-                    type="password"
-                    placeholder="Your Bitbucket app password"
-                    value={appPassword}
-                    onChange={(e) => setAppPassword(e.target.value)}
-                    required
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Create an app password with repository read/write permissions in your{" "}
-                  <a 
-                    href="https://bitbucket.org/account/settings/app-passwords/" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    Bitbucket account settings
-                  </a>
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="bitbucket-workspace">Workspace</Label>
-                <div className="flex items-center space-x-2">
-                  <Lock className="h-4 w-4 text-gray-500" />
-                  <Input
-                    id="bitbucket-workspace"
-                    placeholder="Your Bitbucket workspace"
-                    value={workspace}
-                    onChange={(e) => setWorkspace(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="bitbucket-repository">Repository</Label>
-                <div className="flex items-center space-x-2">
-                  <GitBranch className="h-4 w-4 text-gray-500" />
-                  <Input
-                    id="bitbucket-repository"
-                    placeholder="Your Bitbucket repository"
-                    value={repository}
-                    onChange={(e) => setRepository(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-            </>
-          )}
-        </CardContent>
-        <CardFooter>
-          {isConnected ? (
-            <div className="flex gap-2 w-full justify-between">
-              <Button
-                variant="outline"
-                onClick={handleDisconnect}
-                disabled={isLoading}
-              >
-                Disconnect
-              </Button>
-              <Button
-                type="submit"
-                disabled={isLoading}
-              >
-                Update
-              </Button>
-            </div>
-          ) : (
-            <Button
-              type="submit"
-              className="w-full"
+      <CardContent className="space-y-6">
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="username">Username</Label>
+            <Input
+              id="username"
+              placeholder="Your Bitbucket username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
               disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
-                  Connecting...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  Connect to Bitbucket
-                </span>
-              )}
-            </Button>
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="app-password">App Password</Label>
+            <Input
+              id="app-password"
+              type="password"
+              placeholder="Your Bitbucket app password"
+              value={appPassword}
+              onChange={(e) => setAppPassword(e.target.value)}
+              disabled={isLoading}
+            />
+            <p className="text-xs text-muted-foreground">
+              Create an app password with repository read/write permissions in your Bitbucket account settings
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="workspace">Workspace</Label>
+            <Input
+              id="workspace"
+              placeholder="Your Bitbucket workspace name"
+              value={workspace}
+              onChange={(e) => setWorkspace(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="repository">Repository</Label>
+            <Input
+              id="repository"
+              placeholder="Your Bitbucket repository name"
+              value={repository}
+              onChange={(e) => setRepository(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button 
+          variant="outline" 
+          onClick={handleValidateConnection}
+          disabled={isValidating || isLoading || !username || !appPassword || !workspace || !repository}
+        >
+          {isValidating ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Validating...
+            </>
+          ) : (
+            'Test Connection'
           )}
-        </CardFooter>
-      </form>
+        </Button>
+        <Button 
+          onClick={handleSaveSettings} 
+          disabled={isLoading || !username || !appPassword || !workspace || !repository}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Settings'
+          )}
+        </Button>
+      </CardFooter>
     </Card>
   );
 };

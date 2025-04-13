@@ -18,10 +18,10 @@ import ExportToGSuite from "./ExportToGSuite";
 
 interface ContentDisplayProps {
   title: string;
-  content: string | undefined;
-  contentType: "lld" | "code" | "tests";
-  storyKey: string | undefined;
-  storyId: string | undefined;
+  content?: string;
+  contentType: 'lld' | 'code' | 'tests';
+  storyKey?: string;
+  storyId?: string;
   onPushToJira?: (content: string) => Promise<boolean>;
   projectContext?: string | null;
   selectedDocuments?: string[];

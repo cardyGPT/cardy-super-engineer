@@ -46,10 +46,10 @@ export interface JiraCredentials {
 }
 
 export interface JiraGenerationRequest {
-  type: "lld" | "code" | "tests" | "all";
+  type: 'lld' | 'code' | 'tests' | 'all';
   jiraTicket: JiraTicket;
   dataModel?: any;
-  documentsContext?: string;
+  documentsContext?: any;
   projectContext?: string | null;
   selectedDocuments?: string[];
 }

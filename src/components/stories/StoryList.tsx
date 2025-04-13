@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,7 +28,6 @@ const StoryList: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [ticketsWithArtifacts, setTicketsWithArtifacts] = useState<Set<string>>(new Set());
   
-  // Fetch tickets that have artifacts
   useEffect(() => {
     const fetchTicketsWithArtifacts = async () => {
       try {
@@ -54,7 +52,6 @@ const StoryList: React.FC = () => {
     fetchTicketsWithArtifacts();
   }, []);
   
-  // Filter tickets when search term changes, tickets list changes, or type filter changes
   useEffect(() => {
     if (!tickets) {
       setFilteredTickets([]);
@@ -63,14 +60,12 @@ const StoryList: React.FC = () => {
     
     let filtered = [...tickets];
     
-    // Apply type filter if set
     if (ticketTypeFilter) {
       filtered = filtered.filter(ticket => 
         ticket.issuetype?.name === ticketTypeFilter
       );
     }
     
-    // Apply search filter
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
@@ -84,18 +79,15 @@ const StoryList: React.FC = () => {
     
     setFilteredTickets(filtered);
     
-    // Reset to first page when filters change
     setCurrentPage(1);
   }, [tickets, searchTerm, ticketTypeFilter]);
   
-  // Sort and paginate the filtered tickets
   useEffect(() => {
     if (!filteredTickets.length) {
       setDisplayedTickets([]);
       return;
     }
     
-    // Sort tickets by created or updated date
     const sorted = [...filteredTickets].sort((a, b) => {
       const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
       const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
@@ -103,7 +95,6 @@ const StoryList: React.FC = () => {
       return sortDirection === 'desc' ? dateB - dateA : dateA - dateB;
     });
     
-    // Get current page of tickets
     const start = (currentPage - 1) * PAGE_SIZE;
     const end = start + PAGE_SIZE;
     setDisplayedTickets(sorted.slice(0, end));
