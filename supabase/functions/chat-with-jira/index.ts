@@ -47,6 +47,7 @@ Summary: ${jiraTicket.summary || 'No summary provided'}
 Description: ${jiraTicket.description || 'No description provided'}
 Status: ${jiraTicket.status || 'Unknown'}
 Priority: ${jiraTicket.priority || 'Unknown'}
+Type: ${jiraTicket.issuetype?.name || 'Unknown'}
 `;
 
     // Add any additional contexts
@@ -58,12 +59,22 @@ Priority: ${jiraTicket.priority || 'Unknown'}
       ticketContext += `\nDocuments Context:\n${typeof documentsContext === 'string' ? documentsContext : JSON.stringify(documentsContext, null, 2)}`;
     }
 
-    if (projectContext) {
-      ticketContext += `\nProject Context:\n${typeof projectContext === 'string' ? projectContext : JSON.stringify(projectContext, null, 2)}`;
+    if (projectContext && projectContext.project) {
+      ticketContext += `\nProject Context:\nProject: ${projectContext.project.name} (${projectContext.project.type})`;
+      
+      if (projectContext.documents && projectContext.documents.length > 0) {
+        ticketContext += `\n\nReference Documents:`;
+        projectContext.documents.forEach(doc => {
+          ticketContext += `\n- ${doc.name} (${doc.type})`;
+        });
+      }
     }
 
     if (selectedDocuments && selectedDocuments.length > 0) {
-      ticketContext += `\nSelected Documents:\n${typeof selectedDocuments === 'string' ? selectedDocuments : JSON.stringify(selectedDocuments, null, 2)}`;
+      ticketContext += `\n\nSelected Documents for Reference:`;
+      selectedDocuments.forEach(doc => {
+        ticketContext += `\n- ${doc.name} (${doc.type})`;
+      });
     }
 
     // Determine prompt based on request type
@@ -72,13 +83,13 @@ Priority: ${jiraTicket.priority || 'Unknown'}
 
     if (request.includes('LLD') || request.includes('Low-Level Design')) {
       systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
-      userPrompt = `Create a comprehensive low-level design document for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
+      userPrompt = `Create a comprehensive low-level design document for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.\n\nIMPORTANT: For any design decisions that are influenced by the reference documents, explicitly cite the document name and relevant section (e.g., "As specified in BSITFFS.pdf, section 3.2, the authentication must...").`;
     } else if (request.includes('code') || request.includes('implementation')) {
       systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
-      userPrompt = `Generate production-ready code for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nPlease include:\n1. Frontend AngularJS code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
+      userPrompt = `Generate production-ready code for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nPlease include:\n1. Frontend AngularJS code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.\n\nIMPORTANT: For any implementation details that are influenced by the reference documents, explicitly cite the document name and relevant section (e.g., "// As specified in provider_management_data_model_final.json, the provider entity includes these fields").`;
     } else if (request.includes('test') || request.includes('testing')) {
       systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
-      userPrompt = `Create comprehensive test cases for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
+      userPrompt = `Create comprehensive test cases for this Jira ticket. Use the following information as context:\n\n${ticketContext}\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.\n\nIMPORTANT: For any test scenarios that are influenced by the reference documents, explicitly cite the document name and relevant section (e.g., "// Test case derived from BSITFFS.pdf, section 4.3 compliance requirements").`;
     } else {
       userPrompt = `Based on the following Jira ticket information, generate the requested content:\n\n${ticketContext}\n\nRequest: ${request}`;
     }

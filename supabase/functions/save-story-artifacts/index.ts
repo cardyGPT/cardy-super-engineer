@@ -42,7 +42,16 @@ serve(async (req) => {
     });
 
     // Extract data from request
-    const { storyId, projectId, sprintId, contentType, content, projectContext, documentContext } = requestBody;
+    const { 
+      storyId, 
+      projectId, 
+      sprintId, 
+      contentType, 
+      content, 
+      projectContext, 
+      documentContext,
+      projectContextData
+    } = requestBody;
     
     if (!storyId || !contentType || !content) {
       console.error("Missing required fields");
@@ -110,6 +119,7 @@ serve(async (req) => {
     if (sprintId) data.sprint_id = sprintId;
     if (projectContext) data.project_context = projectContext;
     if (documentContext) data.document_context = JSON.stringify(documentContext);
+    if (projectContextData) data.project_context_data = JSON.stringify(projectContextData);
 
     console.log(`Upserting ${contentType} content for story ${storyId}`);
 

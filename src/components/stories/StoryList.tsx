@@ -3,13 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, Bug, CheckCircle, Clock, Search, ArrowDown, ArrowUp } from "lucide-react";
+import { AlertCircle, Bug, CheckCircle, Clock, Search, ArrowDown, ArrowUp, Sparkles, AlertTriangle } from "lucide-react";
 import { JiraTicket } from "@/types/jira";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import {
-  AlertTriangle
-} from "lucide-react";
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/lib/supabase';
 
 const PAGE_SIZE = 10;
 
@@ -19,7 +18,8 @@ const StoryList: React.FC = () => {
     loading, 
     selectedTicket, 
     setSelectedTicket, 
-    selectedSprint
+    selectedSprint,
+    ticketTypeFilter
   } = useStories();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -27,31 +27,66 @@ const StoryList: React.FC = () => {
   const [displayedTickets, setDisplayedTickets] = useState<JiraTicket[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [ticketsWithArtifacts, setTicketsWithArtifacts] = useState<Set<string>>(new Set());
   
-  // Filter tickets when search term changes or tickets list changes
+  // Fetch tickets that have artifacts
+  useEffect(() => {
+    const fetchTicketsWithArtifacts = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('story_artifacts')
+          .select('story_id');
+        
+        if (error) {
+          console.error("Error fetching artifacts:", error);
+          return;
+        }
+        
+        if (data) {
+          const artifactKeys = new Set(data.map(item => item.story_id));
+          setTicketsWithArtifacts(artifactKeys);
+        }
+      } catch (err) {
+        console.error("Error in fetchTicketsWithArtifacts:", err);
+      }
+    };
+    
+    fetchTicketsWithArtifacts();
+  }, []);
+  
+  // Filter tickets when search term changes, tickets list changes, or type filter changes
   useEffect(() => {
     if (!tickets) {
       setFilteredTickets([]);
       return;
     }
     
-    if (!searchTerm.trim()) {
-      setFilteredTickets([...tickets]);
-    } else {
+    let filtered = [...tickets];
+    
+    // Apply type filter if set
+    if (ticketTypeFilter) {
+      filtered = filtered.filter(ticket => 
+        ticket.issuetype?.name === ticketTypeFilter
+      );
+    }
+    
+    // Apply search filter
+    if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
-      const filtered = tickets.filter(
+      filtered = filtered.filter(
         ticket => 
           ticket.key?.toLowerCase().includes(term) || 
           ticket.summary?.toLowerCase().includes(term) ||
           ticket.description?.toLowerCase().includes(term) ||
           ticket.status?.toLowerCase().includes(term)
       );
-      setFilteredTickets(filtered);
     }
+    
+    setFilteredTickets(filtered);
     
     // Reset to first page when filters change
     setCurrentPage(1);
-  }, [tickets, searchTerm]);
+  }, [tickets, searchTerm, ticketTypeFilter]);
   
   // Sort and paginate the filtered tickets
   useEffect(() => {
@@ -96,6 +131,31 @@ const StoryList: React.FC = () => {
     }
     
     return <Clock className="h-5 w-5 text-gray-400" />;
+  };
+  
+  const getTicketTypeLabel = (ticket: JiraTicket) => {
+    if (!ticket.issuetype?.name) return null;
+    
+    const type = ticket.issuetype.name;
+    let color;
+    
+    if (type === 'Bug') {
+      color = 'destructive';
+    } else if (type === 'Story') {
+      color = 'success';
+    } else if (type === 'Task') {
+      color = 'secondary';
+    } else if (type === 'Sub-task') {
+      color = 'default';
+    } else {
+      color = 'outline';
+    }
+    
+    return (
+      <Badge variant={color as any} className="text-[9px] px-1 py-0 h-4">
+        {type}
+      </Badge>
+    );
   };
   
   const handleLoadMore = () => {
@@ -163,7 +223,7 @@ const StoryList: React.FC = () => {
           ) : filteredTickets.length === 0 ? (
             <div className="text-center p-4 text-muted-foreground">
               <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p>No stories match your search</p>
+              <p>No stories match your filters</p>
             </div>
           ) : (
             <>
@@ -182,9 +242,15 @@ const StoryList: React.FC = () => {
                       {getTicketStatusIcon(ticket.status)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="font-medium truncate">{ticket.summary}</div>
-                      <div className="text-xs mt-1 truncate">
-                        {ticket.key} • {ticket.status || 'Unknown Status'}
+                      <div className="font-medium truncate flex items-center gap-1.5">
+                        {ticket.summary}
+                        {ticketsWithArtifacts.has(ticket.key) && (
+                          <Sparkles className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                        )}
+                      </div>
+                      <div className="text-xs mt-1 flex items-center gap-1.5">
+                        <span className="truncate">{ticket.key} • {ticket.status || 'Unknown Status'}</span>
+                        {getTicketTypeLabel(ticket)}
                       </div>
                     </div>
                   </div>

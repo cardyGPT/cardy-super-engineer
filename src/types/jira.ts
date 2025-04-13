@@ -1,3 +1,4 @@
+
 export interface JiraTicket {
   id: string;
   key: string;
@@ -15,6 +16,10 @@ export interface JiraTicket {
   domain?: string;
   projectId?: string;
   sprintId?: string;
+  issuetype?: {
+    id: string;
+    name: string;
+  };
 }
 
 export interface JiraProject {
@@ -56,6 +61,19 @@ export interface JiraGenerationResponse {
   error?: string;
 }
 
+export interface ProjectContextData {
+  project: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  documents: Array<{
+    id: string;
+    name: string;
+    type: string;
+  }>;
+}
+
 export interface StoriesContextType {
   credentials: JiraCredentials | null;
   setCredentials: (creds: JiraCredentials | null) => void;
@@ -77,4 +95,6 @@ export interface StoriesContextType {
   generatedContent: JiraGenerationResponse | null;
   generateContent: (request: JiraGenerationRequest) => Promise<void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
+  ticketTypeFilter: string | null;
+  setTicketTypeFilter: (type: string | null) => void;
 }
