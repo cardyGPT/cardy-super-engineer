@@ -9,26 +9,33 @@ serve(async (req) => {
   }
 
   try {
-    const { domain, email, apiToken, path, method = 'GET', data } = await req.json();
+    const requestBody = await req.json();
+    const { domain, email, apiToken, path, method = 'GET', data } = requestBody;
 
-    if (!domain || !email || !apiToken) {
-      return new Response(
-        JSON.stringify({ error: 'Missing Jira credentials' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      );
-    }
+    // Validate all required parameters
+    const missingParams = [];
+    if (!domain) missingParams.push('domain');
+    if (!email) missingParams.push('email');
+    if (!apiToken) missingParams.push('apiToken');
+    if (!path) missingParams.push('path');
 
-    if (!path) {
+    if (missingParams.length > 0) {
+      console.error(`Missing required parameters: ${missingParams.join(', ')}`);
       return new Response(
-        JSON.stringify({ error: 'Missing API path' }),
+        JSON.stringify({ 
+          error: 'Missing Jira credentials', 
+          details: `Required parameters: ${missingParams.join(', ')}` 
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
 
     // Construct the Jira API URL
-    const baseUrl = domain.endsWith('/') ? domain : `${domain}/`;
+    const baseUrl = domain.includes('://') ? domain : `https://${domain}`;
+    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const apiPath = path.startsWith('/') ? path.substring(1) : path;
-    const url = `${baseUrl}rest/api/3/${apiPath}`;
+    const url = `${cleanBaseUrl}/rest/api/3/${apiPath}`;
+    
     console.log(`Making Jira API request to: ${url}`);
 
     // Create auth header with base64 encoding
@@ -63,7 +70,13 @@ serve(async (req) => {
       // Provide more specific error messages for common failure scenarios
       let errorMessage = `Jira API error: ${response.status} ${response.statusText}`;
       
-      if (apiPath.includes('agile/1.0/board')) {
+      if (response.status === 401) {
+        errorMessage = "Authentication failed. Please check your Jira credentials.";
+      } else if (response.status === 403) {
+        errorMessage = "You don't have permission to access this Jira resource.";
+      } else if (response.status === 404) {
+        errorMessage = "The requested Jira resource was not found.";
+      } else if (apiPath.includes('agile/1.0/board')) {
         errorMessage = "Failed to fetch Jira boards. Please verify your Jira account has access to Agile boards.";
       } else if (apiPath.includes('agile/1.0/sprint')) {
         errorMessage = "Failed to fetch Jira sprints. Please verify your project is using Scrum methodology.";
@@ -72,6 +85,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: errorMessage,
+          statusCode: response.status,
           details: errorData
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
@@ -88,7 +102,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('Error in Jira API function:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'An error occurred' }),
+      JSON.stringify({ 
+        error: error.message || 'An error occurred',
+        stack: Deno.env.get('SUPABASE_ENV') === 'dev' ? error.stack : undefined 
+      }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }

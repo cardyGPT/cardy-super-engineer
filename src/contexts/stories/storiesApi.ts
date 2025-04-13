@@ -4,32 +4,49 @@ import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationReq
 export const fetchJiraProjects = async (credentials: JiraCredentials): Promise<JiraProject[]> => {
   const { domain, email, apiToken } = credentials;
 
-  const { data, error } = await supabase.functions.invoke('jira-api', {
-    body: {
-      domain,
-      email,
-      apiToken,
-      path: 'project'
+  if (!domain || !email || !apiToken) {
+    throw new Error('Missing Jira credentials. Please check your settings.');
+  }
+
+  try {
+    const { data, error } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        path: 'project'
+      }
+    });
+
+    if (error) {
+      console.error('Error fetching Jira projects:', error);
+      throw new Error(`Failed to fetch Jira projects: ${error.message}`);
     }
-  });
 
-  if (error) {
+    if (!data) {
+      throw new Error('No data returned from Jira API');
+    }
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    if (!Array.isArray(data)) {
+      console.error('Invalid response format when fetching Jira projects:', data);
+      throw new Error('Invalid response format from Jira API');
+    }
+
+    return data.map((project: any) => ({
+      id: project.id,
+      key: project.key,
+      name: project.name,
+      avatarUrl: project.avatarUrls ? project.avatarUrls['48x48'] : undefined,
+      domain: domain
+    }));
+  } catch (error: any) {
     console.error('Error fetching Jira projects:', error);
-    throw new Error('Failed to fetch Jira projects');
+    throw error instanceof Error ? error : new Error('Failed to fetch Jira projects');
   }
-
-  if (!data || !Array.isArray(data)) {
-    console.error('Invalid response format when fetching Jira projects:', data);
-    throw new Error('Invalid response format from Jira API');
-  }
-
-  return data.map((project: any) => ({
-    id: project.id,
-    key: project.key,
-    name: project.name,
-    avatarUrl: project.avatarUrls ? project.avatarUrls['48x48'] : undefined,
-    domain: domain
-  }));
 };
 
 export const fetchJiraSprints = async (
@@ -37,6 +54,10 @@ export const fetchJiraSprints = async (
   projectId: string
 ): Promise<JiraSprint[]> => {
   const { domain, email, apiToken } = credentials;
+
+  if (!domain || !email || !apiToken) {
+    throw new Error('Missing Jira credentials. Please check your settings.');
+  }
 
   try {
     // First get agile boards for the project
@@ -55,7 +76,15 @@ export const fetchJiraSprints = async (
       throw new Error(`Failed to fetch Jira boards: ${boardError.message}`);
     }
 
-    if (!boardData || !boardData.values) {
+    if (!boardData) {
+      throw new Error('No data returned from Jira API');
+    }
+
+    if (boardData.error) {
+      throw new Error(boardData.error);
+    }
+
+    if (!boardData.values) {
       console.error('Invalid board data format:', boardData);
       throw new Error('No boards found for this project');
     }
@@ -83,7 +112,15 @@ export const fetchJiraSprints = async (
       throw new Error(`Failed to fetch Jira sprints: ${sprintError.message}`);
     }
 
-    if (!sprintData || !sprintData.values) {
+    if (!sprintData) {
+      throw new Error('No data returned from Jira API');
+    }
+
+    if (sprintData.error) {
+      throw new Error(sprintData.error);
+    }
+
+    if (!sprintData.values) {
       console.error('Invalid sprint data format:', sprintData);
       throw new Error('No sprints found for this board');
     }
@@ -98,7 +135,7 @@ export const fetchJiraSprints = async (
     }));
   } catch (error: any) {
     console.error('Error in fetchJiraSprints:', error);
-    throw new Error(error.message || 'Failed to fetch Jira sprints');
+    throw error instanceof Error ? error : new Error('Failed to fetch Jira sprints');
   }
 };
 

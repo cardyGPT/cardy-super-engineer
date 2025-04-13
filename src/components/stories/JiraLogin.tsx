@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { JiraCredentials } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Save, AlertCircle, Loader2 } from "lucide-react";
+import { CheckCircle, Save, AlertCircle, Loader2, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const JiraLogin: React.FC = () => {
@@ -37,9 +37,15 @@ const JiraLogin: React.FC = () => {
     
     try {
       // Clean up domain to prevent double https:// issues
-      const cleanDomain = domain.trim()
-        .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
-        .replace(/\/+$/, ''); // Remove trailing slashes
+      let cleanDomain = domain.trim();
+      
+      // If domain doesn't include http:// or https://, add https://
+      if (!cleanDomain.match(/^https?:\/\//i)) {
+        cleanDomain = `https://${cleanDomain}`;
+      }
+      
+      // Remove trailing slashes
+      cleanDomain = cleanDomain.replace(/\/+$/, '');
       
       if (!cleanDomain || !email.trim() || !apiToken.trim()) {
         throw new Error("All fields are required");
@@ -54,17 +60,15 @@ const JiraLogin: React.FC = () => {
       
       console.log("Testing Jira connection with credentials:", { domain: newCredentials.domain, email: newCredentials.email });
       
-      // Validate credentials by making a test API call to get projects
+      // Validate credentials by making a test API call to get myself
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'getProjects',
           domain: newCredentials.domain,
           email: newCredentials.email,
-          apiToken: newCredentials.apiToken
+          apiToken: newCredentials.apiToken,
+          path: 'myself'
         }
       });
-      
-      console.log("Jira API response:", data);
       
       if (error) {
         console.error("Jira API error from Edge Function:", error);
@@ -74,10 +78,8 @@ const JiraLogin: React.FC = () => {
       if (data?.error) {
         console.error("Jira API returned an error:", data.error);
         throw new Error(
-          data.message || 
           data.error || 
-          data.details?.message || 
-          data.details?.errorMessages?.join(', ') || 
+          (data.details?.message || data.details?.errorMessages?.join(', ')) || 
           "Invalid Jira credentials"
         );
       }
@@ -88,7 +90,7 @@ const JiraLogin: React.FC = () => {
       
       toast({
         title: "Connection Successful",
-        description: `Connected to Jira at ${cleanDomain}`,
+        description: `Connected to Jira at ${cleanDomain} as ${data.displayName || email}`,
         variant: "success",
       });
       
@@ -137,7 +139,7 @@ const JiraLogin: React.FC = () => {
               required
             />
             <p className="text-xs text-muted-foreground">
-              This is usually your-company.atlassian.net (without https://)
+              This is usually your-company.atlassian.net
             </p>
           </div>
           
@@ -163,15 +165,15 @@ const JiraLogin: React.FC = () => {
               onChange={(e) => setApiToken(e.target.value)}
               required
             />
-            <p className="text-sm text-muted-foreground">
-              You can generate an API token in your{" "}
+            <p className="text-sm text-muted-foreground flex items-center gap-1">
+              <ExternalLink className="h-3 w-3" />
               <a 
                 href="https://id.atlassian.com/manage-profile/security/api-tokens" 
                 target="_blank" 
                 rel="noopener noreferrer"
                 className="text-blue-500 hover:underline"
               >
-                Atlassian account settings
+                Generate an API token in your Atlassian account settings
               </a>
             </p>
           </div>
