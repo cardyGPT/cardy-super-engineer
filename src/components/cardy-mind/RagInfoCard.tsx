@@ -9,24 +9,23 @@ const RagInfoCard: React.FC = () => {
 
   return (
     <Card>
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-lg flex items-center">
-            <Brain className="h-5 w-5 text-purple-500 mr-2" />
-            RAG-Powered Document Assistant
-          </CardTitle>
-          <CollapsibleTrigger 
-            onClick={() => setIsOpen(!isOpen)} 
-            className="hover:bg-slate-100 p-1 rounded-full transition-colors"
-          >
-            {isOpen ? 
-              <ChevronUp className="h-5 w-5 text-gray-500" /> : 
-              <ChevronDown className="h-5 w-5 text-gray-500" />
-            }
-          </CollapsibleTrigger>
-        </div>
-      </CardHeader>
       <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg flex items-center">
+              <Brain className="h-5 w-5 text-purple-500 mr-2" />
+              RAG-Powered Document Assistant
+            </CardTitle>
+            <CollapsibleTrigger 
+              className="hover:bg-slate-100 p-1 rounded-full transition-colors"
+            >
+              {isOpen ? 
+                <ChevronUp className="h-5 w-5 text-gray-500" /> : 
+                <ChevronDown className="h-5 w-5 text-gray-500" />
+              }
+            </CollapsibleTrigger>
+          </div>
+        </CardHeader>
         <CollapsibleContent>
           <CardContent className="pt-0">
             <div className="space-y-3 text-sm text-muted-foreground">
