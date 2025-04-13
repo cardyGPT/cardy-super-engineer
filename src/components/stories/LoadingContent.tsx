@@ -2,7 +2,8 @@
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { AlertCircle, LoaderCircle, Info } from "lucide-react";
+import { AlertCircle, LoaderCircle, Info, ArrowRight, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface LoadingContentProps {
   count?: number;
@@ -11,6 +12,9 @@ interface LoadingContentProps {
   message?: string;
   isError?: boolean;
   isInfo?: boolean;
+  isWarning?: boolean;
+  onRetry?: () => void;
+  additionalMessage?: string;
 }
 
 const LoadingContent: React.FC<LoadingContentProps> = ({ 
@@ -19,7 +23,10 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
   showTitle = true,
   message = "Loading content...",
   isError = false,
-  isInfo = false
+  isInfo = false,
+  isWarning = false,
+  onRetry,
+  additionalMessage
 }) => {
   return (
     <Card className="p-4">
@@ -32,9 +39,11 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
           />
         ))}
         <div className={`flex items-center justify-center gap-2 text-center text-sm ${
-          isError ? 'text-red-500' : (isInfo ? 'text-blue-500' : 'text-muted-foreground')
-        } mt-2`}>
+          isError ? 'text-red-500' : (isWarning ? 'text-amber-500' : (isInfo ? 'text-blue-500' : 'text-muted-foreground'))
+        } mt-4`}>
           {isError ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : isWarning ? (
             <AlertCircle className="h-4 w-4" />
           ) : isInfo ? (
             <Info className="h-4 w-4" />
@@ -42,7 +51,25 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
             <LoaderCircle className="h-4 w-4 animate-spin" />
           )}
           <p>{message}</p>
+          
+          {onRetry && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 px-2 text-xs"
+              onClick={onRetry}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
+          )}
         </div>
+        
+        {additionalMessage && (
+          <div className="mt-2 text-xs text-center text-muted-foreground">
+            <p>{additionalMessage}</p>
+          </div>
+        )}
       </div>
     </Card>
   );

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,7 @@ import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 import { supabase } from "@/lib/supabase";
 import ContextSettingsDialog from "@/components/stories/ContextSettingsDialog";
 import { ProjectContextData } from "@/types/jira";
+import LoadingContent from "@/components/stories/LoadingContent";
 
 const StoriesPage: React.FC = () => {
   const { 
@@ -48,6 +49,7 @@ const StoriesPage: React.FC = () => {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
   const [projectContextData, setProjectContextData] = useState<ProjectContextData | null>(null);
+  const [lastSuccessfulRefresh, setLastSuccessfulRefresh] = useState<Date | null>(null);
 
   useEffect(() => {
     setPageLoaded(true);
@@ -154,7 +156,7 @@ const StoriesPage: React.FC = () => {
     }
   };
 
-  const handleRefresh = async () => {
+  const handleRefresh = useCallback(async () => {
     if (loading || isRefreshing) return;
     
     setIsRefreshing(true);
@@ -167,6 +169,7 @@ const StoriesPage: React.FC = () => {
       }
       
       setIsRefreshing(false);
+      setLastSuccessfulRefresh(new Date());
       
       toast({
         title: "Refreshed",
@@ -180,7 +183,7 @@ const StoriesPage: React.FC = () => {
         variant: "destructive"
       });
     }
-  };
+  }, [loading, isRefreshing, fetchProjects, selectedProject, fetchSprints, toast]);
 
   const handleProjectChange = async (projectId: string) => {
     const project = jiraProjects.find(p => p.id === projectId);
@@ -323,13 +326,12 @@ const StoriesPage: React.FC = () => {
                       Project
                     </label>
                     {jiraProjects.length === 0 ? (
-                      <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>No Projects Found</AlertTitle>
-                        <AlertDescription>
-                          No projects were found in your Jira account. Make sure you have the correct permissions.
-                        </AlertDescription>
-                      </Alert>
+                      <LoadingContent 
+                        isError={true}
+                        message="No Projects Found. Please check Jira permissions."
+                        onRetry={handleRefresh}
+                        additionalMessage="Make sure your Jira account has access to at least one project."
+                      />
                     ) : (
                       <Select 
                         value={selectedProject?.id || ""} 
@@ -359,27 +361,19 @@ const StoriesPage: React.FC = () => {
                         Loading sprints...
                       </div>
                     ) : sprintError ? (
-                      <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Sprint Fetch Error</AlertTitle>
-                        <AlertDescription>
-                          {sprintError}
-                        </AlertDescription>
-                      </Alert>
+                      <LoadingContent 
+                        isError={true}
+                        message={sprintError}
+                        onRetry={() => selectedProject && fetchSprints(selectedProject.id)}
+                        additionalMessage="Try refreshing or selecting a different project."
+                      />
                     ) : selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0) ? (
-                      <Alert>
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>No Sprints Found</AlertTitle>
-                        <AlertDescription>
-                          No active sprints were found for this project. Make sure the project uses Scrum methodology, has boards configured, and has active sprints.
-                        </AlertDescription>
-                        <div className="mt-2">
-                          <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>
-                            <ExternalLink className="h-4 w-4 mr-2" />
-                            View in Jira
-                          </Button>
-                        </div>
-                      </Alert>
+                      <LoadingContent 
+                        isWarning={true}
+                        message="No active sprints found for this project"
+                        onRetry={() => selectedProject && fetchSprints(selectedProject.id)}
+                        additionalMessage="The project may not use Scrum methodology or have active sprints."
+                      />
                     ) : (
                       <Select 
                         value={selectedSprint?.id || ""} 
@@ -397,6 +391,15 @@ const StoriesPage: React.FC = () => {
                           ))}
                         </SelectContent>
                       </Select>
+                    )}
+                    
+                    {selectedProject && (
+                      <div className="flex justify-end mt-1">
+                        <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          View in Jira
+                        </Button>
+                      </div>
                     )}
                   </div>
 
@@ -421,6 +424,12 @@ const StoriesPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  
+                  {lastSuccessfulRefresh && (
+                    <div className="text-xs text-muted-foreground text-right pt-2">
+                      Last refreshed: {lastSuccessfulRefresh.toLocaleTimeString()}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

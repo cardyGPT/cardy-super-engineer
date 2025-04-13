@@ -14,6 +14,7 @@ import { DataModel, Entity } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import LoadingContent from "@/components/stories/LoadingContent";
 
 const DataModelPage = () => {
   const {
@@ -184,14 +185,24 @@ const DataModelPage = () => {
               </div>
             ) : (
               <div className="h-full flex items-center justify-center flex-col gap-4">
-                <p className="text-gray-500">
-                  {selectedDocument ? "Loading data model..." : "Select a data model to view its ER diagram"}
-                </p>
-                
-                {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
-                    <Database className="h-4 w-4 mr-2" />
-                    Load First Data Model
-                  </Button>}
+                {selectedDocument ? (
+                  <LoadingContent 
+                    message="Loading data model..." 
+                    count={6}
+                    isInfo={true}
+                  />
+                ) : (
+                  <>
+                    <p className="text-gray-500">
+                      Select a data model to view its ER diagram
+                    </p>
+                    
+                    {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
+                        <Database className="h-4 w-4 mr-2" />
+                        Load First Data Model
+                      </Button>}
+                  </>
+                )}
               </div>
             )
           ) : (
@@ -201,14 +212,24 @@ const DataModelPage = () => {
                 <ERDiagramFlow dataModel={currentDataModel} onEntitySelect={handleEntitySelect} />
               ) : (
                 <div className="h-full flex items-center justify-center flex-col gap-4">
-                  <p className="text-gray-500">
-                    {selectedDocument ? "Loading data model..." : "Select a data model to view its ER diagram"}
-                  </p>
-                  
-                  {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
-                      <Database className="h-4 w-4 mr-2" />
-                      Load First Data Model
-                    </Button>}
+                  {selectedDocument ? (
+                    <LoadingContent 
+                      message="Loading data model..." 
+                      count={6}
+                      isInfo={true}
+                    />
+                  ) : (
+                    <>
+                      <p className="text-gray-500">
+                        Select a data model to view its ER diagram
+                      </p>
+                      
+                      {!selectedDocument && dataModelDocuments.length > 0 && <Button variant="outline" onClick={() => setSelectedDocumentId(dataModelDocuments[0].id)}>
+                          <Database className="h-4 w-4 mr-2" />
+                          Load First Data Model
+                        </Button>}
+                    </>
+                  )}
                 </div>
               )}
             </div>

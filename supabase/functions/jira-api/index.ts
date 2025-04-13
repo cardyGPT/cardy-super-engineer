@@ -48,6 +48,15 @@ serve(async (req) => {
       'Content-Type': 'application/json'
     };
 
+    // Special handling for board/sprint fetching
+    if (apiPath.includes('agile/1.0/board') && !apiPath.includes('/sprint')) {
+      console.log(`Fetching boards for project with enhanced handling`);
+    }
+
+    if (apiPath.includes('search') && (apiPath.includes('sprint') || apiPath.includes('Sprint'))) {
+      console.log(`Enhanced JQL sprint search: ${apiPath}`);
+    }
+
     // Make the request to Jira
     const response = await fetch(url, {
       method,

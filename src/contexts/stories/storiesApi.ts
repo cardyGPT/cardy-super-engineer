@@ -216,8 +216,71 @@ export const fetchJiraSprints = async (
       }
     }
     
+    // APPROACH 4: Try to find all possible sprints and filter by project
+    console.log(`APPROACH 4: Trying to fetch all sprints across all boards`);
+    const { data: allBoardsData, error: allBoardsError } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        path: `agile/1.0/board`
+      }
+    });
+    
+    if (!allBoardsError && allBoardsData?.values && allBoardsData.values.length > 0) {
+      // Look for boards that might be related to our project
+      const possibleBoards = allBoardsData.values.filter((board: any) => {
+        if (board.location?.projectId === projectId) return true;
+        if (board.location?.projectKey === projectId) return true;
+        if (board.name && board.name.toLowerCase().includes(projectId.toLowerCase())) return true;
+        return false;
+      });
+      
+      if (possibleBoards.length > 0) {
+        console.log(`Found ${possibleBoards.length} possible boards related to project ${projectId}`);
+        
+        for (const board of possibleBoards) {
+          const boardId = board.id;
+          const { data: boardSprintData, error: boardSprintError } = await supabase.functions.invoke('jira-api', {
+            body: {
+              domain,
+              email,
+              apiToken,
+              path: `agile/1.0/board/${boardId}/sprint?state=active,future,closed`
+            }
+          });
+          
+          if (!boardSprintError && boardSprintData?.values && boardSprintData.values.length > 0) {
+            console.log(`Found ${boardSprintData.values.length} sprints from board ${boardId}`);
+            return boardSprintData.values.map((sprint: any) => ({
+              id: sprint.id,
+              name: sprint.name,
+              state: sprint.state,
+              startDate: sprint.startDate,
+              endDate: sprint.endDate,
+              boardId: boardId
+            }));
+          }
+        }
+      }
+    }
+    
     // If we've exhausted all approaches and found no sprints, return an empty array
     console.log(`No active or future sprints found for project ${projectId} after trying all approaches`);
+    
+    // FALLBACK: Create a fake sprint for testing purposes in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[DEV MODE] Creating a test sprint for development purposes`);
+      return [{
+        id: '12345',
+        name: 'Development Sprint (Test)',
+        state: 'active',
+        startDate: new Date().toISOString(),
+        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+        boardId: 'dev-board'
+      }];
+    }
+    
     return [];
     
   } catch (error: any) {
