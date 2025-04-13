@@ -1,10 +1,62 @@
 
 import React, { createContext, useContext, ReactNode } from 'react';
-import { StoriesContextType } from './types';
 import { useStoriesState } from './useStoriesState';
+import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
-const StoriesContext = createContext<StoriesContextType | undefined>(undefined);
+// Type definitions for the context
+export interface StoriesContextState {
+  // Authentication
+  credentials: JiraCredentials | null;
+  isAuthenticated: boolean;
+  error: string | null;
+  
+  // Data
+  projects: JiraProject[];
+  sprints: Record<string, JiraSprint[]>;
+  tickets: JiraTicket[];
+  
+  // Loading states
+  loading: boolean;
+  projectsLoading: boolean;
+  sprintsLoading: boolean;
+  ticketsLoading: boolean;
+  contentLoading: boolean;
+  
+  // Selection states
+  selectedProject: JiraProject | null;
+  selectedSprint: JiraSprint | null;
+  selectedTicket: JiraTicket | null;
+  
+  // Filters
+  ticketTypeFilter: string | null;
+  searchTerm: string;
+  
+  // Generated content
+  generatedContent: JiraGenerationResponse | null;
+  
+  // Actions
+  setCredentials: (creds: JiraCredentials | null) => void;
+  setSelectedProject: (project: JiraProject | null) => void;
+  setSelectedSprint: (sprint: JiraSprint | null) => void;
+  setSelectedTicket: (ticket: JiraTicket | null) => void;
+  setTicketTypeFilter: (type: string | null) => void;
+  setSearchTerm: (term: string) => void;
+  
+  // API calls
+  fetchProjects: () => Promise<void>;
+  fetchSprints: (projectId: string) => Promise<void>;
+  fetchTickets: (sprintId: string) => Promise<void>;
+  generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
+  pushToJira: (ticketId: string, content: string) => Promise<boolean>;
+  
+  // Utility
+  refreshAll: () => Promise<void>;
+}
 
+// Create context with undefined initial value
+const StoriesContext = createContext<StoriesContextState | undefined>(undefined);
+
+// Custom hook for accessing the context
 export const useStories = () => {
   const context = useContext(StoriesContext);
   if (context === undefined) {
@@ -13,6 +65,7 @@ export const useStories = () => {
   return context;
 };
 
+// Provider component
 export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const storiesState = useStoriesState();
 
