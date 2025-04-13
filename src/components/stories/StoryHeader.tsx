@@ -74,6 +74,19 @@ const StoryHeader: React.FC<StoryHeaderProps> = ({
               Epic: {ticket.epicInfo.name || ticket.epicInfo.key}
             </Badge>
           )}
+          {onOpenInJira && (
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onOpenInJira} className="h-6 w-6 p-0">
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">View in Jira</span>
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-auto p-2">
+                <p className="text-sm">View in Jira</p>
+              </HoverCardContent>
+            </HoverCard>
+          )}
         </div>
         <div className="flex gap-2">
           <div className="flex flex-wrap gap-1">
@@ -96,19 +109,6 @@ const StoryHeader: React.FC<StoryHeaderProps> = ({
               </Badge>
             )}
           </div>
-          {onOpenInJira && (
-            <HoverCard>
-              <HoverCardTrigger asChild>
-                <Button variant="ghost" size="icon" onClick={onOpenInJira}>
-                  <ExternalLink className="h-4 w-4" />
-                  <span className="sr-only">View in Jira</span>
-                </Button>
-              </HoverCardTrigger>
-              <HoverCardContent className="w-auto p-2">
-                <p className="text-sm">View in Jira</p>
-              </HoverCardContent>
-            </HoverCard>
-          )}
         </div>
       </div>
       

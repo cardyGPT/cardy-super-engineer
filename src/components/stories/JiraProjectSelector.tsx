@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Filter } from "lucide-react";
+import { ExternalLink, Filter, CheckCircle } from "lucide-react";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useStories } from "@/contexts/StoriesContext";
 import LoadingContent from "./LoadingContent";
@@ -72,6 +72,24 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
 
   const isLoadingSprints = sprintsLoading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
   const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
+
+  // Function to render sprint state with an icon
+  const renderSprintState = (sprint: { name: string, state: string }) => {
+    const isActive = sprint.state?.toLowerCase() === 'active';
+    return (
+      <div className="flex items-center">
+        {sprint.name}
+        {isActive && (
+          <span className="ml-2" title="Active Sprint">
+            <CheckCircle className="h-4 w-4 text-green-500" />
+          </span>
+        )}
+        <span className="ml-1 text-xs text-muted-foreground">
+          ({sprint.state || 'unknown'})
+        </span>
+      </div>
+    );
+  };
 
   return (
     <Card className="shadow-sm">
@@ -175,7 +193,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                 <SelectItem value="all-project-tickets">All project tickets</SelectItem>
                 {availableSprints.map(sprint => (
                   <SelectItem key={sprint.id} value={sprint.id}>
-                    {sprint.name} ({sprint.state || 'active'})
+                    {renderSprintState(sprint)}
                   </SelectItem>
                 ))}
               </SelectContent>

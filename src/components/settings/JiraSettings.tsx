@@ -72,11 +72,21 @@ const JiraSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       if (onConfigChange) onConfigChange(true);
     } catch (err: any) {
       console.error('Error testing Jira connection:', err);
-      setError(err.message || 'Failed to connect to Jira');
+      
+      let errorMessage = err.message || 'Failed to connect to Jira';
+      
+      // Try to identify if it's a Classic vs Agile API difference
+      if (errorMessage.includes('401') || errorMessage.includes('unauthorized')) {
+        errorMessage = 'Authentication failed. Please check your API token and make sure you are using a Classic API Token, not a Personal Access Token.';
+      } else if (errorMessage.includes('sprints') || errorMessage.includes('does not support')) {
+        errorMessage = 'This project may be using Jira Classic instead of Jira Agile. Some sprint features might be limited.';
+      }
+      
+      setError(errorMessage);
       
       toast({
         title: "Connection Failed",
-        description: err.message || 'Failed to connect to Jira',
+        description: errorMessage,
         variant: "destructive",
       });
       if (onConfigChange) onConfigChange(false);

@@ -1,10 +1,9 @@
-
 import { JiraCredentials, JiraProject, JiraTicket } from '@/types/jira';
 import { callJiraApi, DEV_MODE } from './apiUtils';
 
 export const fetchJiraTickets = async (
   credentials: JiraCredentials, 
-  sprintId: string,
+  sprintId: string | number,
   selectedProject: JiraProject | null,
   startAt: number = 0,
   maxResults: number = 20
@@ -16,8 +15,8 @@ export const fetchJiraTickets = async (
     
     console.log(`Fetching tickets for sprint ID: ${sprintId} in project ${selectedProject.key} (${selectedProject.id}), startAt: ${startAt}, maxResults: ${maxResults}`);
     
-    // Test if this is a development sprint
-    if (sprintId.startsWith('test-')) {
+    // Test if this is a development sprint - ensure sprintId is a string before using startsWith
+    if (typeof sprintId === 'string' && sprintId.startsWith('test-')) {
       if (DEV_MODE) {
         console.log('[DEV MODE] Returning test tickets for development sprint');
         const testData = generateTestTickets(sprintId, selectedProject, credentials, 20);
@@ -37,7 +36,7 @@ export const fetchJiraTickets = async (
     }
     
     // Transform the response into our JiraTicket format
-    const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, sprintId));
+    const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, sprintId.toString()));
     
     return { tickets, total: data.total || tickets.length };
   } catch (error) {
@@ -46,7 +45,7 @@ export const fetchJiraTickets = async (
     // Return test data in dev mode if there's an error
     if (DEV_MODE && selectedProject) {
       console.log('[DEV MODE] Returning test tickets due to error');
-      const testData = generateTestTickets(sprintId, selectedProject, credentials, 5);
+      const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 5);
       return { tickets: testData, total: testData.length };
     }
     
@@ -54,7 +53,6 @@ export const fetchJiraTickets = async (
   }
 };
 
-// New function to fetch tickets directly from a project without requiring a sprint
 export const fetchJiraTicketsByProject = async (
   credentials: JiraCredentials,
   selectedProject: JiraProject | null,
@@ -97,7 +95,6 @@ export const fetchJiraTicketsByProject = async (
   }
 };
 
-// Helper function to transform a Jira issue to our JiraTicket format
 const transformJiraIssue = (issue: any, credentials: JiraCredentials, project: JiraProject, sprintId?: string): JiraTicket => {
   const fields = issue.fields || {};
   
@@ -159,7 +156,6 @@ const transformJiraIssue = (issue: any, credentials: JiraCredentials, project: J
   };
 };
 
-// Helper function to generate test tickets
 const generateTestTickets = (
   sprintId: string, 
   project: JiraProject, 
