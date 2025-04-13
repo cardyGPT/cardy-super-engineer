@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useJiraArtifacts } from "@/hooks/useJiraArtifacts";
+import { JiraTicket } from "@/types/jira";
+import { supabase } from "@/lib/supabase";
 import { 
   AlertCircle, 
   Bug, 
@@ -54,7 +56,7 @@ const StoryList: React.FC = () => {
         
         if (data) {
           const artifactKeys = new Set(data.map(item => item.story_id));
-          setTicketsWithArtifacts(artifactKeys);
+          setTicketsWithArtifacts(artifactKeys as Set<string>);
         }
       } catch (err) {
         console.error("Error fetching tickets with artifacts:", err);

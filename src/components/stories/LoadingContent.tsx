@@ -10,6 +10,7 @@ interface LoadingContentProps {
   titleWidth?: string;
   showTitle?: boolean;
   message?: string;
+  isLoading?: boolean;
   isError?: boolean;
   isInfo?: boolean;
   isWarning?: boolean;
@@ -22,6 +23,7 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
   titleWidth = "w-1/3",
   showTitle = true,
   message = "Loading content...",
+  isLoading = false,
   isError = false,
   isInfo = false,
   isWarning = false,
