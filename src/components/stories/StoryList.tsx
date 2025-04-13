@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Search, AlertCircle, ChevronDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Search, AlertCircle, Filter } from "lucide-react";
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket } from '@/types/jira';
 import LoadingContent from './LoadingContent';
@@ -21,6 +21,8 @@ const StoryList: React.FC = () => {
     ticketStatusFilter,
     searchTerm,
     setSearchTerm,
+    setTicketTypeFilter,
+    setTicketStatusFilter,
     hasMore,
     loadingMore,
     fetchMoreTickets
@@ -28,6 +30,22 @@ const StoryList: React.FC = () => {
   
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
   const [generatedTicketIds, setGeneratedTicketIds] = useState<Set<string>>(new Set());
+  const [uniqueTypes, setUniqueTypes] = useState<string[]>([]);
+  const [uniqueStatuses, setUniqueStatuses] = useState<string[]>([]);
+  
+  // Element ref for scroll detection
+  const listRef = useRef<HTMLDivElement>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastTicketRef = useCallback((node: HTMLDivElement | null) => {
+    if (loadingMore) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        fetchMoreTickets();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [hasMore, loadingMore, fetchMoreTickets]);
   
   // Load the list of story IDs that have generated content
   useEffect(() => {
@@ -53,6 +71,27 @@ const StoryList: React.FC = () => {
     
     fetchGeneratedStoriesIds();
   }, []);
+  
+  // Extract unique ticket types and statuses for filters
+  useEffect(() => {
+    if (tickets.length > 0) {
+      const types = new Set<string>();
+      const statuses = new Set<string>();
+      
+      tickets.forEach(ticket => {
+        if (ticket.issuetype?.name) {
+          types.add(ticket.issuetype.name);
+        }
+        
+        if (ticket.status) {
+          statuses.add(ticket.status);
+        }
+      });
+      
+      setUniqueTypes(Array.from(types).sort());
+      setUniqueStatuses(Array.from(statuses).sort());
+    }
+  }, [tickets]);
   
   // Reset selection when tickets change
   useEffect(() => {
@@ -104,10 +143,12 @@ const StoryList: React.FC = () => {
     setSelectedTicketIds(newSelectedIds);
   };
   
-  const handleLoadMore = () => {
-    if (!loadingMore && hasMore) {
-      fetchMoreTickets();
-    }
+  const handleTypeFilterChange = (value: string) => {
+    setTicketTypeFilter(value === "all" ? null : value);
+  };
+  
+  const handleStatusFilterChange = (value: string) => {
+    setTicketStatusFilter(value === "all" ? null : value);
   };
   
   const getTicketTypeColor = (type: string | undefined) => {
@@ -153,15 +194,60 @@ const StoryList: React.FC = () => {
             </Badge>
           )}
         </CardTitle>
-        <div className="relative">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="search"
-            placeholder="Search stories..."
-            className="pl-8"
-            value={searchTerm}
-            onChange={handleSearchChange}
-          />
+        
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search stories..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={handleSearchChange}
+            />
+          </div>
+          
+          <div className="flex gap-2">
+            <div className="w-1/2">
+              <Select 
+                value={ticketTypeFilter || "all"} 
+                onValueChange={handleTypeFilterChange}
+              >
+                <SelectTrigger>
+                  <span className="flex items-center text-sm">
+                    <Filter className="h-3.5 w-3.5 mr-1" />
+                    Type
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {uniqueTypes.map(type => (
+                    <SelectItem key={type} value={type}>{type}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="w-1/2">
+              <Select 
+                value={ticketStatusFilter || "all"} 
+                onValueChange={handleStatusFilterChange}
+              >
+                <SelectTrigger>
+                  <span className="flex items-center text-sm">
+                    <Filter className="h-3.5 w-3.5 mr-1" />
+                    Status
+                  </span>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  {uniqueStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
       </CardHeader>
 
@@ -184,11 +270,12 @@ const StoryList: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="max-h-[550px] overflow-y-auto">
+          <div className="max-h-[550px] overflow-y-auto" ref={listRef}>
             <div className="divide-y">
-              {filteredTickets.map((ticket: JiraTicket) => (
+              {filteredTickets.map((ticket: JiraTicket, index: number) => (
                 <div
                   key={ticket.id}
+                  ref={index === filteredTickets.length - 1 ? lastTicketRef : undefined}
                   className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${
                     selectedTicket?.id === ticket.id ? 'bg-muted/50 border-l-4 border-primary' : ''
                   }`}
@@ -247,35 +334,13 @@ const StoryList: React.FC = () => {
               ))}
             </div>
             
-            {/* Load more button */}
-            {hasMore && (
+            {/* Loading indicator at the bottom for infinite scroll */}
+            {loadingMore && (
               <div className="p-3 text-center">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleLoadMore} 
-                  disabled={loadingMore}
-                  className="w-full text-muted-foreground"
-                >
-                  {loadingMore ? (
-                    <span className="flex items-center">
-                      <span className="h-4 w-4 border-2 border-b-transparent border-t-current border-l-current border-r-current rounded-full inline-block animate-spin mr-2"></span>
-                      Loading...
-                    </span>
-                  ) : (
-                    <span className="flex items-center justify-center">
-                      Load more
-                      <ChevronDown className="ml-1 h-4 w-4" />
-                    </span>
-                  )}
-                </Button>
-              </div>
-            )}
-            
-            {/* Loading spinner when loading more */}
-            {loadingMore && tickets.length > 0 && (
-              <div className="p-2 text-center">
-                <span className="text-xs text-muted-foreground">Loading more tickets...</span>
+                <span className="flex items-center justify-center text-sm text-muted-foreground">
+                  <span className="h-4 w-4 border-2 border-b-transparent border-t-current border-l-current border-r-current rounded-full inline-block animate-spin mr-2"></span>
+                  Loading more stories...
+                </span>
               </div>
             )}
           </div>

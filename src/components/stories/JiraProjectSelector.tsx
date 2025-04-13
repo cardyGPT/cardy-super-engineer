@@ -8,7 +8,6 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { 
   FolderOpen, 
   Clock, 
@@ -36,7 +35,6 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     setSelectedSprint,
     fetchSprints,
     fetchTickets,
-    fetchTicketsByProject,
     projectsLoading,
     sprintsLoading
   } = useStories();
@@ -80,20 +78,6 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     setIsLoadingTickets(true);
     try {
       await fetchTickets(sprintId);
-    } finally {
-      setIsLoadingTickets(false);
-    }
-  };
-
-  const handleViewAllTickets = async () => {
-    if (!selectedProject) return;
-    
-    setSelectedSprint(null);
-    
-    // Load all tickets for the project
-    setIsLoadingTickets(true);
-    try {
-      await fetchTicketsByProject(selectedProject.id);
     } finally {
       setIsLoadingTickets(false);
     }
@@ -172,47 +156,29 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
           {(sprintsLoading || isLoadingSprints) ? (
             <Skeleton className="h-10 w-full" />
           ) : (
-            <>
-              <Select
-                value={selectedSprint?.id}
-                onValueChange={handleSprintChange}
-                disabled={!selectedProject || sprintsLoading || isLoadingSprints}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select sprint" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectSprints.map((sprint) => {
-                    const { icon, badge } = getSprintStateProps(sprint.state);
-                    return (
-                      <SelectItem key={sprint.id} value={sprint.id}>
-                        <div className="flex items-center">
-                          {icon}
-                          <span className="ml-2">{sprint.name}</span>
-                          {badge}
-                        </div>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-              
-              <div className="flex justify-end mt-2">
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={handleViewAllTickets}
-                  disabled={!selectedProject || isLoadingTickets}
-                >
-                  {isLoadingTickets ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                  )}
-                  View All Tickets
-                </Button>
-              </div>
-            </>
+            <Select
+              value={selectedSprint?.id}
+              onValueChange={handleSprintChange}
+              disabled={!selectedProject || sprintsLoading || isLoadingSprints}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select sprint" />
+              </SelectTrigger>
+              <SelectContent>
+                {projectSprints.map((sprint) => {
+                  const { icon, badge } = getSprintStateProps(sprint.state);
+                  return (
+                    <SelectItem key={sprint.id} value={sprint.id}>
+                      <div className="flex items-center">
+                        {icon}
+                        <span className="ml-2">{sprint.name}</span>
+                        {badge}
+                      </div>
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
           )}
         </div>
       </div>

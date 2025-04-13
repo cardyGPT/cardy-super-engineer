@@ -26,7 +26,7 @@ function ThemeConsumer({ children }: { children: React.ReactNode }) {
     setTheme('light');
   }, [setTheme]);
   
-  const currentTheme = resolvedTheme || theme || 'light';
+  const currentTheme = 'light'; // Always use light theme
   
   return (
     <ThemeContext.Provider value={{ theme: currentTheme }}>
