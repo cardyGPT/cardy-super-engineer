@@ -38,10 +38,10 @@ export const useTickets = (
 
     try {
       console.log(`Fetching tickets for sprint ID: ${sprintToUse} in project ID: ${selectedProject.id}`);
-      const ticketsData = await fetchJiraTickets(credentials, sprintToUse, selectedProject);
+      const result = await fetchJiraTickets(credentials, sprintToUse, selectedProject, 0, 20);
       
-      console.log(`Found ${ticketsData.length} tickets for sprint ID: ${sprintToUse}`);
-      setTickets(ticketsData);
+      console.log(`Found ${result.tickets.length} tickets for sprint ID: ${sprintToUse}`);
+      setTickets(result.tickets);
     } catch (err: any) {
       console.error('Error fetching Jira tickets:', err);
       setError(err.message || 'Failed to fetch Jira tickets');
