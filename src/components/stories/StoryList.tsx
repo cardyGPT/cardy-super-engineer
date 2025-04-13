@@ -1,294 +1,206 @@
 
-import React, { useState, useEffect } from 'react';
-import { useStories } from "@/contexts/StoriesContext";
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { supabase } from "@/lib/supabase";
-import { JiraTicket } from "@/types/jira";
-import { 
-  Search, 
-  ArrowDown, 
-  ArrowUp, 
-  Clock, 
-  CheckCircle, 
-  AlertCircle,
-  Bug,
-  Sparkles,
-  AlertTriangle
-} from "lucide-react";
-import LoadingContent from "./LoadingContent";
-
-const PAGE_SIZE = 10;
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Search, AlertCircle } from "lucide-react";
+import { useStories } from '@/contexts/StoriesContext';
+import { JiraTicket } from '@/types/jira';
+import LoadingContent from './LoadingContent';
+import { supabase } from '@/lib/supabase';
 
 const StoryList: React.FC = () => {
   const { 
     tickets, 
-    ticketsLoading, 
     selectedTicket, 
     setSelectedTicket, 
-    selectedSprint,
+    ticketsLoading, 
+    error,
     ticketTypeFilter,
     searchTerm,
     setSearchTerm
   } = useStories();
   
-  const [filteredTickets, setFilteredTickets] = useState<JiraTicket[]>(tickets);
-  const [displayedTickets, setDisplayedTickets] = useState<JiraTicket[]>(tickets.slice(0, PAGE_SIZE));
-  const [currentPage, setCurrentPage] = useState(1);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
-  const [ticketsWithArtifacts, setTicketsWithArtifacts] = useState<Set<string>>(new Set());
+  const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
+  const [generatedTicketIds, setGeneratedTicketIds] = useState<Set<string>>(new Set());
   
-  // Get all tickets with artifacts
+  // Load the list of story IDs that have generated content
   useEffect(() => {
-    const fetchTicketsWithArtifacts = async () => {
+    const fetchGeneratedStoriesIds = async () => {
       try {
         const { data, error } = await supabase
           .from('story_artifacts')
           .select('story_id');
         
         if (error) {
-          console.error("Error fetching artifacts:", error);
+          console.error('Error fetching generated story IDs:', error);
           return;
         }
         
-        if (data) {
-          const artifactKeys = new Set(data.map(item => item.story_id));
-          setTicketsWithArtifacts(artifactKeys as Set<string>);
+        if (data && data.length > 0) {
+          const ids = new Set(data.map(item => item.story_id));
+          setGeneratedTicketIds(ids);
         }
       } catch (err) {
-        console.error("Error fetching tickets with artifacts:", err);
+        console.error('Error in fetchGeneratedStoriesIds:', err);
       }
     };
     
-    fetchTicketsWithArtifacts();
+    fetchGeneratedStoriesIds();
   }, []);
   
-  // Filter tickets based on search term and ticket type filter
+  // Reset selection when tickets change
   useEffect(() => {
-    let filtered = [...tickets];
-    
-    if (ticketTypeFilter) {
-      filtered = filtered.filter(ticket => 
-        ticket.issuetype?.name === ticketTypeFilter
-      );
-    }
-    
-    if (searchTerm.trim()) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(ticket => 
-        ticket.key?.toLowerCase().includes(term) || 
-        ticket.summary?.toLowerCase().includes(term) ||
-        ticket.description?.toLowerCase().includes(term) ||
-        ticket.status?.toLowerCase().includes(term)
-      );
-    }
-    
-    setFilteredTickets(filtered);
-    setCurrentPage(1);
-  }, [tickets, searchTerm, ticketTypeFilter]);
+    setSelectedTicketIds(new Set<string>());
+  }, [tickets]);
   
-  // Sort and paginate tickets
-  useEffect(() => {
-    if (!filteredTickets.length) {
-      setDisplayedTickets([]);
-      return;
-    }
-    
-    const sorted = [...filteredTickets].sort((a, b) => {
-      const dateA = new Date(a.updated_at || a.created_at || 0).getTime();
-      const dateB = new Date(b.updated_at || b.created_at || 0).getTime();
+  // Apply filters
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      // Apply type filter
+      if (ticketTypeFilter && ticket.issuetype?.name !== ticketTypeFilter) {
+        return false;
+      }
       
-      return sortDirection === 'desc' ? dateB - dateA : dateA - dateB;
+      // Apply search filter
+      if (searchTerm && !ticket.summary.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+      
+      return true;
     });
-    
-    const start = 0;
-    const end = currentPage * PAGE_SIZE;
-    setDisplayedTickets(sorted.slice(start, end));
-  }, [filteredTickets, currentPage, sortDirection]);
+  }, [tickets, ticketTypeFilter, searchTerm]);
   
-  const handleSelectTicket = (ticket: JiraTicket) => {
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+  };
+  
+  const handleTicketClick = (ticket: JiraTicket) => {
     setSelectedTicket(ticket);
+    
+    // Toggle selection
+    const newSelectedIds = new Set(selectedTicketIds);
+    if (newSelectedIds.has(ticket.id)) {
+      newSelectedIds.delete(ticket.id);
+    } else {
+      newSelectedIds.add(ticket.id);
+    }
+    setSelectedTicketIds(newSelectedIds);
   };
   
-  const handleLoadMore = () => {
-    setCurrentPage(prev => prev + 1);
+  const getTicketTypeColor = (type: string | undefined) => {
+    switch(type?.toLowerCase()) {
+      case 'story':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      case 'bug':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+      case 'task':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'sub-task':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    }
   };
-  
-  const toggleSortDirection = () => {
-    setSortDirection(prev => prev === 'desc' ? 'asc' : 'desc');
-  };
-  
-  // Loading state
-  if (ticketsLoading && tickets.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Sprint Stories</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <LoadingContent 
-              count={4}
-              message="Loading stories..."
-            />
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
   
   return (
-    <Card>
-      <CardHeader className="pb-2">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
-          <CardTitle className="text-lg">Sprint Stories</CardTitle>
-          <Button variant="ghost" size="sm" onClick={toggleSortDirection} className="text-xs flex items-center">
-            {sortDirection === 'desc' ? (
-              <>Newest First <ArrowDown className="ml-1 h-3 w-3" /></>
-            ) : (
-              <>Oldest First <ArrowUp className="ml-1 h-3 w-3" /></>
-            )}
-          </Button>
+    <Card className="overflow-hidden h-full">
+      <CardHeader className="pb-3">
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span>Stories</span>
+          {filteredTickets.length > 0 && (
+            <Badge variant="outline" className="ml-2">
+              {filteredTickets.length} 
+              {ticketTypeFilter ? ` ${ticketTypeFilter}` : ' tickets'}
+            </Badge>
+          )}
+        </CardTitle>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search stories..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={handleSearchChange}
+          />
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="relative">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search stories..."
-              className="pl-8"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+
+      <CardContent className="p-0">
+        {ticketsLoading ? (
+          <div className="p-4">
+            <LoadingContent message="Loading stories..." />
           </div>
-          
-          {!selectedSprint ? (
-            <div className="text-center p-4 text-muted-foreground">
-              <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p>Select a sprint to view stories</p>
-            </div>
-          ) : tickets.length === 0 ? (
-            <div className="text-center p-4 text-muted-foreground">
-              <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p>No stories found in this sprint</p>
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <div className="text-center p-4 text-muted-foreground">
-              <AlertTriangle className="h-10 w-10 mx-auto mb-2 opacity-20" />
-              <p>No stories match your filters</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-1">
-                {displayedTickets.map(ticket => (
-                  <TicketListItem 
-                    key={ticket.id}
-                    ticket={ticket}
-                    isSelected={selectedTicket?.id === ticket.id}
-                    hasArtifacts={ticketsWithArtifacts.has(ticket.key)}
-                    onClick={() => handleSelectTicket(ticket)}
-                  />
-                ))}
+        ) : error ? (
+          <div className="p-4 text-sm text-red-500 flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2" />
+            <p>{error}</p>
+          </div>
+        ) : filteredTickets.length === 0 ? (
+          <div className="p-4 text-center text-sm text-muted-foreground">
+            {tickets.length === 0 ? (
+              <p>No stories available in this sprint.</p>
+            ) : (
+              <p>No stories match your filters.</p>
+            )}
+          </div>
+        ) : (
+          <div className="divide-y max-h-[400px] overflow-y-auto">
+            {filteredTickets.map((ticket: JiraTicket) => (
+              <div
+                key={ticket.id}
+                className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${
+                  selectedTicket?.id === ticket.id ? 'bg-muted/50 border-l-4 border-primary' : ''
+                }`}
+                onClick={() => handleTicketClick(ticket)}
+              >
+                <div className="flex justify-between mb-1">
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-muted-foreground mr-2">
+                      {ticket.key}
+                    </span>
+                    <Badge 
+                      variant="secondary" 
+                      className={`text-xs ${getTicketTypeColor(ticket.issuetype?.name)}`}
+                    >
+                      {ticket.issuetype?.name || 'Unknown'}
+                    </Badge>
+                  </div>
+                  
+                  {generatedTicketIds.has(ticket.id) && (
+                    <Badge 
+                      variant="outline" 
+                      className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                    >
+                      Generated
+                    </Badge>
+                  )}
+                </div>
+                
+                <h3 className="text-sm font-medium line-clamp-2">
+                  {ticket.summary}
+                </h3>
+                
+                <div className="flex mt-2 gap-2">
+                  {ticket.priority && (
+                    <Badge variant="outline" className="text-xs">
+                      P: {ticket.priority}
+                    </Badge>
+                  )}
+                  
+                  {ticket.status && (
+                    <Badge variant="outline" className="text-xs">
+                      {ticket.status}
+                    </Badge>
+                  )}
+                </div>
               </div>
-              
-              {displayedTickets.length < filteredTickets.length && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full mt-2" 
-                  onClick={handleLoadMore}
-                >
-                  Load More
-                </Button>
-              )}
-            </>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
-  );
-};
-
-// Helper component for rendering a ticket item
-const TicketListItem: React.FC<{
-  ticket: JiraTicket;
-  isSelected: boolean;
-  hasArtifacts: boolean;
-  onClick: () => void;
-}> = ({ ticket, isSelected, hasArtifacts, onClick }) => {
-  return (
-    <div 
-      className={`p-2 rounded-md cursor-pointer flex items-start transition-colors ${
-        isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'
-      }`}
-      onClick={onClick}
-    >
-      <div className="mr-2 mt-0.5">
-        <TicketStatusIcon status={ticket.status} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="font-medium truncate flex items-center gap-1.5">
-          {ticket.summary}
-          {hasArtifacts && (
-            <Sparkles className="h-3 w-3 text-amber-500 flex-shrink-0" />
-          )}
-        </div>
-        <div className="text-xs mt-1 flex items-center gap-1.5">
-          <span className="truncate">{ticket.key} • {ticket.status || 'Unknown Status'}</span>
-          <TicketTypeLabel ticket={ticket} />
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// Helper function for ticket status icon
-const TicketStatusIcon: React.FC<{ status?: string }> = ({ status }) => {
-  if (!status) return <Clock className="h-5 w-5 text-gray-400" />;
-  
-  const lowerStatus = status.toLowerCase();
-  
-  if (lowerStatus.includes('todo') || lowerStatus.includes('backlog') || lowerStatus.includes('open')) {
-    return <Clock className="h-5 w-5 text-blue-500" />;
-  } else if (lowerStatus.includes('progress') || lowerStatus.includes('doing')) {
-    return <ArrowDown className="h-5 w-5 text-orange-500" />;
-  } else if (lowerStatus.includes('review') || lowerStatus.includes('testing')) {
-    return <AlertCircle className="h-5 w-5 text-purple-500" />;
-  } else if (lowerStatus.includes('done') || lowerStatus.includes('closed') || lowerStatus.includes('complete')) {
-    return <CheckCircle className="h-5 w-5 text-green-500" />;
-  } else if (lowerStatus.includes('bug') || lowerStatus.includes('issue') || lowerStatus.includes('blocke')) {
-    return <Bug className="h-5 w-5 text-red-500" />;
-  }
-  
-  return <Clock className="h-5 w-5 text-gray-400" />;
-};
-
-// Helper function for ticket type label
-const TicketTypeLabel: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
-  if (!ticket.issuetype?.name) return null;
-  
-  const type = ticket.issuetype.name;
-  let color;
-  
-  if (type === 'Bug') {
-    color = 'destructive';
-  } else if (type === 'Story') {
-    color = 'success';
-  } else if (type === 'Task') {
-    color = 'secondary';
-  } else if (type === 'Sub-task') {
-    color = 'default';
-  } else {
-    color = 'outline';
-  }
-  
-  return (
-    <Badge variant={color as any} className="text-[9px] px-1 py-0 h-4">
-      {type}
-    </Badge>
   );
 };
 

@@ -12,7 +12,7 @@ import { CheckCircle, Save, AlertCircle, Loader2, ExternalLink } from "lucide-re
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const JiraLogin: React.FC = () => {
-  const { credentials, setCredentials } = useStories();
+  const { credentials, setCredentials, fetchProjects } = useStories();
   const [domain, setDomain] = useState("");
   const [email, setEmail] = useState("");
   const [apiToken, setApiToken] = useState("");
@@ -27,8 +27,12 @@ const JiraLogin: React.FC = () => {
       setDomain(credentials.domain || "");
       setEmail(credentials.email || "");
       setIsConnected(true);
+      
+      // If we have credentials but no projects have been loaded,
+      // trigger a project fetch
+      fetchProjects();
     }
-  }, [credentials]);
+  }, [credentials, fetchProjects]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,7 +62,10 @@ const JiraLogin: React.FC = () => {
         apiToken: apiToken.trim()
       };
       
-      console.log("Testing Jira connection with credentials:", { domain: newCredentials.domain, email: newCredentials.email });
+      console.log("Testing Jira connection with credentials:", { 
+        domain: newCredentials.domain, 
+        email: newCredentials.email 
+      });
       
       // Validate credentials by making a test API call to get myself
       const { data, error } = await supabase.functions.invoke('jira-api', {
@@ -93,6 +100,9 @@ const JiraLogin: React.FC = () => {
         description: `Connected to Jira at ${cleanDomain} as ${data.displayName || email}`,
         variant: "success",
       });
+      
+      // Immediately fetch projects after successful authentication
+      fetchProjects();
       
     } catch (error: any) {
       console.error("Login error:", error);

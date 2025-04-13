@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { AlertCircle, LoaderCircle, Info, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-interface LoadingContentProps {
+export interface LoadingContentProps {
   count?: number;
   titleWidth?: string;
   showTitle?: boolean;

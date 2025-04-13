@@ -1,5 +1,5 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, generateJiraContent, pushContentToJira } from './api';
@@ -8,7 +8,16 @@ export const useStoriesState = () => {
   const { toast } = useToast();
   
   // Authentication state
-  const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
+  const [credentials, setCredentials] = useState<JiraCredentials | null>(() => {
+    // Try to load credentials from localStorage on initialization
+    try {
+      const savedCredentials = localStorage.getItem('jira_credentials');
+      return savedCredentials ? JSON.parse(savedCredentials) : null;
+    } catch (err) {
+      console.error('Failed to load credentials from localStorage:', err);
+      return null;
+    }
+  });
   const [error, setError] = useState<string | null>(null);
   
   // Data state
@@ -39,6 +48,23 @@ export const useStoriesState = () => {
   
   // Computed state - authentication status
   const isAuthenticated = !!credentials;
+
+  // Save credentials to localStorage when they change
+  useEffect(() => {
+    if (credentials) {
+      localStorage.setItem('jira_credentials', JSON.stringify(credentials));
+    } else {
+      localStorage.removeItem('jira_credentials');
+    }
+  }, [credentials]);
+
+  // Auto-fetch projects when credentials are available
+  useEffect(() => {
+    if (credentials && projects.length === 0 && !projectsLoading) {
+      console.log('Auto-fetching projects on credentials load');
+      fetchProjects();
+    }
+  }, [credentials]);
   
   // API method - Fetch projects
   const fetchProjects = useCallback(async () => {

@@ -10,7 +10,7 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
   const { domain, email, apiToken } = credentials;
   
   try {
-    console.log(`Calling Jira API with path: ${path}`);
+    console.log(`Calling Jira API with path: ${path}, method: ${method}`);
     const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
