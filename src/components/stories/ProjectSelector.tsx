@@ -80,7 +80,12 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     return (stateOrder[stateA] || 3) - (stateOrder[stateB] || 3);
   });
 
-  // Log all sprints state for debugging
+  // Get only active sprints for quick access
+  const activeSprints = sortedSprints.filter(sprint => 
+    (sprint.state || '').toLowerCase() === 'active'
+  );
+
+  // Log sprint information for debugging
   if (selectedProject && availableSprints.length > 0) {
     console.log('Available sprints:', availableSprints.map(s => ({ 
       id: s.id, 
@@ -88,6 +93,8 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
       state: s.state,
       stateType: typeof s.state
     })));
+    
+    console.log('Active sprints count:', activeSprints.length);
   }
 
   return (
@@ -185,20 +192,38 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   <SelectValue placeholder="Select a sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sortedSprints.map(sprint => {
-                    // Normalize state to lowercase for display consistency
-                    const sprintState = (sprint.state || '').toLowerCase();
-                    const stateDisplay = 
-                      sprintState === 'active' ? '(active)' : 
-                      sprintState === 'future' ? '(future)' : 
-                      '(closed)';
-                    
-                    return (
-                      <SelectItem key={sprint.id} value={sprint.id}>
-                        {sprint.name} {stateDisplay}
-                      </SelectItem>
-                    );
-                  })}
+                  {/* Show active sprints first with special indicator */}
+                  {activeSprints.length > 0 && (
+                    <>
+                      {activeSprints.map(sprint => (
+                        <SelectItem key={sprint.id} value={sprint.id} className="font-medium">
+                          🟢 {sprint.name} (active)
+                        </SelectItem>
+                      ))}
+                      {sortedSprints.length > activeSprints.length && (
+                        <SelectItem value="divider" disabled className="py-1 my-1 border-t border-gray-200">
+                          Other Sprints
+                        </SelectItem>
+                      )}
+                    </>
+                  )}
+                  
+                  {/* Show non-active sprints */}
+                  {sortedSprints
+                    .filter(sprint => (sprint.state || '').toLowerCase() !== 'active')
+                    .map(sprint => {
+                      const sprintState = (sprint.state || '').toLowerCase();
+                      const stateDisplay = 
+                        sprintState === 'future' ? '(future)' : 
+                        '(closed)';
+                      
+                      return (
+                        <SelectItem key={sprint.id} value={sprint.id}>
+                          {sprint.name} {stateDisplay}
+                        </SelectItem>
+                      );
+                    })
+                  }
                 </SelectContent>
               </Select>
               <div className="flex justify-between mt-1">
