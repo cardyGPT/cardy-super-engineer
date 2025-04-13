@@ -53,6 +53,10 @@ export const routes = createBrowserRouter([
     element: <DataModelPage />,
   },
   {
+    path: '/smart-er-diagram',
+    element: <DataModelPage />,
+  },
+  {
     path: '/documents',
     element: <DocumentsPage />,
   },

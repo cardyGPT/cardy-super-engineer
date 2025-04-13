@@ -110,6 +110,10 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
       }
       
       setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
+      
+      // Clear tickets when sprints change
+      setTickets([]);
+      setSelectedTicket(null);
     } catch (err: any) {
       console.error('Error fetching Jira sprints:', err);
       setError(err.message || 'Failed to fetch Jira sprints');
@@ -136,11 +140,19 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
       return;
     }
 
+    if (!selectedProject) {
+      setError('No project selected');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
+      console.log(`Fetching tickets for sprint ID: ${sprintToUse} in project ID: ${selectedProject.id}`);
       const ticketsData = await fetchJiraTickets(credentials, sprintToUse, selectedProject);
+      
+      console.log(`Found ${ticketsData.length} tickets for sprint ID: ${sprintToUse}`);
       setTickets(ticketsData);
     } catch (err: any) {
       console.error('Error fetching Jira tickets:', err);
@@ -150,6 +162,8 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
         description: err.message || 'Failed to fetch Jira tickets',
         variant: "destructive",
       });
+      // Ensure tickets is at least an empty array on error
+      setTickets([]);
     } finally {
       setLoading(false);
     }
@@ -215,11 +229,6 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
       return false;
     }
   };
-
-  // Filter tickets based on the selected type
-  const filteredTickets = ticketTypeFilter
-    ? tickets.filter(ticket => ticket.issuetype?.name === ticketTypeFilter)
-    : tickets;
 
   return {
     credentials,

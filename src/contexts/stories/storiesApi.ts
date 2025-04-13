@@ -2,489 +2,420 @@
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
-export const fetchJiraProjects = async (credentials: JiraCredentials): Promise<JiraProject[]> => {
+const DEV_MODE = true; // Set to true to enable development mode with test data
+
+// Helper function to fetch from Jira API through our edge function
+const callJiraApi = async (credentials: JiraCredentials, path: string, method: string = 'GET', data?: any) => {
   const { domain, email, apiToken } = credentials;
-
-  if (!domain || !email || !apiToken) {
-    throw new Error('Missing Jira credentials. Please check your settings.');
-  }
-
+  
   try {
-    const { data, error } = await supabase.functions.invoke('jira-api', {
+    const { data: responseData, error } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
         email,
         apiToken,
-        path: 'project'
+        path,
+        method,
+        data
       }
     });
 
     if (error) {
-      console.error('Error fetching Jira projects:', error);
-      throw new Error(`Failed to fetch Jira projects: ${error.message}`);
+      console.error('Error calling Jira API:', error);
+      throw new Error(error.message || 'Failed to call Jira API');
     }
 
-    if (!data) {
-      throw new Error('No data returned from Jira API');
-    }
+    return responseData;
+  } catch (error) {
+    console.error('Error in callJiraApi:', error);
+    throw error;
+  }
+};
 
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    if (!Array.isArray(data)) {
-      console.error('Invalid response format when fetching Jira projects:', data);
-      throw new Error('Invalid response format from Jira API');
-    }
-
+export const fetchJiraProjects = async (credentials: JiraCredentials): Promise<JiraProject[]> => {
+  try {
+    const data = await callJiraApi(credentials, 'project');
+    
+    // Transform the response into our JiraProject format
     return data.map((project: any) => ({
       id: project.id,
       key: project.key,
       name: project.name,
-      avatarUrl: project.avatarUrls ? project.avatarUrls['48x48'] : undefined,
-      domain: domain
+      avatarUrl: project.avatarUrls?.['48x48'],
+      domain: credentials.domain
     }));
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error fetching Jira projects:', error);
-    throw error instanceof Error ? error : new Error('Failed to fetch Jira projects');
+    throw error;
   }
 };
 
-export const fetchJiraSprints = async (
-  credentials: JiraCredentials,
-  projectId: string
-): Promise<JiraSprint[]> => {
-  const { domain, email, apiToken } = credentials;
-
-  if (!domain || !email || !apiToken) {
-    throw new Error('Missing Jira credentials. Please check your settings.');
-  }
-
+export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: string): Promise<JiraSprint[]> => {
+  console.log(`Attempting to fetch sprints for project ID: ${projectId}`);
+  
   try {
-    // We'll use multiple approaches to fetch sprints, trying each one until we find sprints
-    console.log(`Attempting to fetch sprints for project ID: ${projectId}`);
-    
-    // APPROACH 1: Try to get active and future sprints directly using JQL search
+    // APPROACH 1: Try to fetch active sprints directly using JQL
     console.log(`APPROACH 1: Fetching active sprints directly for project ${projectId} using JQL`);
-    const { data: projectSprintData, error: projectSprintError } = await supabase.functions.invoke('jira-api', {
-      body: {
-        domain,
-        email,
-        apiToken,
-        path: `search?jql=project=${projectId}%20AND%20sprint%20in%20openSprints()&fields=sprint,summary&maxResults=100`
-      }
-    });
+    const jqlQuery = `project = ${projectId} AND sprint in openSprints()`;
+    const activeSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=1`);
     
-    if (projectSprintError) {
-      console.error('Error fetching project sprints directly:', projectSprintError);
-      console.log('Trying next approach...');
-    } else if (projectSprintData?.issues && projectSprintData.issues.length > 0) {
-      // Extract unique sprints from the issues
-      const sprintsSet = new Set();
-      const sprints = [];
-      
-      // Extract sprints from each issue
-      projectSprintData.issues.forEach((issue: any) => {
-        const customFields = Object.keys(issue.fields).filter(key => 
-          key.startsWith('customfield_') && 
-          Array.isArray(issue.fields[key]) && 
-          issue.fields[key].length > 0 &&
-          issue.fields[key][0]?.id && 
-          issue.fields[key][0]?.state
-        );
-        
-        customFields.forEach(fieldKey => {
-          const issueSprints = issue.fields[fieldKey];
-          if (Array.isArray(issueSprints)) {
-            issueSprints.forEach((sprint: any) => {
-              if (!sprintsSet.has(sprint.id) && (sprint.state === 'active' || sprint.state === 'future')) {
-                sprintsSet.add(sprint.id);
-                sprints.push({
-                  id: sprint.id,
-                  name: sprint.name,
-                  state: sprint.state,
-                  startDate: sprint.startDate,
-                  endDate: sprint.endDate,
-                  boardId: sprint.originBoardId || 'unknown'
-                });
-              }
-            });
-          }
-        });
-      });
-      
-      if (sprints.length > 0) {
-        console.log(`Found ${sprints.length} active sprints directly from issues`);
-        return sprints;
+    if (activeSprintsData.issues && activeSprintsData.issues.length > 0) {
+      // Extract sprint info from the first issue
+      const sprints = activeSprintsData.issues[0].fields?.sprint || [];
+      if (Array.isArray(sprints) && sprints.length > 0) {
+        return sprints.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state,
+          startDate: sprint.startDate,
+          endDate: sprint.endDate,
+          boardId: sprint.originBoardId || '0'
+        }));
       }
     }
     
-    // APPROACH 2: Get agile boards for the project
+    // APPROACH 2: If no active sprints found with JQL, try getting boards for the project
     console.log(`APPROACH 2: Fetching boards for project ${projectId}`);
-    const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
-      body: {
-        domain,
-        email,
-        apiToken,
-        path: `agile/1.0/board?projectKeyOrId=${projectId}`
-      }
-    });
-
-    if (boardError) {
-      console.error('Error fetching Jira boards:', boardError);
-      console.log('Trying next approach...');
-    } else if (boardData?.values && boardData.values.length > 0) {
-      // Try each board to find sprints
-      for (const board of boardData.values) {
-        const boardId = board.id;
-        console.log(`Checking board ID ${boardId} for sprints`);
-        
-        const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
-          body: {
-            domain,
-            email,
-            apiToken,
-            path: `agile/1.0/board/${boardId}/sprint?state=active,future`
-          }
-        });
-
-        if (sprintError) {
-          console.error(`Error fetching sprints for board ${boardId}:`, sprintError);
-          continue; // Try next board
-        }
-
-        if (sprintData?.values && sprintData.values.length > 0) {
-          console.log(`Successfully fetched ${sprintData.values.length} sprints for board ${boardId}`);
+    const boardsData = await callJiraApi(credentials, `agile/1.0/board?projectKeyOrId=${projectId}`);
+    
+    if (boardsData.values && boardsData.values.length > 0) {
+      // For each board, try to fetch active sprints
+      for (const board of boardsData.values) {
+        try {
+          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active,future`);
           
-          return sprintData.values.map((sprint: any) => ({
-            id: sprint.id,
-            name: sprint.name,
-            state: sprint.state,
-            startDate: sprint.startDate,
-            endDate: sprint.endDate,
-            boardId: boardId
-          }));
-        }
-      }
-    }
-    
-    // APPROACH 3: Try another JQL query approach
-    console.log(`APPROACH 3: Trying alternative JQL query for sprints in project ${projectId}`);
-    const { data: allIssuesData, error: allIssuesError } = await supabase.functions.invoke('jira-api', {
-      body: {
-        domain,
-        email,
-        apiToken,
-        path: `search?jql=project=${projectId}&fields=id,summary,sprint&maxResults=50`
-      }
-    });
-    
-    if (!allIssuesError && allIssuesData?.issues && allIssuesData.issues.length > 0) {
-      // Try to extract sprint info from any custom fields that might hold sprint data
-      const sprintMap = new Map();
-      
-      allIssuesData.issues.forEach((issue: any) => {
-        // Look through all fields for any that might be sprint fields (typically customfield_XXXXX)
-        Object.entries(issue.fields).forEach(([fieldKey, fieldValue]) => {
-          if (Array.isArray(fieldValue) && fieldValue.length > 0 && typeof fieldValue[0] === 'object') {
-            const possibleSprints = fieldValue.filter((item: any) => 
-              item && item.id && item.name && item.state &&
-              (item.state === 'active' || item.state === 'future')
-            );
-            
-            if (possibleSprints.length > 0) {
-              possibleSprints.forEach((sprint: any) => {
-                if (!sprintMap.has(sprint.id)) {
-                  sprintMap.set(sprint.id, {
-                    id: sprint.id,
-                    name: sprint.name,
-                    state: sprint.state,
-                    startDate: sprint.startDate,
-                    endDate: sprint.endDate,
-                    boardId: sprint.originBoardId || 'unknown'
-                  });
-                }
-              });
-            }
-          }
-        });
-      });
-      
-      if (sprintMap.size > 0) {
-        console.log(`Found ${sprintMap.size} sprints from issue custom fields`);
-        return Array.from(sprintMap.values());
-      }
-    }
-    
-    // APPROACH 4: Try to find all possible sprints and filter by project
-    console.log(`APPROACH 4: Trying to fetch all sprints across all boards`);
-    const { data: allBoardsData, error: allBoardsError } = await supabase.functions.invoke('jira-api', {
-      body: {
-        domain,
-        email,
-        apiToken,
-        path: `agile/1.0/board`
-      }
-    });
-    
-    if (!allBoardsError && allBoardsData?.values && allBoardsData.values.length > 0) {
-      // Look for boards that might be related to our project
-      const possibleBoards = allBoardsData.values.filter((board: any) => {
-        if (board.location?.projectId === projectId) return true;
-        if (board.location?.projectKey === projectId) return true;
-        if (board.name && board.name.toLowerCase().includes(projectId.toLowerCase())) return true;
-        return false;
-      });
-      
-      if (possibleBoards.length > 0) {
-        console.log(`Found ${possibleBoards.length} possible boards related to project ${projectId}`);
-        
-        for (const board of possibleBoards) {
-          const boardId = board.id;
-          const { data: boardSprintData, error: boardSprintError } = await supabase.functions.invoke('jira-api', {
-            body: {
-              domain,
-              email,
-              apiToken,
-              path: `agile/1.0/board/${boardId}/sprint?state=active,future,closed`
-            }
-          });
-          
-          if (!boardSprintError && boardSprintData?.values && boardSprintData.values.length > 0) {
-            console.log(`Found ${boardSprintData.values.length} sprints from board ${boardId}`);
-            return boardSprintData.values.map((sprint: any) => ({
+          if (sprintsData.values && sprintsData.values.length > 0) {
+            return sprintsData.values.map((sprint: any) => ({
               id: sprint.id,
               name: sprint.name,
               state: sprint.state,
               startDate: sprint.startDate,
               endDate: sprint.endDate,
-              boardId: boardId
+              boardId: board.id
             }));
           }
+        } catch (err) {
+          console.error(`Error fetching sprints for board ${board.id}:`, err);
+          // Continue to next board if this one fails
         }
       }
     }
     
-    // If we've exhausted all approaches and found no sprints, return an empty array
+    // APPROACH 3: Try another JQL query variation
+    console.log(`APPROACH 3: Trying alternative JQL query for sprints in project ${projectId}`);
+    const alternativeJql = `project = ${projectId} AND sprint not in closedSprints()`;
+    const altSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(alternativeJql)}&maxResults=1`);
+    
+    if (altSprintsData.issues && altSprintsData.issues.length > 0) {
+      const issue = altSprintsData.issues[0];
+      const sprints = issue.fields?.sprint || [];
+      if (Array.isArray(sprints) && sprints.length > 0) {
+        return sprints.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state || 'active',
+          startDate: sprint.startDate,
+          endDate: sprint.endDate,
+          boardId: sprint.originBoardId || '0'
+        }));
+      }
+    }
+    
+    // APPROACH 4: Last resort - get all sprints across all boards
+    console.log(`APPROACH 4: Trying to fetch all sprints across all boards`);
+    const allBoardsData = await callJiraApi(credentials, `agile/1.0/board`);
+    
+    if (allBoardsData.values && allBoardsData.values.length > 0) {
+      for (const board of allBoardsData.values.slice(0, 5)) { // Limit to first 5 boards to avoid too many requests
+        try {
+          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active`);
+          
+          if (sprintsData.values && sprintsData.values.length > 0) {
+            // For each sprint, check if it contains issues from our project
+            for (const sprint of sprintsData.values) {
+              try {
+                const sprintIssuesJql = `project = ${projectId} AND sprint = ${sprint.id}`;
+                const sprintIssuesData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(sprintIssuesJql)}&maxResults=1`);
+                
+                if (sprintIssuesData.issues && sprintIssuesData.issues.length > 0) {
+                  // This sprint contains issues from our project, so return it
+                  return [{
+                    id: sprint.id,
+                    name: sprint.name,
+                    state: sprint.state,
+                    startDate: sprint.startDate,
+                    endDate: sprint.endDate,
+                    boardId: board.id
+                  }];
+                }
+              } catch (err) {
+                console.error(`Error checking sprint ${sprint.id} for project ${projectId}:`, err);
+                // Continue to next sprint
+              }
+            }
+          }
+        } catch (err) {
+          // Ignore errors for individual boards
+          continue;
+        }
+      }
+    }
+    
     console.log(`No active or future sprints found for project ${projectId} after trying all approaches`);
     
-    // FALLBACK: Create a fake sprint for testing purposes in development
-    if (process.env.NODE_ENV === 'development') {
+    // If we're in dev mode and no sprints were found, create a test sprint
+    if (DEV_MODE) {
       console.log(`[DEV MODE] Creating a test sprint for development purposes`);
-      return [{
-        id: '12345',
-        name: 'Development Sprint (Test)',
+      const testSprint: JiraSprint = {
+        id: `test-${projectId}`,
+        name: `Development Sprint (Test) (active)`,
         state: 'active',
-        startDate: new Date().toISOString(),
-        endDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
-        boardId: 'dev-board'
-      }];
+        boardId: '0',
+      };
+      return [testSprint];
     }
     
     return [];
-    
-  } catch (error: any) {
-    console.error('Error in fetchJiraSprints:', error);
-    throw error instanceof Error ? error : new Error('Failed to fetch Jira sprints');
+  } catch (error) {
+    console.error('Error fetching Jira sprints:', error);
+    throw error;
   }
 };
 
 export const fetchJiraTickets = async (
-  credentials: JiraCredentials,
+  credentials: JiraCredentials, 
   sprintId: string,
-  selectedProject?: { id?: string }
+  selectedProject: JiraProject | null
 ): Promise<JiraTicket[]> => {
-  const { domain, email, apiToken } = credentials;
-
-  const { data, error } = await supabase.functions.invoke('jira-api', {
-    body: {
-      domain,
-      email,
-      apiToken,
-      path: `agile/1.0/sprint/${sprintId}/issue`
+  try {
+    if (!selectedProject) {
+      throw new Error('No project selected');
     }
-  });
-
-  if (error) {
+    
+    // Handle test sprint in dev mode
+    if (DEV_MODE && sprintId.startsWith('test-')) {
+      console.log(`[DEV MODE] Creating test tickets for test sprint ${sprintId}`);
+      const projectId = sprintId.replace('test-', '');
+      
+      // Creating mock data for development purposes
+      const mockTickets: JiraTicket[] = [
+        {
+          id: `${projectId}-1001`,
+          key: `${selectedProject.key}-1001`,
+          summary: 'Implement user authentication flow',
+          description: 'Create a secure authentication flow that includes registration, login, and password recovery.',
+          status: 'In Progress',
+          issuetype: { id: '1', name: 'Story' },
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId
+        },
+        {
+          id: `${projectId}-1002`,
+          key: `${selectedProject.key}-1002`,
+          summary: 'Fix login screen validation issues',
+          description: 'Users are reporting that login validation error messages are confusing. Improve the UX.',
+          status: 'To Do',
+          issuetype: { id: '2', name: 'Bug' },
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId
+        },
+        {
+          id: `${projectId}-1003`,
+          key: `${selectedProject.key}-1003`,
+          summary: 'Add payment integration with Stripe',
+          description: 'Integrate Stripe payment gateway to process subscription payments.',
+          status: 'To Do',
+          issuetype: { id: '1', name: 'Story' },
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId
+        },
+        {
+          id: `${projectId}-1004`,
+          key: `${selectedProject.key}-1004`,
+          summary: 'Update user preferences dashboard',
+          description: 'Enhance the user preferences dashboard to include new notification settings.',
+          status: 'In Progress',
+          issuetype: { id: '3', name: 'Task' },
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId
+        },
+        {
+          id: `${projectId}-1005`,
+          key: `${selectedProject.key}-1005`,
+          summary: 'Performance optimization for report generation',
+          description: 'Reports are taking too long to generate. Optimize database queries and caching.',
+          status: 'To Do',
+          issuetype: { id: '1', name: 'Story' },
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId
+        }
+      ];
+      
+      return mockTickets;
+    }
+    
+    // Regular API call for real sprints
+    console.log(`Fetching tickets for sprint ID: ${sprintId} in project ${selectedProject.key}`);
+    const jqlQuery = `sprint = ${sprintId} ORDER BY updated DESC`;
+    const data = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=50`);
+    
+    // Ensure data.issues is always an array to prevent the map error
+    if (!data.issues) {
+      console.log('No issues found in sprint, returning empty array');
+      return [];
+    }
+    
+    // Transform the response into our JiraTicket format
+    return data.issues.map((issue: any) => {
+      const fields = issue.fields || {};
+      
+      return {
+        id: issue.id,
+        key: issue.key,
+        summary: fields.summary || '',
+        description: fields.description || '',
+        acceptance_criteria: fields.customfield_10016 || '',
+        status: fields.status?.name || '',
+        assignee: fields.assignee?.displayName || '',
+        priority: fields.priority?.name || '',
+        story_points: fields.customfield_10026 || 0,
+        labels: fields.labels || [],
+        epic: fields.epic?.name || '',
+        created_at: fields.created,
+        updated_at: fields.updated,
+        domain: credentials.domain,
+        projectId: selectedProject.id,
+        sprintId,
+        issuetype: fields.issuetype ? {
+          id: fields.issuetype.id,
+          name: fields.issuetype.name
+        } : undefined
+      };
+    });
+  } catch (error) {
     console.error('Error fetching Jira tickets:', error);
-    throw new Error('Failed to fetch Jira tickets');
+    throw error;
   }
-
-  return data.issues.map((issue: any) => {
-    // Extract acceptance criteria from custom fields if available
-    const acceptanceCriteria = issue.fields.customfield_10010 || '';
-
-    return {
-      id: issue.id,
-      key: issue.key,
-      summary: issue.fields.summary,
-      description: issue.fields.description || '',
-      acceptance_criteria: acceptanceCriteria,
-      status: issue.fields.status?.name,
-      assignee: issue.fields.assignee?.displayName,
-      priority: issue.fields.priority?.name,
-      story_points: issue.fields.customfield_10008, // Assuming this is the story points field
-      labels: issue.fields.labels,
-      epic: issue.fields.epic?.name,
-      created_at: issue.fields.created,
-      updated_at: issue.fields.updated,
-      issuetype: {
-        id: issue.fields.issuetype.id,
-        name: issue.fields.issuetype.name
-      },
-      projectId: selectedProject?.id,
-      sprintId: sprintId,
-      domain: domain
-    };
-  });
 };
 
 export const generateJiraContent = async (
-  selectedTicket: JiraTicket,
+  ticket: JiraTicket,
   request: JiraGenerationRequest
 ): Promise<JiraGenerationResponse> => {
-  // First check if the content already exists
-  if (selectedTicket.key) {
-    const { data: existingData, error: fetchError } = await supabase
-      .from('story_artifacts')
-      .select('*')
-      .eq('story_id', selectedTicket.key)
-      .maybeSingle();
-
-    if (!fetchError && existingData) {
-      // If we already have content, return it
-      const existingContent: JiraGenerationResponse = {
-        lld: existingData.lld_content || undefined,
-        code: existingData.code_content || undefined,
-        tests: existingData.test_content || undefined
-      };
-
-      // Only use existing content if it exists for the requested type
-      if ((request.type === 'lld' && existingData.lld_content) ||
-          (request.type === 'code' && existingData.code_content) ||
-          (request.type === 'tests' && existingData.test_content) ||
-          (request.type === 'all' && (existingData.lld_content || existingData.code_content || existingData.test_content))) {
-        return existingContent;
+  try {
+    const { data, error } = await supabase.functions.invoke('chat-with-jira', {
+      body: {
+        jiraTicket: ticket,
+        dataModel: request.dataModel || null,
+        documentsContext: request.documentsContext || null,
+        request: request.type === 'lld' ? 'Generate a Low-Level Design' :
+                request.type === 'code' ? 'Generate Implementation Code' :
+                request.type === 'tests' ? 'Generate Test Cases' : 'Generate all content',
+        projectContext: request.projectContext || null,
+        selectedDocuments: request.selectedDocuments || []
       }
+    });
+
+    if (error) {
+      console.error('Error generating content:', error);
+      throw new Error(error.message || 'Failed to generate content');
     }
-  }
 
-  // No existing content or specific content requested not available, generate new content
-  const { data, error } = await supabase.functions.invoke('chat-with-jira', {
-    body: {
-      jiraTicket: selectedTicket,
-      dataModel: request.dataModel,
-      documentsContext: request.documentsContext,
-      request: `Generate ${request.type === 'lld' ? 'Low-Level Design' : 
-                request.type === 'code' ? 'Implementation Code' : 
-                request.type === 'tests' ? 'Test Cases' : 
-                'Low-Level Design, Implementation Code, and Test Cases'} for ${selectedTicket.key}: ${selectedTicket.summary}`,
-      projectContext: request.projectContext,
-      selectedDocuments: request.selectedDocuments
+    // Save the generated content to our database
+    try {
+      await saveGeneratedContent(ticket, request.type, data.response);
+    } catch (saveError) {
+      console.error('Error saving generated content:', saveError);
+      // Continue even if saving fails
     }
-  });
 
-  if (error) {
-    console.error('Error generating content:', error);
-    throw new Error('Failed to generate content');
-  }
-
-  // Prepare response data
-  let responseData: JiraGenerationResponse = {};
-
-  if (request.type === 'lld' || request.type === 'all') {
-    responseData.lld = data.response;
-  } else if (request.type === 'code') {
-    responseData.code = data.response;
-  } else if (request.type === 'tests') {
-    responseData.tests = data.response;
-  } else {
-    responseData.response = data.response;
-  }
-
-  // Save the generated content
-  let contentToSave = '';
-  let contentType = request.type;
-  
-  if (request.type === 'all') {
-    // If all content was requested, save it under lld for now (we'd need to parse later)
-    contentToSave = data.response;
-    contentType = 'lld';
-  } else {
-    contentToSave = data.response;
-  }
-
-  // Save the content to the database
-  await supabase.functions.invoke('save-story-artifacts', {
-    body: {
-      storyId: selectedTicket.key,
-      projectId: selectedTicket.projectId,
-      sprintId: selectedTicket.sprintId,
-      contentType: contentType,
-      content: contentToSave
+    // Return the response based on the request type
+    if (request.type === 'lld') {
+      return { lld: data.response };
+    } else if (request.type === 'code') {
+      return { code: data.response };
+    } else if (request.type === 'tests') {
+      return { tests: data.response };
+    } else {
+      // Split the response into sections for 'all' type
+      return {
+        response: data.response,
+        // Additional processing could be done here to extract sections
+      };
     }
-  });
+  } catch (error) {
+    console.error('Error in generateJiraContent:', error);
+    throw error;
+  }
+};
 
-  return responseData;
+const saveGeneratedContent = async (ticket: JiraTicket, contentType: string, content: string) => {
+  if (!ticket || !ticket.key || !contentType || !content) return;
+
+  try {
+    const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
+      body: {
+        storyId: ticket.key,
+        projectId: ticket.projectId,
+        sprintId: ticket.sprintId,
+        contentType, 
+        content
+      }
+    });
+
+    if (error) {
+      console.error('Error saving generated content:', error);
+      throw new Error(error.message || 'Failed to save generated content');
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error in saveGeneratedContent:', error);
+    throw error;
+  }
 };
 
 export const pushContentToJira = async (
-  credentials: JiraCredentials, 
-  ticketId: string, 
+  credentials: JiraCredentials,
+  ticketId: string,
   content: string
 ): Promise<boolean> => {
-  const { domain, email, apiToken } = credentials;
-
-  // Add the comment to the Jira ticket
-  const { error } = await supabase.functions.invoke('jira-api', {
-    body: {
-      domain,
-      email,
-      apiToken,
-      path: `issue/${ticketId}/comment`,
-      method: 'POST',
-      data: {
-        body: {
-          version: 1,
-          type: "doc",
-          content: [
-            {
-              type: "paragraph",
-              content: [
-                {
-                  type: "text",
-                  text: content
-                }
-              ]
-            }
-          ]
-        }
+  try {
+    // Format content for Jira's ADFV2 format
+    const formattedContent = {
+      body: {
+        version: 1,
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: content
+              }
+            ]
+          }
+        ]
       }
-    }
-  });
+    };
 
-  if (error) {
-    console.error('Error pushing to Jira:', error);
-    throw new Error('Failed to push to Jira');
+    // Push to Jira as a comment
+    await callJiraApi(
+      credentials,
+      `issue/${ticketId}/comment`,
+      'POST',
+      formattedContent
+    );
+
+    return true;
+  } catch (error) {
+    console.error('Error pushing content to Jira:', error);
+    throw error;
   }
-
-  return true;
-};
-
-export const saveArtifact = async (
-  storyId: string,
-  projectId?: string,
-  sprintId?: string,
-  contentType?: string,
-  content?: string
-): Promise<void> => {
-  await supabase.functions.invoke('save-story-artifacts', {
-    body: {
-      storyId,
-      projectId,
-      sprintId,
-      contentType,
-      content
-    }
-  });
 };

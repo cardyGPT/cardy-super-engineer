@@ -48,13 +48,9 @@ serve(async (req) => {
       'Content-Type': 'application/json'
     };
 
-    // Special handling for board/sprint fetching
-    if (apiPath.includes('agile/1.0/board') && !apiPath.includes('/sprint')) {
+    // Special handling for sprint search
+    if (apiPath.includes('board') && !apiPath.includes('/sprint')) {
       console.log(`Fetching boards for project with enhanced handling`);
-    }
-
-    if (apiPath.includes('search') && (apiPath.includes('sprint') || apiPath.includes('Sprint'))) {
-      console.log(`Enhanced JQL sprint search: ${apiPath}`);
     }
 
     // Make the request to Jira
@@ -120,6 +116,12 @@ serve(async (req) => {
 
     // Parse the response
     const responseData = await response.json();
+    
+    // If we're fetching sprint issues but got no results, return an empty array instead of undefined
+    if (apiPath.includes('search') && responseData && !responseData.issues) {
+      console.log('No issues found in sprint search, returning empty issues array');
+      responseData.issues = [];
+    }
     
     // Log success response for debugging
     if (apiPath.includes('agile/1.0/board')) {
