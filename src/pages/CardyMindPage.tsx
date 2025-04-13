@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { BrainCircuit } from "lucide-react";
@@ -87,13 +88,15 @@ const CardyMindPage: React.FC = () => {
         selectedDocuments: selectedDocuments.length
       });
 
-      // Call the Supabase function to chat with documents
-      const response = await supabase.functions.invoke('chat-with-documents', {
+      // Call the Supabase function to chat with all project data
+      const response = await supabase.functions.invoke('chat-with-all-project-data', {
         body: {
-          message: userInput,
-          projectId: selectedProject,
-          documentIds: selectedDocuments.length > 0 ? selectedDocuments : undefined
-        },
+          messages: [
+            ...messages,
+            { role: "user", content: userInput }
+          ],
+          documents: filteredDocs
+        }
       });
 
       if (response.error) {
@@ -107,11 +110,17 @@ const CardyMindPage: React.FC = () => {
       }
       
       // Update used documents from API response if available
-      if (data.documentsUsed && Array.isArray(data.documentsUsed)) {
-        setUsedDocuments(data.documentsUsed);
+      if (data.context?.projects) {
+        const usedDocumentNames = documents
+          .filter(doc => data.context.projects.includes(doc.projectId))
+          .map(doc => doc.name);
+        setUsedDocuments(usedDocumentNames);
       }
       
-      setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: data.response.content 
+      }]);
       setUserInput("");
     } catch (error: any) {
       console.error('Error in AI chat:', error);
