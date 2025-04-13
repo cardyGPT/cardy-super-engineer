@@ -58,6 +58,33 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
     }
   }, [credentials]);
 
+  // Reset affected states when selectedProject changes
+  useEffect(() => {
+    if (selectedProject) {
+      // When project changes, clear selected sprint and ticket
+      setSelectedSprint(null);
+      setSelectedTicket(null);
+      setTickets([]);
+      
+      // If we already have sprints for this project, no need to fetch
+      if (!sprints[selectedProject.id] || sprints[selectedProject.id].length === 0) {
+        fetchSprints(selectedProject.id);
+      }
+    }
+  }, [selectedProject]);
+
+  // Reset ticket selection when selectedSprint changes
+  useEffect(() => {
+    if (selectedSprint) {
+      setSelectedTicket(null);
+      
+      // Fetch tickets for the selected sprint
+      fetchTickets(selectedSprint.id);
+    } else {
+      setTickets([]);
+    }
+  }, [selectedSprint]);
+
   const fetchProjects = async () => {
     if (!credentials) {
       setError('No Jira credentials provided');
@@ -68,8 +95,10 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
     setError(null);
 
     try {
+      console.log('Fetching Jira projects...');
       const projectsData = await fetchJiraProjects(credentials);
       setProjects(projectsData);
+      console.log(`Fetched ${projectsData.length} Jira projects`);
     } catch (err: any) {
       console.error('Error fetching Jira projects:', err);
       setError(err.message || 'Failed to fetch Jira projects');
@@ -109,11 +138,26 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
         console.log(`Found ${sprintsData.length} sprints for project ID: ${projectToUse}`);
       }
       
-      setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
+      // Check if sprints received are for the current selected project
+      // This prevents race conditions where project was changed during fetch
+      if (selectedProject && selectedProject.id === projectToUse) {
+        setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
+      } else {
+        // If project id changed, still update sprints for that project
+        setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
+      }
       
-      // Clear tickets when sprints change
-      setTickets([]);
-      setSelectedTicket(null);
+      // Clear tickets when sprints change for the current project
+      if (selectedProject && selectedProject.id === projectToUse) {
+        setTickets([]);
+        setSelectedTicket(null);
+        
+        // If there's only one sprint, select it automatically
+        if (sprintsData.length === 1) {
+          setSelectedSprint(sprintsData[0]);
+          fetchTickets(sprintsData[0].id);
+        }
+      }
     } catch (err: any) {
       console.error('Error fetching Jira sprints:', err);
       setError(err.message || 'Failed to fetch Jira sprints');

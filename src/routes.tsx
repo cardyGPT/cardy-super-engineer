@@ -57,6 +57,18 @@ export const routes = createBrowserRouter([
     element: <DataModelPage />,
   },
   {
+    path: '/docs-model',
+    element: <DataModelPage />,
+  },
+  {
+    path: '/docs-&-data-model',
+    element: <DataModelPage />,
+  },
+  {
+    path: '/docs-and-data-model',
+    element: <DataModelPage />,
+  },
+  {
     path: '/documents',
     element: <DocumentsPage />,
   },

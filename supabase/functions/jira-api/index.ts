@@ -48,9 +48,15 @@ serve(async (req) => {
       'Content-Type': 'application/json'
     };
 
-    // Special handling for sprint search
-    if (apiPath.includes('board') && !apiPath.includes('/sprint')) {
+    // Log specific request details for debugging
+    if (apiPath.includes('project')) {
+      console.log(`Fetching projects with enhanced logging`);
+    } else if (apiPath.includes('board')) {
       console.log(`Fetching boards for project with enhanced handling`);
+    } else if (apiPath.includes('sprint')) {
+      console.log(`Fetching sprints with path: ${apiPath}`);
+    } else if (apiPath.includes('search') && apiPath.includes('jql')) {
+      console.log(`Executing JQL search: ${apiPath}`);
     }
 
     // Make the request to Jira
@@ -117,19 +123,21 @@ serve(async (req) => {
     // Parse the response
     const responseData = await response.json();
     
-    // If we're fetching sprint issues but got no results, return an empty array instead of undefined
-    if (apiPath.includes('search') && responseData && !responseData.issues) {
-      console.log('No issues found in sprint search, returning empty issues array');
-      responseData.issues = [];
-    }
-    
-    // Log success response for debugging
-    if (apiPath.includes('agile/1.0/board')) {
+    // Enhanced logging for specific response types
+    if (apiPath.includes('project')) {
+      console.log(`Project API response: Found ${responseData.length || 0} projects`);
+    } else if (apiPath.includes('agile/1.0/board')) {
       console.log(`Board API response: Found ${responseData.values?.length || 0} boards`);
     } else if (apiPath.includes('agile/1.0/sprint')) {
       console.log(`Sprint API response: Found ${responseData.values?.length || 0} sprints`);
     } else if (apiPath.includes('search') && apiPath.includes('sprint')) {
       console.log(`Search API for sprints: Found ${responseData.issues?.length || 0} issues`);
+    }
+    
+    // If we're fetching sprint issues but got no results, return an empty array instead of undefined
+    if (apiPath.includes('search') && responseData && !responseData.issues) {
+      console.log('No issues found in sprint search, returning empty issues array');
+      responseData.issues = [];
     }
 
     return new Response(

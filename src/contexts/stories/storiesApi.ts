@@ -1,14 +1,16 @@
-
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
-const DEV_MODE = true; // Set to true to enable development mode with test data
+// Set this to false to disable test data and use real data only
+// In production, this should be set to false
+const DEV_MODE = true; 
 
 // Helper function to fetch from Jira API through our edge function
 const callJiraApi = async (credentials: JiraCredentials, path: string, method: string = 'GET', data?: any) => {
   const { domain, email, apiToken } = credentials;
   
   try {
+    console.log(`Calling Jira API with path: ${path}`);
     const { data: responseData, error } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
@@ -34,6 +36,7 @@ const callJiraApi = async (credentials: JiraCredentials, path: string, method: s
 
 export const fetchJiraProjects = async (credentials: JiraCredentials): Promise<JiraProject[]> => {
   try {
+    console.log('Fetching Jira projects...');
     const data = await callJiraApi(credentials, 'project');
     
     // Transform the response into our JiraProject format
@@ -61,8 +64,10 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     
     if (activeSprintsData.issues && activeSprintsData.issues.length > 0) {
       // Extract sprint info from the first issue
-      const sprints = activeSprintsData.issues[0].fields?.sprint || [];
+      const issue = activeSprintsData.issues[0];
+      const sprints = issue.fields?.sprint || [];
       if (Array.isArray(sprints) && sprints.length > 0) {
+        console.log(`Found ${sprints.length} active sprints via JQL approach`);
         return sprints.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
@@ -79,12 +84,16 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     const boardsData = await callJiraApi(credentials, `agile/1.0/board?projectKeyOrId=${projectId}`);
     
     if (boardsData.values && boardsData.values.length > 0) {
+      console.log(`Found ${boardsData.values.length} boards for project ${projectId}`);
+      
       // For each board, try to fetch active sprints
       for (const board of boardsData.values) {
         try {
+          console.log(`Fetching sprints for board ${board.id}`);
           const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active,future`);
           
           if (sprintsData.values && sprintsData.values.length > 0) {
+            console.log(`Found ${sprintsData.values.length} sprints for board ${board.id}`);
             return sprintsData.values.map((sprint: any) => ({
               id: sprint.id,
               name: sprint.name,
@@ -93,12 +102,16 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
               endDate: sprint.endDate,
               boardId: board.id
             }));
+          } else {
+            console.log(`No active/future sprints found for board ${board.id}`);
           }
         } catch (err) {
           console.error(`Error fetching sprints for board ${board.id}:`, err);
           // Continue to next board if this one fails
         }
       }
+    } else {
+      console.log(`No boards found for project ${projectId}`);
     }
     
     // APPROACH 3: Try another JQL query variation
@@ -110,6 +123,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       const issue = altSprintsData.issues[0];
       const sprints = issue.fields?.sprint || [];
       if (Array.isArray(sprints) && sprints.length > 0) {
+        console.log(`Found ${sprints.length} active sprints via alternative JQL approach`);
         return sprints.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
@@ -126,8 +140,11 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     const allBoardsData = await callJiraApi(credentials, `agile/1.0/board`);
     
     if (allBoardsData.values && allBoardsData.values.length > 0) {
+      console.log(`Found ${allBoardsData.values.length} boards total, checking for project ${projectId} sprints`);
+      
       for (const board of allBoardsData.values.slice(0, 5)) { // Limit to first 5 boards to avoid too many requests
         try {
+          console.log(`Checking board ${board.id} for sprints related to project ${projectId}`);
           const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active`);
           
           if (sprintsData.values && sprintsData.values.length > 0) {
@@ -139,6 +156,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
                 
                 if (sprintIssuesData.issues && sprintIssuesData.issues.length > 0) {
                   // This sprint contains issues from our project, so return it
+                  console.log(`Found sprint ${sprint.id} with issues for project ${projectId}`);
                   return [{
                     id: sprint.id,
                     name: sprint.name,
@@ -165,12 +183,13 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     
     // If we're in dev mode and no sprints were found, create a test sprint
     if (DEV_MODE) {
-      console.log(`[DEV MODE] Creating a test sprint for development purposes`);
+      console.log(`[DEV MODE] Creating a test sprint for project ${projectId} for development purposes`);
       const testSprint: JiraSprint = {
         id: `test-${projectId}`,
-        name: `Development Sprint (Test) (active)`,
+        name: `Development Sprint for ${projectId} (Test) (active)`,
         state: 'active',
         boardId: '0',
+        projectId: projectId // Add projectId to the sprint to track which project it belongs to
       };
       return [testSprint];
     }
@@ -192,10 +211,19 @@ export const fetchJiraTickets = async (
       throw new Error('No project selected');
     }
     
+    console.log(`Fetching tickets for sprint ID: ${sprintId} in project ${selectedProject.key} (${selectedProject.id})`);
+    
     // Handle test sprint in dev mode
     if (DEV_MODE && sprintId.startsWith('test-')) {
       console.log(`[DEV MODE] Creating test tickets for test sprint ${sprintId}`);
       const projectId = sprintId.replace('test-', '');
+      
+      // Verify this test sprint belongs to the selected project
+      if (projectId !== selectedProject.id) {
+        console.warn(`Test sprint ${sprintId} does not match selected project ${selectedProject.id}`);
+        // Create empty ticket array for mismatched project/sprint
+        return [];
+      }
       
       // Creating mock data for development purposes
       const mockTickets: JiraTicket[] = [
@@ -266,7 +294,7 @@ export const fetchJiraTickets = async (
     
     // Ensure data.issues is always an array to prevent the map error
     if (!data.issues) {
-      console.log('No issues found in sprint, returning empty array');
+      console.log('No issues found in sprint, returning empty issues array');
       return [];
     }
     

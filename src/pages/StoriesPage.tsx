@@ -166,6 +166,10 @@ const StoriesPage: React.FC = () => {
       
       if (selectedProject) {
         await fetchSprints(selectedProject.id);
+        
+        if (selectedSprint) {
+          await fetchTickets(selectedSprint.id);
+        }
       }
       
       setIsRefreshing(false);
@@ -183,41 +187,75 @@ const StoriesPage: React.FC = () => {
         variant: "destructive"
       });
     }
-  }, [loading, isRefreshing, fetchProjects, selectedProject, fetchSprints, toast]);
+  }, [loading, isRefreshing, fetchProjects, selectedProject, fetchSprints, selectedSprint, fetchTickets, toast]);
 
   const handleProjectChange = async (projectId: string) => {
+    // Find the project in our projects list
     const project = jiraProjects.find(p => p.id === projectId);
+    
+    // If project exists and is different from current selection
     if (project && (!selectedProject || selectedProject.id !== project.id)) {
-      setSelectedProject(project);
+      console.log(`Changing selected project to: ${project.name} (${project.id})`);
+      
+      // Clear sprint selection and error first
       setSelectedSprint(null);
       setSprintError(null);
       
-      try {
-        await fetchSprints(project.id);
-      } catch (err: any) {
-        console.error("Error fetching sprints:", err);
-        setSprintError(err.message || "Failed to fetch sprints");
-        toast({
-          title: "Error",
-          description: err.message || "Failed to fetch sprints",
-          variant: "destructive",
-        });
+      // Update selected project
+      setSelectedProject(project);
+      
+      // If we don't have sprints for this project yet, fetch them
+      if (!sprints[project.id] || sprints[project.id].length === 0) {
+        try {
+          console.log(`No cached sprints for project ${project.id}, fetching...`);
+          await fetchSprints(project.id);
+        } catch (err: any) {
+          console.error("Error fetching sprints:", err);
+          setSprintError(err.message || "Failed to fetch sprints");
+          toast({
+            title: "Error",
+            description: err.message || "Failed to fetch sprints",
+            variant: "destructive",
+          });
+        }
+      } else {
+        console.log(`Using ${sprints[project.id].length} cached sprints for project ${project.id}`);
       }
     }
   };
 
   const handleSprintChange = (sprintId: string) => {
-    if (!selectedProject) return;
+    if (!selectedProject) {
+      console.error("Attempting to select sprint without a selected project");
+      return;
+    }
     
+    // Check if we have sprints for this project
     const projectSprints = sprints[selectedProject.id] || [];
+    
+    if (projectSprints.length === 0) {
+      console.error(`No sprints found for project ${selectedProject.id}`);
+      return;
+    }
+    
+    // Find the sprint in our sprints list for this project
     const sprint = projectSprints.find(s => s.id === sprintId);
-    if (sprint && (!selectedSprint || selectedSprint.id !== sprint.id)) {
+    
+    if (sprint) {
+      console.log(`Changing selected sprint to: ${sprint.name} (${sprint.id})`);
+      
+      // Update selected sprint
       setSelectedSprint(sprint);
+      
+      // Fetch tickets for this sprint
       fetchTickets(sprint.id);
+    } else {
+      console.error(`Sprint ${sprintId} not found in project ${selectedProject.id}`);
     }
   };
 
   const handleTypeFilterChange = (type: string | null) => {
+    console.log(`Setting ticket type filter to: ${type || 'all'}`);
     setTicketTypeFilter(type);
   };
   
@@ -232,6 +270,9 @@ const StoriesPage: React.FC = () => {
   }, [error, toast, pageLoaded]);
 
   const isLoadingSprints = loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
+  
+  // Check if we have sprints for the selected project
+  const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
   
   return (
     <AppLayout>
@@ -367,7 +408,11 @@ const StoriesPage: React.FC = () => {
                         onRetry={() => selectedProject && fetchSprints(selectedProject.id)}
                         additionalMessage="Try refreshing or selecting a different project."
                       />
-                    ) : selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0) ? (
+                    ) : !selectedProject ? (
+                      <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
+                        Select a project first
+                      </div>
+                    ) : availableSprints.length === 0 ? (
                       <LoadingContent 
                         isWarning={true}
                         message="No active sprints found for this project"
@@ -378,15 +423,15 @@ const StoriesPage: React.FC = () => {
                       <Select 
                         value={selectedSprint?.id || ""} 
                         onValueChange={handleSprintChange}
-                        disabled={!selectedProject || !sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0}
+                        disabled={!selectedProject || availableSprints.length === 0}
                       >
                         <SelectTrigger id="sprint-select" className="w-full">
                           <SelectValue placeholder="Select a sprint" />
                         </SelectTrigger>
                         <SelectContent>
-                          {(sprints[selectedProject?.id || ''] || []).map(sprint => (
+                          {availableSprints.map(sprint => (
                             <SelectItem key={sprint.id} value={sprint.id}>
-                              {sprint.name} ({sprint.state})
+                              {sprint.name} ({sprint.state || 'active'})
                             </SelectItem>
                           ))}
                         </SelectContent>
