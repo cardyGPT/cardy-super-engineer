@@ -28,6 +28,11 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
       throw new Error(error.message || 'Failed to call Jira API');
     }
 
+    if (responseData?.error) {
+      console.error('Jira API returned an error:', responseData.error);
+      throw new Error(responseData.error || 'Error from Jira API');
+    }
+
     return responseData;
   } catch (error) {
     console.error('Error in callJiraApi:', error);

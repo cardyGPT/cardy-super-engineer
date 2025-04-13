@@ -66,9 +66,9 @@ serve(async (req) => {
     }
     
     // Successfully got a response
-    const data = await response.json();
+    const responseData = await response.json();
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(responseData),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
