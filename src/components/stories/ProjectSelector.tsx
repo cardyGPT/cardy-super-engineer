@@ -87,14 +87,17 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
 
   // Log sprint information for debugging
   if (selectedProject && availableSprints.length > 0) {
-    console.log('Available sprints:', availableSprints.map(s => ({ 
+    console.log('All available sprints:', availableSprints.map(s => ({ 
       id: s.id, 
       name: s.name, 
       state: s.state,
       stateType: typeof s.state
     })));
     
-    console.log('Active sprints count:', activeSprints.length);
+    console.log('Active sprints found:', activeSprints.length);
+    if (activeSprints.length > 0) {
+      console.log('Active sprints:', activeSprints.map(s => ({ id: s.id, name: s.name })));
+    }
   }
 
   return (
@@ -195,14 +198,17 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   {/* Show active sprints first with special indicator */}
                   {activeSprints.length > 0 && (
                     <>
+                      <SelectItem value="active-header" disabled className="font-semibold text-green-600 py-1">
+                        ACTIVE SPRINTS
+                      </SelectItem>
                       {activeSprints.map(sprint => (
-                        <SelectItem key={sprint.id} value={sprint.id} className="font-medium">
-                          🟢 {sprint.name} (active)
+                        <SelectItem key={sprint.id} value={sprint.id} className="font-medium ml-2">
+                          🟢 {sprint.name}
                         </SelectItem>
                       ))}
                       {sortedSprints.length > activeSprints.length && (
                         <SelectItem value="divider" disabled className="py-1 my-1 border-t border-gray-200">
-                          Other Sprints
+                          OTHER SPRINTS
                         </SelectItem>
                       )}
                     </>
@@ -213,13 +219,13 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                     .filter(sprint => (sprint.state || '').toLowerCase() !== 'active')
                     .map(sprint => {
                       const sprintState = (sprint.state || '').toLowerCase();
-                      const stateDisplay = 
-                        sprintState === 'future' ? '(future)' : 
-                        '(closed)';
+                      const stateIcon = 
+                        sprintState === 'future' ? '🔜' : 
+                        '✓';
                       
                       return (
-                        <SelectItem key={sprint.id} value={sprint.id}>
-                          {sprint.name} {stateDisplay}
+                        <SelectItem key={sprint.id} value={sprint.id} className="ml-2">
+                          {stateIcon} {sprint.name} ({sprintState})
                         </SelectItem>
                       );
                     })
