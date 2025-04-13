@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -160,7 +161,17 @@ const StoriesPage: React.FC = () => {
     setSprintError(null);
     try {
       await fetchProjects();
+      
+      if (selectedProject) {
+        await fetchSprints(selectedProject.id);
+      }
+      
       setIsRefreshing(false);
+      
+      toast({
+        title: "Refreshed",
+        description: "Jira data has been refreshed"
+      });
     } catch (err) {
       setIsRefreshing(false);
       toast({
@@ -343,7 +354,7 @@ const StoriesPage: React.FC = () => {
                     <label htmlFor="sprint-select" className="text-sm font-medium">
                       Sprint
                     </label>
-                    {loading && selectedProject ? (
+                    {isLoadingSprints ? (
                       <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
                         Loading sprints...
                       </div>
@@ -360,7 +371,7 @@ const StoriesPage: React.FC = () => {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>No Sprints Found</AlertTitle>
                         <AlertDescription>
-                          No sprints were found for this project. Make sure the project uses Scrum methodology, has boards configured, and has active sprints.
+                          No active sprints were found for this project. Make sure the project uses Scrum methodology, has boards configured, and has active sprints.
                         </AlertDescription>
                         <div className="mt-2">
                           <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>

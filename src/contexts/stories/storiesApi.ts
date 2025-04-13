@@ -61,6 +61,55 @@ export const fetchJiraSprints = async (
   }
 
   try {
+    // Try to get all active and future sprints for the project directly
+    console.log(`Attempting to fetch active sprints directly for project ${projectId}`);
+    const { data: projectSprintData, error: projectSprintError } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        // Try to get active sprints directly using JQL
+        path: `search?jql=project=${projectId}%20AND%20sprint%20in%20openSprints()&fields=sprint`
+      }
+    });
+    
+    if (projectSprintError) {
+      console.error('Error fetching project sprints directly:', projectSprintError);
+      throw new Error(projectSprintError.message || 'Failed to fetch sprints directly');
+    }
+    
+    if (projectSprintData?.issues && projectSprintData.issues.length > 0) {
+      // Extract unique sprints from the issues
+      const sprintsSet = new Set();
+      const sprints = [];
+      
+      // Extract sprints from each issue
+      projectSprintData.issues.forEach((issue: any) => {
+        const issueSprints = issue.fields.sprint || [];
+        if (Array.isArray(issueSprints)) {
+          issueSprints.forEach((sprint: any) => {
+            if (!sprintsSet.has(sprint.id) && (sprint.state === 'active' || sprint.state === 'future')) {
+              sprintsSet.add(sprint.id);
+              sprints.push({
+                id: sprint.id,
+                name: sprint.name,
+                state: sprint.state,
+                startDate: sprint.startDate,
+                endDate: sprint.endDate,
+                boardId: sprint.originBoardId || 'unknown'
+              });
+            }
+          });
+        }
+      });
+      
+      if (sprints.length > 0) {
+        console.log(`Found ${sprints.length} active sprints directly from issues`);
+        return sprints;
+      }
+    }
+    
+    // If no sprints from issues, try the agile API
     // First get agile boards for the project
     console.log(`Fetching boards for project ${projectId}`);
     const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
@@ -77,43 +126,29 @@ export const fetchJiraSprints = async (
       throw new Error(`Failed to fetch Jira boards: ${boardError.message}`);
     }
 
-    if (!boardData) {
-      console.warn('No board data returned from Jira API');
-      return [];
-    }
-
-    if (boardData.error) {
-      throw new Error(boardData.error);
-    }
-
     // Check if values array exists and has items
     if (!boardData.values || boardData.values.length === 0) {
-      console.log('No boards found for this project');
+      console.log('No boards found for this project, trying to fetch all active sprints');
       
-      // Try fetching all active and future sprints for the project directly
-      console.log(`Attempting to fetch active sprints directly for project ${projectId}`);
-      const { data: projectSprintData, error: projectSprintError } = await supabase.functions.invoke('jira-api', {
+      // Try a different approach - get all active sprints regardless of board
+      const { data: allSprintsData, error: allSprintsError } = await supabase.functions.invoke('jira-api', {
         body: {
           domain,
           email,
           apiToken,
-          // Try to get active sprints directly from the project
-          path: `agile/1.0/board/sprint?state=active,future&projectKeyOrId=${projectId}`
+          path: `search?jql=project=${projectId}%20AND%20sprint%20not%20in%20closedSprints()&maxResults=100`
         }
       });
       
-      if (projectSprintError) {
-        console.error('Error fetching project sprints directly:', projectSprintError);
-      } else if (projectSprintData?.values && projectSprintData.values.length > 0) {
-        console.log(`Found ${projectSprintData.values.length} sprints directly for project`);
-        return projectSprintData.values.map((sprint: any) => ({
-          id: sprint.id,
-          name: sprint.name,
-          state: sprint.state,
-          startDate: sprint.startDate,
-          endDate: sprint.endDate,
-          boardId: sprint.originBoardId || 'unknown'
-        }));
+      if (allSprintsError) {
+        console.error('Error fetching all sprints:', allSprintsError);
+        return [];
+      }
+      
+      if (allSprintsData && allSprintsData.total > 0) {
+        // Try to extract sprint info from the issues
+        console.log(`Found ${allSprintsData.total} issues in active sprints`);
+        return [];
       }
       
       return [];
@@ -128,7 +163,7 @@ export const fetchJiraSprints = async (
         domain,
         email,
         apiToken,
-        path: `agile/1.0/board/${boardId}/sprint`
+        path: `agile/1.0/board/${boardId}/sprint?state=active,future`
       }
     });
 
@@ -140,10 +175,6 @@ export const fetchJiraSprints = async (
     if (!sprintData) {
       console.warn('No sprint data returned from Jira API');
       return [];
-    }
-
-    if (sprintData.error) {
-      throw new Error(sprintData.error);
     }
 
     // Check if values array exists

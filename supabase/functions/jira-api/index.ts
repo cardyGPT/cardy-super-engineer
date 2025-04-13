@@ -67,6 +67,23 @@ serve(async (req) => {
       
       console.error(`Jira API error (${response.status}):`, errorData);
       
+      // Special handling for 404 errors on specific paths
+      if (response.status === 404) {
+        if (apiPath.includes('agile/1.0/board')) {
+          console.log("Board not found, returning empty values array");
+          return new Response(
+            JSON.stringify({ values: [] }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        } else if (apiPath.includes('agile/1.0/sprint')) {
+          console.log("Sprint not found, returning empty values array");
+          return new Response(
+            JSON.stringify({ values: [] }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+      }
+      
       // Provide more specific error messages based on path and status code
       let errorMessage = `Jira API error: ${response.status} ${response.statusText}`;
       
@@ -75,27 +92,7 @@ serve(async (req) => {
       } else if (response.status === 403) {
         errorMessage = "You don't have permission to access this Jira resource.";
       } else if (response.status === 404) {
-        if (apiPath.includes('agile/1.0/board')) {
-          console.log("Board not found, returning empty values array");
-          // Special handling for board-related 404 errors
-          return new Response(
-            JSON.stringify({ 
-              values: [] // Return empty values array instead of error for board not found
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-          );
-        } else if (apiPath.includes('agile/1.0/sprint')) {
-          console.log("Sprint not found, returning empty values array");
-          // Special handling for sprint-related 404 errors
-          return new Response(
-            JSON.stringify({ 
-              values: [] // Return empty values array instead of error for sprint not found
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-          );
-        } else {
-          errorMessage = "The requested Jira resource was not found.";
-        }
+        errorMessage = "The requested Jira resource was not found.";
       } else if (apiPath.includes('agile/1.0/board')) {
         errorMessage = "Failed to fetch Jira boards. Please verify your Jira account has access to Agile boards.";
       } else if (apiPath.includes('agile/1.0/sprint')) {
