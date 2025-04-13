@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -186,15 +185,18 @@ const StoriesPage: React.FC = () => {
       setSprintError(null);
       
       try {
+        setLoading(true);
         await fetchSprints(project.id);
+        setLoading(false);
       } catch (err: any) {
         console.error("Error fetching sprints:", err);
         setSprintError(err.message || "Failed to fetch sprints");
         toast({
           title: "Error",
           description: err.message || "Failed to fetch sprints",
-          variant: "destructive"
+          variant: "destructive",
         });
+        setLoading(false);
       }
     }
   };
@@ -367,8 +369,13 @@ const StoriesPage: React.FC = () => {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>No Sprints Found</AlertTitle>
                         <AlertDescription>
-                          No sprints were found for this project. Make sure the project uses Scrum methodology.
+                          No sprints were found for this project. Make sure the project uses Scrum methodology or create a sprint in Jira.
                         </AlertDescription>
+                        <div className="mt-2">
+                          <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>
+                            View in Jira
+                          </Button>
+                        </div>
                       </Alert>
                     ) : (
                       <Select 

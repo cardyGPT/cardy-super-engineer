@@ -77,19 +77,16 @@ export const fetchJiraSprints = async (
     }
 
     if (!boardData) {
-      throw new Error('No data returned from Jira API');
+      console.warn('No board data returned from Jira API');
+      return [];
     }
 
     if (boardData.error) {
       throw new Error(boardData.error);
     }
 
-    if (!boardData.values) {
-      console.error('Invalid board data format:', boardData);
-      throw new Error('No boards found for this project');
-    }
-
-    if (boardData.values.length === 0) {
+    // Check if values array exists and has items
+    if (!boardData.values || boardData.values.length === 0) {
       console.log('No boards found for this project');
       return [];
     }
@@ -113,16 +110,18 @@ export const fetchJiraSprints = async (
     }
 
     if (!sprintData) {
-      throw new Error('No data returned from Jira API');
+      console.warn('No sprint data returned from Jira API');
+      return [];
     }
 
     if (sprintData.error) {
       throw new Error(sprintData.error);
     }
 
+    // Check if values array exists
     if (!sprintData.values) {
-      console.error('Invalid sprint data format:', sprintData);
-      throw new Error('No sprints found for this board');
+      console.warn('Invalid sprint data format:', sprintData);
+      return [];
     }
 
     return sprintData.values.map((sprint: any) => ({

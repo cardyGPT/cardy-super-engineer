@@ -30,7 +30,7 @@ serve(async (req) => {
       );
     }
 
-    // Construct the Jira API URL
+    // Construct the Jira API URL - ensure proper formatting of URL
     const baseUrl = domain.includes('://') ? domain : `https://${domain}`;
     const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
     const apiPath = path.startsWith('/') ? path.substring(1) : path;
@@ -67,7 +67,7 @@ serve(async (req) => {
       
       console.error(`Jira API error (${response.status}):`, errorData);
       
-      // Provide more specific error messages for common failure scenarios
+      // Provide more specific error messages based on path and status code
       let errorMessage = `Jira API error: ${response.status} ${response.statusText}`;
       
       if (response.status === 401) {
@@ -75,7 +75,17 @@ serve(async (req) => {
       } else if (response.status === 403) {
         errorMessage = "You don't have permission to access this Jira resource.";
       } else if (response.status === 404) {
-        errorMessage = "The requested Jira resource was not found.";
+        if (apiPath.includes('agile/1.0/board')) {
+          // Special handling for board-related 404 errors
+          return new Response(
+            JSON.stringify({ 
+              values: [] // Return empty values array instead of error for board not found
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        } else {
+          errorMessage = "The requested Jira resource was not found.";
+        }
       } else if (apiPath.includes('agile/1.0/board')) {
         errorMessage = "Failed to fetch Jira boards. Please verify your Jira account has access to Agile boards.";
       } else if (apiPath.includes('agile/1.0/sprint')) {
