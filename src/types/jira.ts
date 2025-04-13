@@ -37,6 +37,7 @@ export interface JiraSprint {
   startDate?: string;
   endDate?: string;
   boardId: string;
+  projectId?: string; // Add this property to support tracking which project a sprint belongs to
 }
 
 export interface JiraCredentials {
