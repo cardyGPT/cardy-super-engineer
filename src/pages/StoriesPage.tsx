@@ -281,6 +281,7 @@ const StoriesPage: React.FC = () => {
           <h1 className="text-3xl font-bold">Jira Stories</h1>
           
           <div className="flex gap-2">
+            {/* Commenting out context button
             <Button 
               variant="outline" 
               size="sm" 
@@ -289,6 +290,7 @@ const StoriesPage: React.FC = () => {
               <Database className="h-4 w-4 mr-2" />
               Context
             </Button>
+            */}
             
             {isAuthenticated && (
               <Button 
@@ -311,6 +313,7 @@ const StoriesPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Commenting out project context display
         {projectContextData && (
           <div className="mb-4">
             <Card className="bg-muted/50 border-dashed">
@@ -339,6 +342,7 @@ const StoriesPage: React.FC = () => {
             </Card>
           </div>
         )}
+        */}
 
         {!isAuthenticated ? (
           <Card>
@@ -415,7 +419,7 @@ const StoriesPage: React.FC = () => {
                     ) : availableSprints.length === 0 ? (
                       <LoadingContent 
                         isWarning={true}
-                        message="No active sprints found for this project"
+                        message="No sprints found for this project"
                         onRetry={() => selectedProject && fetchSprints(selectedProject.id)}
                         additionalMessage="The project may not use Scrum methodology or have active sprints."
                       />
@@ -448,6 +452,7 @@ const StoriesPage: React.FC = () => {
                     )}
                   </div>
 
+                  {/* Commenting out filter by type
                   <div className="space-y-2">
                     <label htmlFor="type-filter-select" className="text-sm font-medium flex items-center">
                       <Filter className="h-3 w-3 mr-1" />
@@ -469,6 +474,7 @@ const StoriesPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
+                  */}
                   
                   {lastSuccessfulRefresh && (
                     <div className="text-xs text-muted-foreground text-right pt-2">

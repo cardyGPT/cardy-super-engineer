@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,11 +61,13 @@ const StoryList: React.FC = () => {
     
     let filtered = [...tickets];
     
+    /* Commenting out ticket type filtering
     if (ticketTypeFilter) {
       filtered = filtered.filter(ticket => 
         ticket.issuetype?.name === ticketTypeFilter
       );
     }
+    */
     
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -80,7 +83,7 @@ const StoryList: React.FC = () => {
     setFilteredTickets(filtered);
     
     setCurrentPage(1);
-  }, [tickets, searchTerm, ticketTypeFilter]);
+  }, [tickets, searchTerm]);
   
   useEffect(() => {
     if (!filteredTickets.length) {

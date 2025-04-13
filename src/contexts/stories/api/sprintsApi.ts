@@ -6,18 +6,23 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
   console.log(`Attempting to fetch sprints for project ID: ${projectId}`);
   
   try {
-    // APPROACH 1: Try to fetch active sprints directly using JQL
-    console.log(`APPROACH 1: Fetching active sprints directly for project ${projectId} using JQL`);
-    const jqlQuery = `project = ${projectId} AND sprint in openSprints()`;
-    const activeSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=1`);
+    // APPROACH 1: Try to fetch all sprints (including closed ones) using JQL
+    console.log(`APPROACH 1: Fetching all sprints for project ${projectId} using JQL`);
+    const jqlQuery = `project = ${projectId}`;
+    const allSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=1`);
     
-    if (activeSprintsData.issues && activeSprintsData.issues.length > 0) {
+    if (allSprintsData.issues && allSprintsData.issues.length > 0) {
       // Extract sprint info from the first issue
-      const issue = activeSprintsData.issues[0];
-      const sprints = issue.fields?.sprint || [];
-      if (Array.isArray(sprints) && sprints.length > 0) {
-        console.log(`Found ${sprints.length} active sprints via JQL approach`);
-        return sprints.map((sprint: any) => ({
+      const issue = allSprintsData.issues[0];
+      const sprints = issue.fields?.closedSprints || [];
+      const activeSprints = issue.fields?.sprint || [];
+      
+      // Combine active and closed sprints
+      const allSprints = [...activeSprints, ...sprints];
+      
+      if (Array.isArray(allSprints) && allSprints.length > 0) {
+        console.log(`Found ${allSprints.length} sprints via JQL approach`);
+        return allSprints.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
           state: sprint.state,
@@ -29,18 +34,18 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       }
     }
     
-    // APPROACH 2: If no active sprints found with JQL, try getting boards for the project
+    // APPROACH 2: If no sprints found with JQL, try getting boards for the project
     console.log(`APPROACH 2: Fetching boards for project ${projectId}`);
     const boardsData = await callJiraApi(credentials, `agile/1.0/board?projectKeyOrId=${projectId}`);
     
     if (boardsData.values && boardsData.values.length > 0) {
       console.log(`Found ${boardsData.values.length} boards for project ${projectId}`);
       
-      // For each board, try to fetch active sprints
+      // For each board, try to fetch all sprints (including closed ones)
       for (const board of boardsData.values) {
         try {
-          console.log(`Fetching sprints for board ${board.id}`);
-          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active,future`);
+          console.log(`Fetching all sprints for board ${board.id}`);
+          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active,future,closed`);
           
           if (sprintsData.values && sprintsData.values.length > 0) {
             console.log(`Found ${sprintsData.values.length} sprints for board ${board.id}`);
@@ -54,7 +59,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
               projectId
             }));
           } else {
-            console.log(`No active/future sprints found for board ${board.id}`);
+            console.log(`No sprints found for board ${board.id}`);
           }
         } catch (err) {
           console.error(`Error fetching sprints for board ${board.id}:`, err);
@@ -65,20 +70,25 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       console.log(`No boards found for project ${projectId}`);
     }
     
-    // APPROACH 3: Try another JQL query variation
-    console.log(`APPROACH 3: Trying alternative JQL query for sprints in project ${projectId}`);
-    const alternativeJql = `project = ${projectId} AND sprint not in closedSprints()`;
+    // APPROACH 3: Try another JQL query variation to get all sprints
+    console.log(`APPROACH 3: Trying alternative JQL query for all sprints in project ${projectId}`);
+    const alternativeJql = `project = ${projectId}`;
     const altSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(alternativeJql)}&maxResults=1`);
     
     if (altSprintsData.issues && altSprintsData.issues.length > 0) {
       const issue = altSprintsData.issues[0];
-      const sprints = issue.fields?.sprint || [];
-      if (Array.isArray(sprints) && sprints.length > 0) {
-        console.log(`Found ${sprints.length} active sprints via alternative JQL approach`);
-        return sprints.map((sprint: any) => ({
+      const closedSprints = issue.fields?.closedSprints || [];
+      const activeSprints = issue.fields?.sprint || [];
+      
+      // Combine active and closed sprints
+      const allSprints = [...activeSprints, ...closedSprints];
+      
+      if (Array.isArray(allSprints) && allSprints.length > 0) {
+        console.log(`Found ${allSprints.length} sprints via alternative JQL approach`);
+        return allSprints.map((sprint: any) => ({
           id: sprint.id,
           name: sprint.name,
-          state: sprint.state || 'active',
+          state: sprint.state || 'closed',
           startDate: sprint.startDate,
           endDate: sprint.endDate,
           boardId: sprint.originBoardId || '0',
@@ -97,7 +107,7 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       for (const board of allBoardsData.values.slice(0, 5)) { // Limit to first 5 boards to avoid too many requests
         try {
           console.log(`Checking board ${board.id} for sprints related to project ${projectId}`);
-          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active`);
+          const sprintsData = await callJiraApi(credentials, `agile/1.0/board/${board.id}/sprint?state=active,closed`);
           
           if (sprintsData.values && sprintsData.values.length > 0) {
             // For each sprint, check if it contains issues from our project
@@ -132,17 +142,17 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       }
     }
     
-    console.log(`No active or future sprints found for project ${projectId} after trying all approaches`);
+    console.log(`No sprints found for project ${projectId} after trying all approaches`);
     
     // If we're in dev mode and no sprints were found, create a test sprint
     if (DEV_MODE) {
       console.log(`[DEV MODE] Creating a test sprint for project ${projectId} for development purposes`);
       const testSprint: JiraSprint = {
         id: `test-${projectId}`,
-        name: `Development Sprint for ${projectId} (Test) (active)`,
+        name: `Development Sprint for ${projectId} (Test)`,
         state: 'active',
         boardId: '0',
-        projectId // Add projectId to the sprint to track which project it belongs to
+        projectId
       };
       return [testSprint];
     }
