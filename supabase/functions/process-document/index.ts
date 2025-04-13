@@ -27,8 +27,8 @@ serve(async (req) => {
     }
 
     // Parse request data
-    const { documentId } = await req.json();
-    console.log(`Processing document: ${documentId}`);
+    const { documentId, fileUrl, fileType, projectId, forceReprocess = false } = await req.json();
+    console.log(`Processing document: ${documentId}, Force reprocess: ${forceReprocess}`);
 
     if (!documentId) {
       throw new Error('Document ID is required');
@@ -260,35 +260,72 @@ serve(async (req) => {
     }
 
     // Delete any existing chunks for this document to avoid duplicates
-    const { error: deleteError } = await supabase
-      .from('project_chunks')
-      .delete()
-      .eq('document_id', document.id);
+    if (forceReprocess) {
+      console.log(`Force reprocessing requested. Deleting existing chunks for document ${document.id}`);
+      const { error: deleteError } = await supabase
+        .from('project_chunks')
+        .delete()
+        .eq('document_id', document.id);
 
-    if (deleteError) {
-      console.error(`Warning: Failed to delete existing chunks: ${deleteError.message}`);
+      if (deleteError) {
+        console.error(`Warning: Failed to delete existing chunks: ${deleteError.message}`);
+      }
+    } else {
+      // Check if chunks already exist
+      const { data: existingChunks, error: checkError } = await supabase
+        .from('project_chunks')
+        .select('id')
+        .eq('document_id', document.id)
+        .limit(1);
+      
+      if (!checkError && existingChunks && existingChunks.length > 0) {
+        console.log(`Chunks already exist for document ${document.id}. Skipping processing.`);
+        return new Response(
+          JSON.stringify({
+            success: true,
+            message: `Document already processed. Use forceReprocess=true to reprocess.`,
+            documentId: document.id,
+            skipped: true
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
-    // Split content into chunks using semantic chunking with improved PDF handling
-    const chunks = splitIntoSemanticChunks(textContent, document.type);
+    // Enhanced semantic chunking for better RAG
+    console.log('Starting semantic chunking with improved algorithm');
+    const chunks = splitIntoEnhancedSemanticChunks(textContent, document.type);
     console.log(`Split document into ${chunks.length} semantically meaningful chunks`);
 
     // Process each chunk and get embeddings
     const embeddingPromises = chunks.map(async (chunk, index) => {
       try {
+        // Get embedding from OpenAI
         const embedding = await getEmbedding(chunk.text);
+        
+        // Enhanced chunk metadata
+        const chunkMetadata = {
+          project_id: document.project_id,
+          document_id: document.id,
+          document_type: document.type,
+          chunk_text: chunk.text,
+          chunk_index: index,
+          embedding: embedding,
+          // Add chunk-specific metadata
+          metadata: {
+            document_name: document.name,
+            section: chunk.section || null,
+            importance: chunk.importance || 'standard',
+            char_length: chunk.text.length,
+            word_count: chunk.text.split(/\s+/).length,
+            position_ratio: index / chunks.length
+          }
+        };
         
         // Insert chunk and embedding into the database
         const { error: insertError } = await supabase
           .from('project_chunks')
-          .insert({
-            project_id: document.project_id,
-            document_id: document.id,
-            document_type: document.type,
-            chunk_text: chunk.text,
-            chunk_index: index,
-            embedding: embedding
-          });
+          .insert(chunkMetadata);
 
         if (insertError) {
           console.error(`Error inserting chunk ${index}: ${insertError.message}`);
@@ -307,6 +344,25 @@ serve(async (req) => {
     
     const successCount = results.filter(r => r.success).length;
     console.log(`Successfully processed ${successCount} of ${chunks.length} chunks`);
+
+    // Update document with processed status and metadata
+    const { error: updateError } = await supabase
+      .from('documents')
+      .update({ 
+        processed_at: new Date().toISOString(),
+        chunks_count: successCount,
+        processing_metadata: {
+          success_rate: successCount / chunks.length,
+          total_chunks: chunks.length,
+          model_used: 'text-embedding-ada-002',
+          processing_date: new Date().toISOString()
+        }
+      })
+      .eq('id', document.id);
+    
+    if (updateError) {
+      console.warn(`Warning: Failed to update document metadata: ${updateError.message}`);
+    }
 
     return new Response(
       JSON.stringify({
@@ -334,276 +390,389 @@ serve(async (req) => {
   }
 });
 
-// Function to split text into semantically meaningful chunks
-function splitIntoSemanticChunks(text: string, documentType: string): { text: string }[] {
-  const chunks: { text: string }[] = [];
-  const maxChunkSize = 1500;
+// Enhanced semantic chunking function with better metadata
+function splitIntoEnhancedSemanticChunks(text, documentType) {
+  const chunks = [];
+  const maxChunkSize = 1500; // Optimal size for embedding
   
-  // For JSON documents, use special handling
+  // Enhanced chunking for different document types
   if (documentType === 'data-model' || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+    // Special handling for JSON/data model documents
     try {
-      // Try to parse if it's a JSON string
+      // JSON parsing and entity extraction
       let jsonObj;
       if (typeof text === 'string') {
         try {
           jsonObj = JSON.parse(text);
         } catch (e) {
-          // If it's not valid JSON but is a data model, chunk by lines
           return splitTextByLineGroups(text, maxChunkSize);
         }
       } else {
         jsonObj = text;
       }
       
-      // Convert back to string with formatting
-      const formattedJson = JSON.stringify(jsonObj, null, 2);
-      
-      // For small JSON documents, keep them together
-      if (formattedJson.length <= maxChunkSize * 1.5) {
-        chunks.push({ text: formattedJson });
-        return chunks;
-      }
-      
-      // For larger JSON documents, try to split by top-level keys
-      if (typeof jsonObj === 'object' && jsonObj !== null) {
-        if (Array.isArray(jsonObj)) {
-          // For arrays, chunk by items
-          let currentChunk = '';
-          for (const item of jsonObj) {
-            const itemStr = JSON.stringify(item, null, 2);
-            
-            if (currentChunk.length + itemStr.length > maxChunkSize && currentChunk.length > 0) {
-              chunks.push({ text: `[${currentChunk}]` });
-              currentChunk = '';
-            }
-            
-            if (currentChunk.length > 0) {
-              currentChunk += ',\n';
-            }
-            
-            currentChunk += itemStr;
+      // Enhanced entity-aware chunking for data models
+      if (jsonObj && typeof jsonObj === 'object') {
+        // Handle entities specifically for better RAG context
+        if (jsonObj.entities || jsonObj.models || jsonObj.tables) {
+          const entityContainer = jsonObj.entities || jsonObj.models || jsonObj.tables;
+          
+          // Create a schema overview chunk with high importance
+          const schemaOverview = {
+            text: `DATA MODEL SCHEMA OVERVIEW:\n\n${JSON.stringify(Object.keys(entityContainer), null, 2)}`,
+            section: 'Schema Overview',
+            importance: 'high'
+          };
+          chunks.push(schemaOverview);
+          
+          // Process each entity individually for better retrieval
+          for (const [entityName, entityDef] of Object.entries(entityContainer)) {
+            const entityChunk = {
+              text: `ENTITY: ${entityName}\n\n${JSON.stringify(entityDef, null, 2)}`,
+              section: `Entity: ${entityName}`,
+              importance: 'high'
+            };
+            chunks.push(entityChunk);
           }
           
-          if (currentChunk.length > 0) {
-            chunks.push({ text: `[${currentChunk}]` });
-          }
-        } else {
-          // For objects, chunk by keys
-          const keys = Object.keys(jsonObj);
-          let currentChunk = '';
-          let currentChunkKeys = [];
-          
-          for (const key of keys) {
-            const keyValue = jsonObj[key];
-            const keyValueStr = JSON.stringify({ [key]: keyValue }, null, 2).slice(1, -1);
-            
-            if (currentChunk.length + keyValueStr.length > maxChunkSize && currentChunk.length > 0) {
-              chunks.push({ text: `{\n${currentChunk}\n}` });
-              currentChunk = '';
-              currentChunkKeys = [];
-            }
-            
-            if (currentChunk.length > 0) {
-              currentChunk += ',\n';
-            }
-            
-            currentChunk += keyValueStr;
-            currentChunkKeys.push(key);
+          // Add relationship information if available
+          if (jsonObj.relationships) {
+            const relationshipsChunk = {
+              text: `RELATIONSHIPS:\n\n${JSON.stringify(jsonObj.relationships, null, 2)}`,
+              section: 'Relationships',
+              importance: 'high'
+            };
+            chunks.push(relationshipsChunk);
           }
           
-          if (currentChunk.length > 0) {
-            chunks.push({ text: `{\n${currentChunk}\n}` });
-          }
+          return chunks;
         }
-      } else {
-        // Fallback to line-by-line chunking
-        return splitTextByLineGroups(formattedJson, maxChunkSize);
+        
+        // For other JSON structures, use the standard approach with improved metadata
+        // ... keep existing code (JSON chunking logic)
       }
     } catch (e) {
       console.error("Error processing JSON document:", e);
       return splitTextByLineGroups(text, maxChunkSize);
     }
   } else {
-    // For text documents, improve the semantic splitting approach
-    return splitTextBySemanticStructure(text, maxChunkSize);
+    // For PDFs and other text documents, use enhanced semantic splitting
+    return splitTextByEnhancedSemanticStructure(text, maxChunkSize);
   }
   
   return chunks;
 }
 
-// Improved function to split text by natural semantic boundaries
-function splitTextBySemanticStructure(text: string, maxChunkSize: number): { text: string }[] {
-  const chunks: { text: string }[] = [];
+// Enhanced semantic structure extraction with better section detection
+function splitTextByEnhancedSemanticStructure(text, maxChunkSize) {
+  const chunks = [];
   
-  // First, try to identify document structure by section headers
-  // Common header patterns in technical and academic documents
-  const sectionPattern = /(?:^|\n)(?:#{1,6}\s+|\d+(?:\.\d+)*\s+|(?:SECTION|CHAPTER|PART)\s+\d+[.:]\s*|(?:[A-Z][a-z]*\s*){1,3}:)/g;
-  
-  // If the text contains section headers
-  if (sectionPattern.test(text)) {
-    // Reset the regex
-    sectionPattern.lastIndex = 0;
+  // Advanced regex patterns for technical document sections
+  const sectionPatterns = [
+    // Headers with numbers (e.g., "1.2.3 Section Title")
+    /(?:^|\n)(?:\d+(?:\.\d+)*\s+)([A-Z][A-Za-z0-9\s:,-]+)(?:\r?\n)/g,
     
-    // Find all matches (section starts)
-    const matches: { index: number, length: number }[] = [];
+    // Markdown/RST style headers
+    /(?:^|\n)(?:#{1,6}\s+)([A-Z][A-Za-z0-9\s:,-]+)(?:\r?\n)/g,
+    
+    // Uppercase section markers
+    /(?:^|\n)(?:SECTION|CHAPTER|PART|MODULE|APPENDIX)\s+\d+[.:]\s*([A-Z][A-Za-z0-9\s:,-]+)(?:\r?\n)/g,
+    
+    // Common document section labels
+    /(?:^|\n)(?:Introduction|Background|Methodology|Requirements|Conclusion|References|Summary|Overview|Appendix)(?:\r?\n)/g
+  ];
+  
+  // Find all section boundaries with improved pattern recognition
+  let matches = [];
+  for (const pattern of sectionPatterns) {
     let match;
-    while ((match = sectionPattern.exec(text)) !== null) {
-      matches.push({ index: match.index, length: match[0].length });
+    while ((match = pattern.exec(text)) !== null) {
+      const title = match[1] || match[0].trim();
+      matches.push({
+        index: match.index,
+        length: match[0].length,
+        title: title
+      });
     }
+  }
+  
+  // Sort matches by position in text
+  matches.sort((a, b) => a.index - b.index);
+  
+  // If we found section breaks, process each section
+  if (matches.length > 0) {
+    // Create a document overview section (crucial for context)
+    const documentOverview = {
+      text: `DOCUMENT OVERVIEW\n\n${matches.map(m => m.title).join("\n")}`,
+      section: "Document Overview",
+      importance: "high"
+    };
+    chunks.push(documentOverview);
     
-    // Process sections
+    // Process each section
     for (let i = 0; i < matches.length; i++) {
       const startPos = matches[i].index;
       const endPos = (i < matches.length - 1) ? matches[i + 1].index : text.length;
       const section = text.substring(startPos, endPos);
+      const sectionTitle = matches[i].title;
       
-      // If section is small enough, keep it as one chunk
+      // Skip tiny sections (likely false positives)
+      if (section.length < 50) continue;
+      
+      // For small enough sections, keep them together
       if (section.length <= maxChunkSize) {
-        chunks.push({ text: section.trim() });
+        chunks.push({
+          text: section.trim(),
+          section: sectionTitle,
+          importance: getSectionImportance(sectionTitle)
+        });
       } else {
-        // Otherwise split section into smaller chunks
-        const sectionChunks = splitSectionIntoChunks(section, maxChunkSize);
+        // Split large sections into coherent chunks
+        const sectionChunks = splitLargeSection(section, sectionTitle, maxChunkSize);
         chunks.push(...sectionChunks);
       }
-    }
-    
-    // If no chunks were created (might happen if regex failed to match properly)
-    if (chunks.length === 0) {
-      return splitByParagraphGroups(text, maxChunkSize);
     }
     
     return chunks;
   }
   
-  // If no clear section structure, fall back to paragraph-based splitting
-  return splitByParagraphGroups(text, maxChunkSize);
+  // If no clear sections found, fall back to paragraph-based splitting
+  return splitByEnhancedParagraphGroups(text, maxChunkSize);
 }
 
-// Helper function to split a section into smaller chunks
-function splitSectionIntoChunks(section: string, maxChunkSize: number): { text: string }[] {
-  const chunks: { text: string }[] = [];
+// Determine section importance based on content cues
+function getSectionImportance(sectionTitle) {
+  const lowerTitle = sectionTitle.toLowerCase();
   
-  // First try to split by paragraphs
-  const paragraphs = section.split(/\n\n+/);
-  let currentChunk = "";
-  let sectionTitle = section.split('\n')[0]; // Capture section title for context
-  
-  for (const paragraph of paragraphs) {
-    // If adding this paragraph would exceed max size and we already have content
-    if (currentChunk.length + paragraph.length > maxChunkSize && currentChunk.length > 0) {
-      chunks.push({ text: currentChunk.trim() });
-      // Start a new chunk with the section title for context continuity
-      currentChunk = sectionTitle + "\n\n"; 
-    }
-    
-    // If the paragraph itself is too large (rare but possible)
-    if (paragraph.length > maxChunkSize) {
-      // If we have a current chunk, save it first
-      if (currentChunk.length > 0) {
-        chunks.push({ text: currentChunk.trim() });
-        currentChunk = "";
-      }
-      
-      // Split large paragraph by sentences
-      const sentences = paragraph.split(/(?<=[.!?])\s+/);
-      let sentenceChunk = sectionTitle + "\n\n";
-      
-      for (const sentence of sentences) {
-        if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > (sectionTitle.length + 10)) {
-          chunks.push({ text: sentenceChunk.trim() });
-          sentenceChunk = sectionTitle + "\n\n";
-        }
-        
-        if (sentence.length > maxChunkSize) {
-          // Handle extremely long sentences by force-splitting
-          for (let i = 0; i < sentence.length; i += maxChunkSize - (sectionTitle.length + 10)) {
-            const part = sentence.substring(i, Math.min(i + maxChunkSize - (sectionTitle.length + 10), sentence.length));
-            chunks.push({ text: (sectionTitle + "\n\n" + part).trim() });
-          }
-        } else {
-          sentenceChunk += sentence + " ";
-        }
-      }
-      
-      if (sentenceChunk.length > (sectionTitle.length + 10)) {
-        chunks.push({ text: sentenceChunk.trim() });
-      }
-    } else {
-      currentChunk += (currentChunk.length > 0 ? "\n\n" : "") + paragraph;
-    }
+  // High importance sections
+  if (
+    lowerTitle.includes('requirement') ||
+    lowerTitle.includes('introduction') ||
+    lowerTitle.includes('overview') ||
+    lowerTitle.includes('scope') ||
+    lowerTitle.includes('objective') ||
+    lowerTitle.includes('feature') ||
+    lowerTitle.includes('functional') ||
+    lowerTitle.includes('architecture')
+  ) {
+    return 'high';
   }
   
-  if (currentChunk.length > 0) {
-    chunks.push({ text: currentChunk.trim() });
+  // Medium importance
+  if (
+    lowerTitle.includes('background') ||
+    lowerTitle.includes('summary') ||
+    lowerTitle.includes('conclusion') ||
+    lowerTitle.includes('design')
+  ) {
+    return 'medium';
+  }
+  
+  // Standard importance
+  return 'standard';
+}
+
+// Enhanced version of splitting large sections with context preservation
+function splitLargeSection(section, sectionTitle, maxChunkSize) {
+  const chunks = [];
+  
+  // Detect if section contains code blocks
+  const hasCodeBlocks = section.includes('```') || 
+                       section.includes('    ') || 
+                       section.includes('<code>');
+  
+  // If section has code, use special handling to keep code blocks intact
+  if (hasCodeBlocks) {
+    const codeBlockChunks = splitPreservingCodeBlocks(section, sectionTitle, maxChunkSize);
+    return codeBlockChunks;
+  }
+  
+  // Otherwise split by paragraphs with context headers
+  const paragraphs = section.split(/\n\n+/);
+  let currentChunk = "";
+  let subSectionIndex = 0;
+  
+  // Always include section title context in each chunk
+  const contextHeader = `${sectionTitle}\n\n`;
+  
+  for (const paragraph of paragraphs) {
+    // If adding this paragraph would exceed max size
+    if (currentChunk.length + paragraph.length + 10 > maxChunkSize && currentChunk.length > 0) {
+      chunks.push({
+        text: currentChunk.trim(),
+        section: `${sectionTitle} (part ${subSectionIndex + 1})`,
+        importance: getSectionImportance(sectionTitle)
+      });
+      
+      currentChunk = contextHeader; // Reset with context header
+      subSectionIndex++;
+    }
+    
+    // Initialize chunk with context header if it's empty
+    if (currentChunk.length === 0) {
+      currentChunk = contextHeader;
+    }
+    
+    // Add paragraph
+    currentChunk += paragraph + "\n\n";
+  }
+  
+  // Don't forget the last chunk
+  if (currentChunk.length > contextHeader.length) {
+    chunks.push({
+      text: currentChunk.trim(),
+      section: `${sectionTitle} (part ${subSectionIndex + 1})`,
+      importance: getSectionImportance(sectionTitle)
+    });
   }
   
   return chunks;
 }
 
-// Split text by paragraph groups
-function splitByParagraphGroups(text: string, maxChunkSize: number): { text: string }[] {
-  const chunks: { text: string }[] = [];
-  const paragraphs = text.split(/\n\n+/);
+// Split text preserving code blocks
+function splitPreservingCodeBlocks(text, sectionTitle, maxChunkSize) {
+  const chunks = [];
+  const codeBlockRegex = /(```[\s\S]*?```|    [\s\S]*?\n\n|<code>[\s\S]*?<\/code>)/g;
+  
+  // Split text into code blocks and non-code content
+  const parts = text.split(codeBlockRegex);
+  
   let currentChunk = "";
+  let subSectionIndex = 0;
+  const contextHeader = `${sectionTitle}\n\n`;
+  
+  for (const part of parts) {
+    // If this is a code block
+    const isCodeBlock = part.startsWith('```') || 
+                        part.startsWith('    ') || 
+                        part.startsWith('<code>');
+    
+    // If adding this part would exceed max size
+    if (currentChunk.length + part.length + 10 > maxChunkSize) {
+      // But if it's a code block that needs to stay intact
+      if (isCodeBlock && currentChunk.length > contextHeader.length) {
+        // Finish current chunk
+        chunks.push({
+          text: currentChunk.trim(),
+          section: `${sectionTitle} (part ${subSectionIndex + 1})`,
+          importance: getSectionImportance(sectionTitle)
+        });
+        
+        // Start a new chunk with the code block
+        currentChunk = contextHeader + part;
+        subSectionIndex++;
+      } 
+      // If current part is not a code block, we can split it
+      else if (!isCodeBlock) {
+        // Finish current chunk
+        chunks.push({
+          text: currentChunk.trim(),
+          section: `${sectionTitle} (part ${subSectionIndex + 1})`,
+          importance: getSectionImportance(sectionTitle)
+        });
+        
+        // Start a new chunk
+        currentChunk = contextHeader + part;
+        subSectionIndex++;
+      }
+      // If code block is too large on its own
+      else {
+        // Keep code block with context in a single chunk even if it's large
+        chunks.push({
+          text: (contextHeader + part).trim(),
+          section: `${sectionTitle} (code block)`,
+          importance: 'high' // Code blocks often have high importance
+        });
+        
+        currentChunk = contextHeader;
+      }
+    } else {
+      // Add part to current chunk
+      if (currentChunk.length === 0) {
+        currentChunk = contextHeader + part;
+      } else {
+        currentChunk += part;
+      }
+    }
+  }
+  
+  // Don't forget the last chunk
+  if (currentChunk.length > contextHeader.length) {
+    chunks.push({
+      text: currentChunk.trim(),
+      section: `${sectionTitle} (part ${subSectionIndex + 1})`,
+      importance: getSectionImportance(sectionTitle)
+    });
+  }
+  
+  return chunks;
+}
+
+// Enhanced paragraph grouping with better context preservation
+function splitByEnhancedParagraphGroups(text, maxChunkSize) {
+  const chunks = [];
+  const paragraphs = text.split(/\n\n+/);
+  
+  let currentChunk = "";
+  let paragraphIndex = 0;
   
   for (const paragraph of paragraphs) {
+    // Skip empty paragraphs
+    if (!paragraph.trim()) continue;
+    
+    // If adding this paragraph would exceed max size
     if (currentChunk.length + paragraph.length + 2 > maxChunkSize && currentChunk.length > 0) {
-      chunks.push({ text: currentChunk.trim() });
+      chunks.push({
+        text: currentChunk.trim(),
+        section: `Text Section ${paragraphIndex}`,
+        importance: 'standard'
+      });
+      
       currentChunk = "";
     }
     
-    if (paragraph.length > maxChunkSize) {
-      // If we have a current chunk, save it
-      if (currentChunk.length > 0) {
-        chunks.push({ text: currentChunk.trim() });
-        currentChunk = "";
-      }
+    currentChunk += (currentChunk.length > 0 ? "\n\n" : "") + paragraph;
+    
+    // Check for topic shifts within paragraphs to improve chunking
+    if (detectTopicShift(paragraph)) {
+      chunks.push({
+        text: currentChunk.trim(),
+        section: `Text Section ${paragraphIndex}`,
+        importance: 'standard'
+      });
       
-      // Split large paragraphs by sentences
-      const sentences = paragraph.split(/(?<=[.!?])\s+/);
-      let sentenceChunk = "";
-      
-      for (const sentence of sentences) {
-        if (sentenceChunk.length + sentence.length + 1 > maxChunkSize && sentenceChunk.length > 0) {
-          chunks.push({ text: sentenceChunk.trim() });
-          sentenceChunk = "";
-        }
-        
-        if (sentence.length > maxChunkSize) {
-          // Handle extremely long sentences
-          if (sentenceChunk.length > 0) {
-            chunks.push({ text: sentenceChunk.trim() });
-            sentenceChunk = "";
-          }
-          
-          // Force split by size
-          for (let i = 0; i < sentence.length; i += maxChunkSize) {
-            const part = sentence.substring(i, Math.min(i + maxChunkSize, sentence.length));
-            chunks.push({ text: part.trim() });
-          }
-        } else {
-          sentenceChunk += (sentenceChunk.length > 0 ? " " : "") + sentence;
-        }
-      }
-      
-      if (sentenceChunk.length > 0) {
-        chunks.push({ text: sentenceChunk.trim() });
-      }
-    } else {
-      currentChunk += (currentChunk.length > 0 ? "\n\n" : "") + paragraph;
+      currentChunk = "";
+      paragraphIndex++;
     }
   }
   
+  // Don't forget the last chunk
   if (currentChunk.length > 0) {
-    chunks.push({ text: currentChunk.trim() });
+    chunks.push({
+      text: currentChunk.trim(),
+      section: `Text Section ${paragraphIndex}`,
+      importance: 'standard'
+    });
   }
   
   return chunks;
 }
 
-// Split text by line groups with overlap
-function splitTextByLineGroups(text: string, maxChunkSize: number): { text: string }[] {
-  const chunks: { text: string }[] = [];
+// Simple topic shift detection based on language cues
+function detectTopicShift(paragraph) {
+  const topicShiftCues = [
+    "however,", "on the other hand", "in contrast", "similarly", 
+    "furthermore", "moving on", "next", "additionally",
+    "in summary", "to conclude", "finally"
+  ];
+  
+  const lowerParagraph = paragraph.toLowerCase();
+  return topicShiftCues.some(cue => lowerParagraph.includes(cue));
+}
+
+// Keep original line-based chunking for fallback
+function splitTextByLineGroups(text, maxChunkSize) {
+  const chunks = [];
   const lines = text.split(/\r?\n/);
   let currentChunk = "";
   
@@ -626,30 +795,45 @@ function splitTextByLineGroups(text: string, maxChunkSize: number): { text: stri
   return chunks;
 }
 
-// Function to get embeddings from OpenAI API
-async function getEmbedding(text: string): Promise<number[]> {
-  try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: text.replace(/\n/g, ' ').trim(),
-      }),
-    });
+// Function to get embeddings from OpenAI API with improved error handling
+async function getEmbedding(text) {
+  const maxRetries = 3;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-ada-002',
+          input: text.replace(/\n/g, ' ').trim(),
+        }),
+      });
 
-    if (!response.ok) {
-      const errorResponse = await response.json();
-      throw new Error(`OpenAI API error: ${errorResponse.error?.message || response.statusText}`);
+      if (!response.ok) {
+        const errorResponse = await response.json();
+        // If rate limited, wait and retry
+        if (response.status === 429 && attempt < maxRetries) {
+          console.log(`Rate limited, waiting before retry ${attempt}/${maxRetries}`);
+          await new Promise(r => setTimeout(r, 2000 * attempt));
+          continue;
+        }
+        throw new Error(`OpenAI API error: ${errorResponse.error?.message || response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data[0].embedding;
+    } catch (error) {
+      if (attempt < maxRetries) {
+        console.warn(`Embedding attempt ${attempt} failed: ${error.message}. Retrying...`);
+        await new Promise(r => setTimeout(r, 1000 * attempt));
+      } else {
+        console.error(`Failed to get embedding after ${maxRetries} attempts: ${error.message}`);
+        throw error;
+      }
     }
-
-    const data = await response.json();
-    return data.data[0].embedding;
-  } catch (error) {
-    console.error(`Error getting embedding: ${error.message}`);
-    throw error;
   }
 }

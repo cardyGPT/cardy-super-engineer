@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { BrainCircuit } from "lucide-react";
+import { BrainCircuit, RefreshCw } from "lucide-react";
 import { useProject } from "@/contexts/ProjectContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -11,6 +10,7 @@ import DocumentSelection from "@/components/cardy-mind/DocumentSelection";
 import ConversationDisplay from "@/components/cardy-mind/ConversationDisplay";
 import ChatInputForm from "@/components/cardy-mind/ChatInputForm";
 import RagInfoCard from "@/components/cardy-mind/RagInfoCard";
+import { Button } from "@/components/ui/button";
 
 const CardyMindPage: React.FC = () => {
   const { projects, documents } = useProject();
@@ -28,7 +28,6 @@ const CardyMindPage: React.FC = () => {
   const [usedDocuments, setUsedDocuments] = useState<string[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
 
-  // Initialize with all documents selected when a project is selected
   useEffect(() => {
     if (selectedProject) {
       const projectDocs = documents
@@ -41,7 +40,6 @@ const CardyMindPage: React.FC = () => {
     }
   }, [selectedProject, documents]);
 
-  // Debug log for documents
   useEffect(() => {
     console.log("Available documents:", documents.map(d => ({ id: d.id, name: d.name, project: d.projectId })));
     if (selectedProject) {
@@ -56,25 +54,20 @@ const CardyMindPage: React.FC = () => {
     e.preventDefault();
     if (!userInput.trim() || isLoading) return;
 
-    // Add user message to the chat
     setMessages(prev => [...prev, { role: "user", content: userInput }]);
     setIsLoading(true);
 
     try {
-      // Track document names for reference
       let includedDocNames: string[] = [];
       
-      // Filter documents based on selection criteria
       const projectDocs = selectedProject 
         ? documents.filter(doc => doc.projectId === selectedProject)
         : documents;
       
-      // Further filter by selected documents if any are selected
       const filteredDocs = selectedDocuments.length > 0
         ? projectDocs.filter(doc => selectedDocuments.includes(doc.id))
         : projectDocs;
       
-      // Create the document context for the ones selected
       filteredDocs.forEach(doc => {
         includedDocNames.push(doc.name);
       });
@@ -88,7 +81,6 @@ const CardyMindPage: React.FC = () => {
         selectedDocuments: selectedDocuments.length
       });
 
-      // Call the Supabase function to chat with all project data
       const response = await supabase.functions.invoke('chat-with-all-project-data', {
         body: {
           messages: [
@@ -109,7 +101,6 @@ const CardyMindPage: React.FC = () => {
         throw new Error('Invalid response format from API');
       }
       
-      // Update used documents from API response if available
       if (data.context?.projects) {
         const usedDocumentNames = documents
           .filter(doc => data.context.projects.includes(doc.projectId))
@@ -130,7 +121,6 @@ const CardyMindPage: React.FC = () => {
         variant: "destructive"
       });
       
-      // Add error message to chat
       setMessages(prev => [...prev, { 
         role: "assistant", 
         content: "I'm sorry, I encountered an error while processing your request. Please try again or check the selected documents." 
@@ -140,7 +130,6 @@ const CardyMindPage: React.FC = () => {
     }
   };
 
-  // Get the selected project name
   const selectedProjectName = selectedProject 
     ? projects.find(p => p.id === selectedProject)?.name || "Unknown Project" 
     : null;
@@ -154,7 +143,6 @@ const CardyMindPage: React.FC = () => {
     setSelectedDocuments([]);
   };
 
-  // Handle document selection
   const handleDocumentToggle = (docId: string, checked: boolean) => {
     if (checked) {
       setSelectedDocuments(prev => [...prev, docId]);
@@ -163,7 +151,6 @@ const CardyMindPage: React.FC = () => {
     }
   };
 
-  // Select all documents for the selected project
   const handleSelectAllDocuments = () => {
     const projectDocs = documents
       .filter(doc => (!selectedProject || doc.projectId === selectedProject))
@@ -172,24 +159,20 @@ const CardyMindPage: React.FC = () => {
     setSelectedDocuments(projectDocs);
   };
 
-  // Clear all selected documents
   const handleClearAllDocuments = () => {
     setSelectedDocuments([]);
   };
 
-  // Refresh document list - reprocess selected documents
   const handleRefreshDocuments = async () => {
     setIsRefreshing(true);
     
     try {
-      // If there are selected documents, we'll reprocess them
       if (selectedDocuments.length > 0) {
         toast({
           title: "Refreshing documents",
           description: "Updating document index...",
         });
         
-        // Call the process-document function for each selected document
         for (const docId of selectedDocuments) {
           await supabase.functions.invoke('process-document', {
             body: { documentId: docId }
@@ -218,7 +201,6 @@ const CardyMindPage: React.FC = () => {
     }
   };
 
-  // Clear all chat messages except the initial greeting
   const handleClearChat = () => {
     setMessages([{
       role: "assistant",
@@ -227,20 +209,93 @@ const CardyMindPage: React.FC = () => {
     setUsedDocuments([]);
   };
 
+  const forceProcessDocuments = async () => {
+    if (!selectedDocuments.length) {
+      toast({
+        title: "No documents selected",
+        description: "Please select documents to process first",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsRefreshing(true);
+    toast({
+      title: "Processing documents",
+      description: "Starting document processing...",
+    });
+
+    try {
+      for (const docId of selectedDocuments) {
+        const document = documents.find(doc => doc.id === docId);
+        if (!document) continue;
+
+        toast({
+          title: "Processing",
+          description: `Processing ${document.name}...`,
+        });
+
+        const result = await supabase.functions.invoke('process-document', {
+          body: {
+            documentId: docId,
+            fileUrl: document.fileUrl,
+            fileType: document.fileType || '',
+            projectId: document.projectId,
+            forceReprocess: true
+          }
+        });
+
+        if (result.error) {
+          throw new Error(`Error processing ${document.name}: ${result.error.message}`);
+        }
+
+        console.log(`Document ${document.name} processed:`, result.data);
+      }
+
+      toast({
+        title: "Processing complete",
+        description: `Successfully processed ${selectedDocuments.length} documents`,
+      });
+
+    } catch (error: any) {
+      console.error('Document processing error:', error);
+      toast({
+        title: "Processing failed",
+        description: error.message || "An error occurred during document processing",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
         <div className="flex flex-col space-y-6">
-          <div className="flex items-center">
-            <div className="mr-2 bg-purple-100 p-1 rounded">
-              <BrainCircuit className="h-5 w-5 text-purple-600" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="mr-2 bg-purple-100 p-1 rounded">
+                <BrainCircuit className="h-5 w-5 text-purple-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Cardy Mind</h1>
+                <p className="text-muted-foreground">
+                  Ask questions about your project documents using our RAG system
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">Cardy Mind</h1>
-              <p className="text-muted-foreground">
-                Ask questions about your project documents using our RAG system
-              </p>
-            </div>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={forceProcessDocuments} 
+              disabled={isRefreshing || !selectedDocuments.length}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Force Process Documents
+            </Button>
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
