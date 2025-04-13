@@ -1,21 +1,30 @@
 
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
-import { AlertTriangle } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Brain, Database, FileText, Layers } from "lucide-react";
 
 const RagInfoCard: React.FC = () => {
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start space-x-2">
-          <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-1" />
-          <div>
-            <h3 className="font-medium mb-1">RAG-Powered Document Assistant</h3>
-            <p className="text-sm text-muted-foreground">
-              Cardy Mind uses AI with Retrieval Augmented Generation (RAG) to analyze your documents.
-              Documents are chunked, embedded with pgvector, and retrieved based on semantic
-              similarity for accurate answers.
-            </p>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg flex items-center">
+          <Brain className="h-5 w-5 text-purple-500 mr-2" />
+          RAG-Powered Document Assistant
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="pt-0">
+        <div className="space-y-3 text-sm text-muted-foreground">
+          <div className="flex items-start space-x-2">
+            <FileText className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+            <p>Documents are processed with semantic chunking to preserve context integrity.</p>
+          </div>
+          <div className="flex items-start space-x-2">
+            <Database className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
+            <p>Each chunk is embedded with OpenAI's text-embedding-ada-002 model and stored in pgvector.</p>
+          </div>
+          <div className="flex items-start space-x-2">
+            <Layers className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p>Queries use vector similarity search to find the most relevant document sections.</p>
           </div>
         </div>
       </CardContent>
