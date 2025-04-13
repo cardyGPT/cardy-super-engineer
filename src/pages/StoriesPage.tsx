@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -185,9 +186,9 @@ const StoriesPage: React.FC = () => {
       setSprintError(null);
       
       try {
-        setLoading(true);
+        // Fix: Don't use setLoading as it's not in the component scope
+        // Instead, we're relying on the loading state from the useStories hook
         await fetchSprints(project.id);
-        setLoading(false);
       } catch (err: any) {
         console.error("Error fetching sprints:", err);
         setSprintError(err.message || "Failed to fetch sprints");
@@ -196,7 +197,6 @@ const StoriesPage: React.FC = () => {
           description: err.message || "Failed to fetch sprints",
           variant: "destructive",
         });
-        setLoading(false);
       }
     }
   };
