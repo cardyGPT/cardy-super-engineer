@@ -1,3 +1,4 @@
+
 import * as React from "react"
 
 import type {
@@ -6,7 +7,7 @@ import type {
 } from "@/components/ui/toast"
 
 const TOAST_LIMIT = 20
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_REMOVE_DELAY = 10000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -90,8 +91,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -126,67 +125,174 @@ export const reducer = (state: State, action: Action): State => {
   }
 }
 
-const listeners: Array<(state: State) => void> = []
+// Initialize the state
+const initialState: State = { toasts: [] }
 
-let memoryState: State = { toasts: [] }
+// Create a React context to manage the toast state
+const ToastContext = React.createContext<{
+  state: State
+  dispatch: React.Dispatch<Action>
+} | undefined>(undefined)
 
-function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action)
-  listeners.forEach((listener) => {
-    listener(memoryState)
-  })
+// Create a ToastProvider to wrap the application
+export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, dispatch] = React.useReducer(reducer, initialState)
+  
+  return (
+    <ToastContext.Provider value={{ state, dispatch }}>
+      {children}
+    </ToastContext.Provider>
+  );
+};
+
+// Create a context hook to use the toast context
+function useToastContext() {
+  const context = React.useContext(ToastContext)
+  if (context === undefined) {
+    throw new Error("useToast must be used within a ToastProvider")
+  }
+  return context
 }
 
 type Toast = Omit<ToasterToast, "id">
 
-function toast({ ...props }: Toast) {
-  const id = genId()
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    })
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  })
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  }
-}
-
 function useToast() {
-  const [state, setState] = React.useState<State>(memoryState)
+  const { state, dispatch } = useToastContext();
 
-  React.useEffect(() => {
-    listeners.push(setState)
-    return () => {
-      const index = listeners.indexOf(setState)
-      if (index > -1) {
-        listeners.splice(index, 1)
+  const toast = React.useCallback(
+    (props: Toast) => {
+      const id = genId()
+
+      const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id })
+      const update = (props: ToasterToast) =>
+        dispatch({
+          type: "UPDATE_TOAST",
+          toast: { ...props, id },
+        })
+
+      dispatch({
+        type: "ADD_TOAST",
+        toast: {
+          ...props,
+          id,
+          open: true,
+          onOpenChange: (open) => {
+            if (!open) dismiss()
+          },
+        },
+      })
+
+      return {
+        id,
+        dismiss,
+        update,
       }
-    }
-  }, [state])
+    },
+    [dispatch]
+  )
 
   return {
-    ...state,
+    toasts: state.toasts,
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
   }
 }
 
-export { useToast, toast }
+// This is a function outside of a component to create a toast
+// without having to use the hook directly
+let toastCreator: ((props: Toast) => { id: string; dismiss: () => void; update: (props: ToasterToast) => void }) | undefined
+
+// Initialize toast function if needed
+function initializeToast() {
+  if (!toastCreator && typeof window !== 'undefined') {
+    // We're exporting toast as a function, not a hook.
+    // We need a global dispatch function outside the component lifecycle.
+    // Create a standalone version
+    const toasts: ToasterToast[] = []
+    
+    toastCreator = (props: Toast) => {
+      const id = genId()
+      
+      const newToast: ToasterToast = {
+        ...props,
+        id,
+        open: true,
+        onOpenChange: (open) => {
+          if (!open) dismiss()
+        },
+      }
+      
+      toasts.push(newToast)
+      
+      // Trigger any listeners
+      listeners.forEach((listener) => {
+        listener({ toasts: [...toasts] })
+      })
+      
+      // Set timeout to remove
+      setTimeout(() => {
+        const index = toasts.findIndex(t => t.id === id)
+        if (index !== -1) {
+          toasts.splice(index, 1)
+          listeners.forEach((listener) => {
+            listener({ toasts: [...toasts] })
+          })
+        }
+      }, TOAST_REMOVE_DELAY)
+      
+      function dismiss() {
+        const index = toasts.findIndex(t => t.id === id)
+        if (index !== -1) {
+          toasts[index].open = false
+          listeners.forEach((listener) => {
+            listener({ toasts: [...toasts] })
+          })
+          
+          setTimeout(() => {
+            const currentIndex = toasts.findIndex(t => t.id === id)
+            if (currentIndex !== -1) {
+              toasts.splice(currentIndex, 1)
+              listeners.forEach((listener) => {
+                listener({ toasts: [...toasts] })
+              })
+            }
+          }, 300) // Animation time
+        }
+      }
+      
+      function update(props: ToasterToast) {
+        const index = toasts.findIndex(t => t.id === id)
+        if (index !== -1) {
+          toasts[index] = { ...toasts[index], ...props }
+          listeners.forEach((listener) => {
+            listener({ toasts: [...toasts] })
+          })
+        }
+      }
+      
+      return {
+        id,
+        dismiss,
+        update,
+      }
+    }
+  }
+  
+  return toastCreator
+}
+
+// Listeners for the standalone toast function
+const listeners: Array<(state: State) => void> = []
+
+// Toast function for use outside of components
+export function toast(props: Toast) {
+  const toastFn = initializeToast()
+  if (!toastFn) {
+    throw new Error('Toast function not initialized. Make sure to use ToastProvider at the root of your app.')
+  }
+  return toastFn(props)
+}
+
+// Update use-toast.ts file to re-export toast function
+export { useToast }
 export type { Toast }
