@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -374,14 +373,14 @@ const StoriesPage: React.FC = () => {
                       Filter by Type
                     </label>
                     <Select 
-                      value={ticketTypeFilter || ""} 
-                      onValueChange={handleTypeFilterChange}
+                      value={ticketTypeFilter || "all"} 
+                      onValueChange={(value) => handleTypeFilterChange(value === "all" ? null : value)}
                     >
                       <SelectTrigger id="type-filter-select" className="w-full">
                         <SelectValue placeholder="All types" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">All types</SelectItem>
+                        <SelectItem value="all">All types</SelectItem>
                         <SelectItem value="Story">Story</SelectItem>
                         <SelectItem value="Bug">Bug</SelectItem>
                         <SelectItem value="Task">Task</SelectItem>
