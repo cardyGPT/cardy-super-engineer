@@ -136,3 +136,88 @@ export const fetchJiraTickets = async (
     throw error;
   }
 };
+
+// New function to fetch tickets directly from a project without requiring a sprint
+export const fetchJiraTicketsByProject = async (
+  credentials: JiraCredentials,
+  selectedProject: JiraProject | null,
+  maxResults: number = 50
+): Promise<JiraTicket[]> => {
+  try {
+    if (!selectedProject) {
+      throw new Error('No project selected');
+    }
+    
+    console.log(`Fetching tickets directly for project ${selectedProject.key} (${selectedProject.id})`);
+    
+    // Create a JQL query that fetches recent tickets from the project
+    const jqlQuery = `project = ${selectedProject.id} ORDER BY created DESC`;
+    const data = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=${maxResults}`);
+    
+    if (!data.issues || !Array.isArray(data.issues)) {
+      console.log('No issues found in project, returning empty issues array');
+      return [];
+    }
+    
+    console.log(`Found ${data.issues.length} issues in project ${selectedProject.key}`);
+    
+    // Transform the response into our JiraTicket format
+    return data.issues.map((issue: any) => {
+      const fields = issue.fields || {};
+      
+      // Extract sprint information if available
+      let sprintId = null;
+      if (fields.sprint) {
+        sprintId = fields.sprint.id;
+      }
+      
+      return {
+        id: issue.id,
+        key: issue.key,
+        summary: fields.summary || '',
+        description: fields.description || '',
+        acceptance_criteria: fields.customfield_10016 || '',
+        status: fields.status?.name || '',
+        assignee: fields.assignee?.displayName || '',
+        priority: fields.priority?.name || '',
+        story_points: fields.customfield_10026 || 0,
+        labels: fields.labels || [],
+        epic: fields.epic?.name || '',
+        created_at: fields.created,
+        updated_at: fields.updated,
+        domain: credentials.domain,
+        projectId: selectedProject.id,
+        sprintId,
+        issuetype: fields.issuetype ? {
+          id: fields.issuetype.id,
+          name: fields.issuetype.name
+        } : undefined
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching Jira tickets by project:', error);
+    
+    // Return test data in dev mode if there's an error
+    if (DEV_MODE && selectedProject) {
+      console.log('[DEV MODE] Returning test tickets for project due to error');
+      return [
+        {
+          id: `error-project-${Date.now()}`,
+          key: `${selectedProject.key}-999`,
+          summary: '[TEST] Project tickets - this is a test ticket',
+          description: 'This is a test ticket when fetching project tickets directly',
+          status: 'Error',
+          domain: credentials.domain,
+          projectId: selectedProject.id,
+          sprintId: null,
+          issuetype: {
+            id: '10001',
+            name: 'Story'
+          }
+        }
+      ];
+    }
+    
+    throw error;
+  }
+};

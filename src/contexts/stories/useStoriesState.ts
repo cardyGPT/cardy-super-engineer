@@ -2,7 +2,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
-import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, generateJiraContent, pushContentToJira } from './api';
+import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, fetchJiraTicketsByProject, generateJiraContent, pushContentToJira } from './api';
 
 export const useStoriesState = () => {
   const { toast } = useToast();
@@ -170,6 +170,44 @@ export const useStoriesState = () => {
       setTicketsLoading(false);
     }
   }, [credentials, selectedProject, toast]);
+
+  // API method - Fetch tickets directly from a project
+  const fetchTicketsByProject = useCallback(async (projectId: string) => {
+    if (!credentials || !selectedProject) {
+      setError('Missing credentials or project selection');
+      return;
+    }
+    
+    setTicketsLoading(true);
+    setError(null);
+    setSelectedSprint(null); // Clear sprint selection since we're getting all project tickets
+    
+    try {
+      console.log(`Fetching tickets for project ${projectId}...`);
+      const ticketsData = await fetchJiraTicketsByProject(credentials, selectedProject);
+      
+      setTickets(ticketsData);
+      console.log(`Fetched ${ticketsData.length} tickets for project ${projectId}`);
+      
+      toast({
+        title: "Project Stories Loaded",
+        description: `Loaded ${ticketsData.length} stories from the project directly.`,
+        variant: "default",
+      });
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to fetch Jira tickets';
+      console.error('Error fetching project tickets:', errorMessage);
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+      setTickets([]);
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, [credentials, selectedProject, toast]);
   
   // API method - Generate content
   const generateContent = useCallback(async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
@@ -314,6 +352,7 @@ export const useStoriesState = () => {
     fetchProjects,
     fetchSprints,
     fetchTickets,
+    fetchTicketsByProject,
     generateContent,
     pushToJira,
     

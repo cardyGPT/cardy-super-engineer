@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Filter } from "lucide-react";
+import { ExternalLink, Filter, List } from "lucide-react";
 import { useStories } from "@/contexts/StoriesContext";
 import LoadingContent from "./LoadingContent";
 
@@ -21,6 +21,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     setSelectedSprint,
     fetchSprints,
     fetchTickets,
+    fetchTicketsByProject,
     projectsLoading,
     sprintsLoading,
     ticketTypeFilter,
@@ -52,6 +53,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     }
   };
 
+  const handleViewAllStories = () => {
+    if (!selectedProject) return;
+    fetchTicketsByProject(selectedProject.id);
+  };
+
   const handleTypeFilterChange = (value: string) => {
     setTicketTypeFilter(value === "all" ? null : value);
   };
@@ -71,6 +77,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
           </label>
           {projects.length === 0 ? (
             <LoadingContent 
+              count={1}
               isLoading={projectsLoading}
               isError={!projectsLoading}
               message={projectsLoading ? "Loading projects..." : "No Projects Found"}
@@ -109,41 +116,62 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
               Select a project first
             </div>
           ) : availableSprints.length === 0 ? (
-            <LoadingContent 
-              isWarning={true}
-              message="No sprints found for this project"
-              additionalMessage="The project may not use Scrum methodology or have active sprints."
-            />
-          ) : (
-            <Select 
-              value={selectedSprint?.id || ""} 
-              onValueChange={handleSprintChange}
-              disabled={!selectedProject || availableSprints.length === 0}
-            >
-              <SelectTrigger id="sprint-select" className="w-full">
-                <SelectValue placeholder="Select a sprint" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableSprints.map(sprint => (
-                  <SelectItem key={sprint.id} value={sprint.id}>
-                    {sprint.name} ({sprint.state || 'active'})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
-          {selectedProject && (
-            <div className="flex justify-end mt-1">
+            <div className="space-y-2">
+              <LoadingContent 
+                count={1}
+                isWarning={true}
+                message="No sprints found for this project"
+                additionalMessage="The project may not use Scrum methodology or have active sprints."
+              />
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}
+                className="w-full"
+                onClick={handleViewAllStories}
               >
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View in Jira
+                <List className="h-4 w-4 mr-2" />
+                View All Stories
               </Button>
             </div>
+          ) : (
+            <>
+              <Select 
+                value={selectedSprint?.id || ""} 
+                onValueChange={handleSprintChange}
+                disabled={!selectedProject || availableSprints.length === 0}
+              >
+                <SelectTrigger id="sprint-select" className="w-full">
+                  <SelectValue placeholder="Select a sprint" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSprints.map(sprint => (
+                    <SelectItem key={sprint.id} value={sprint.id}>
+                      {sprint.name} ({sprint.state || 'active'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="flex justify-between mt-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleViewAllStories}
+                >
+                  <List className="h-4 w-4 mr-2" />
+                  All Stories
+                </Button>
+                {selectedProject && (
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    View in Jira
+                  </Button>
+                )}
+              </div>
+            </>
           )}
         </div>
 

@@ -41,6 +41,7 @@ interface StoriesContextProps {
   fetchProjects: () => Promise<void>;
   fetchSprints: (projectId: string) => Promise<void>;
   fetchTickets: (sprintId: string) => Promise<void>;
+  fetchTicketsByProject: (projectId: string) => Promise<void>;
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   refreshAll: () => Promise<void>;
