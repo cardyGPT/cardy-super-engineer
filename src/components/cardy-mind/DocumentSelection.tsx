@@ -1,5 +1,5 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RefreshCw, FileText, Check, Filter, FileUp, Search, FileJson, FileCode, FilePieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,12 +32,16 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
   handleRefreshDocuments
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [visibleDocuments, setVisibleDocuments] = useState<ProjectDocument[]>([]);
 
-  // Filter documents based on the selected project and search query
-  const filteredDocuments = documents
-    .filter(doc => !selectedProject || doc.projectId === selectedProject)
-    .filter(doc => doc.type !== "data-model" || doc.type === "data-model") // Include both data models and other documents
-    .filter(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  // Update visible documents when dependencies change
+  useEffect(() => {
+    const filtered = documents
+      .filter(doc => !selectedProject || doc.projectId === selectedProject)
+      .filter(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()));
+    
+    setVisibleDocuments(filtered);
+  }, [documents, selectedProject, searchQuery]);
 
   // Get document type icon
   const getDocumentIcon = (type: string) => {
@@ -58,7 +62,7 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
   };
 
   // Group documents by type for better organization
-  const documentsByType = filteredDocuments.reduce((acc, doc) => {
+  const documentsByType = visibleDocuments.reduce((acc, doc) => {
     const type = doc.type || 'other';
     if (!acc[type]) {
       acc[type] = [];
@@ -68,7 +72,7 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
   }, {} as Record<string, ProjectDocument[]>);
 
   const documentTypes = Object.keys(documentsByType);
-  const totalDocuments = filteredDocuments.length;
+  const totalDocuments = visibleDocuments.length;
   const selectedCount = selectedDocuments.length;
 
   return (
@@ -134,7 +138,7 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
                   Refresh
                 </Button>
               </TooltipTrigger>
-              <TooltipContent>Refresh document list</TooltipContent>
+              <TooltipContent>Refresh document list and reprocess selected documents</TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>

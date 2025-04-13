@@ -41,6 +41,17 @@ const CardyMindPage: React.FC = () => {
     }
   }, [selectedProject, documents]);
 
+  // Debug log for documents
+  useEffect(() => {
+    console.log("Available documents:", documents.map(d => ({ id: d.id, name: d.name, project: d.projectId })));
+    if (selectedProject) {
+      console.log("Selected project documents:", documents
+        .filter(doc => doc.projectId === selectedProject)
+        .map(d => ({ id: d.id, name: d.name }))
+      );
+    }
+  }, [documents, selectedProject]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userInput.trim() || isLoading) return;
@@ -158,7 +169,7 @@ const CardyMindPage: React.FC = () => {
     setSelectedDocuments([]);
   };
 
-  // Refresh document list - simulate reindexing
+  // Refresh document list - reprocess selected documents
   const handleRefreshDocuments = async () => {
     setIsRefreshing(true);
     

@@ -104,14 +104,19 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
               <ChevronDown className="h-4 w-4 ml-2 flex-shrink-0" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[200px] max-h-[300px] overflow-y-auto">
+          <DropdownMenuContent align="start" className="w-[300px] max-h-[400px] overflow-y-auto">
             {projects.map(project => (
               <DropdownMenuItem 
                 key={project.id}
                 onClick={() => handleSelectProject(project.id)}
                 className="cursor-pointer"
               >
-                {project.name}
+                <div className="flex flex-col">
+                  <span className="font-medium">{project.name}</span>
+                  {project.type && (
+                    <span className="text-xs text-muted-foreground">{project.type}</span>
+                  )}
+                </div>
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

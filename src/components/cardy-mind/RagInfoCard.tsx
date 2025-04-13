@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Brain, Database, FileText, Layers, Code, FileJson } from "lucide-react";
+import { Brain, Database, FileText, Layers, Code, FileJson, BarChart } from "lucide-react";
 
 const RagInfoCard: React.FC = () => {
   return (
@@ -16,7 +16,7 @@ const RagInfoCard: React.FC = () => {
         <div className="space-y-3 text-sm text-muted-foreground">
           <div className="flex items-start space-x-2">
             <FileText className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
-            <p>Documents are processed with semantic chunking to preserve context integrity.</p>
+            <p>Documents are processed with <span className="font-medium text-blue-600">semantic chunking</span> to preserve context integrity.</p>
           </div>
           <div className="flex items-start space-x-2">
             <FileJson className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
@@ -24,15 +24,19 @@ const RagInfoCard: React.FC = () => {
           </div>
           <div className="flex items-start space-x-2">
             <Database className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-            <p>Each chunk is embedded with OpenAI's text-embedding-ada-002 model and stored in pgvector.</p>
+            <p>Each chunk is embedded with OpenAI's <span className="font-medium text-green-600">text-embedding-ada-002</span> model and stored in pgvector.</p>
           </div>
           <div className="flex items-start space-x-2">
             <Layers className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p>Queries use vector similarity search to find the most relevant document sections.</p>
+            <p>Queries use <span className="font-medium text-amber-600">vector similarity search</span> with <span className="font-medium text-amber-600">project-specific context</span> filtering.</p>
           </div>
           <div className="flex items-start space-x-2">
             <Code className="h-4 w-4 text-purple-500 flex-shrink-0 mt-0.5" />
-            <p>GPT-4o processes retrieved chunks with document citations for accurate, contextual responses.</p>
+            <p>GPT-4o processes retrieved chunks with <span className="font-medium text-purple-600">document citations</span> for accurate, contextual responses.</p>
+          </div>
+          <div className="flex items-start space-x-2">
+            <BarChart className="h-4 w-4 text-indigo-500 flex-shrink-0 mt-0.5" />
+            <p>All document queries maintain <span className="font-medium text-indigo-600">source provenance</span> for traceability and verification.</p>
           </div>
         </div>
       </CardContent>

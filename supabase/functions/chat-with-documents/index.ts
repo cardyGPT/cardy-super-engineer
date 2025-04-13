@@ -105,10 +105,16 @@ serve(async (req) => {
     console.log("Generated embedding for query");
     
     // Set up filter for the similarity search
-    const filter: Record<string, any> = {};
+    const filter = {} as Record<string, any>;
     if (projectId) {
       filter.project_id = projectId;
     }
+    
+    if (documentIds.length > 0) {
+      filter.document_ids = documentIds;
+    }
+    
+    console.log("Using filter for document search:", filter);
     
     // Use vector similarity search function to find relevant document chunks
     const { data: relevantChunks, error: searchError } = await supabase.rpc(
@@ -128,28 +134,31 @@ serve(async (req) => {
     
     console.log(`Retrieved ${relevantChunks?.length || 0} relevant document chunks`);
     
-    // Filter by specific documents if provided
-    let filteredChunks = relevantChunks;
-    if (documentIds.length > 0) {
-      filteredChunks = relevantChunks.filter(chunk => 
-        documentIds.includes(chunk.document_id)
-      );
-      console.log(`Filtered to ${filteredChunks.length} chunks from selected documents`);
-    }
-    
     // If no chunks were found, check if there are any chunks at all for the selected documents
-    if (filteredChunks.length === 0 && documentIds.length > 0) {
-      // Query for any chunks from the selected documents, regardless of relevance
-      const { data: anyChunks, error: anyChunksError } = await supabase
-        .from('project_chunks')
-        .select('id, project_id, document_id, document_type, chunk_text, chunk_index')
-        .in('document_id', documentIds)
-        .limit(30);
+    if (!relevantChunks || relevantChunks.length === 0) {
+      console.log("No relevant chunks found, checking for any chunks from the selected documents");
+      
+      // If project id is provided, try to get any chunks from that project
+      let docQuery = supabase.from('project_chunks').select('*');
+      
+      if (projectId) {
+        docQuery = docQuery.eq('project_id', projectId);
+      }
+      
+      if (documentIds.length > 0) {
+        docQuery = docQuery.in('document_id', documentIds);
+      }
+      
+      docQuery = docQuery.limit(30);
+      
+      const { data: anyChunks, error: anyChunksError } = await docQuery;
+      
+      if (anyChunksError) {
+        console.error("Error retrieving any chunks:", anyChunksError);
+      } else if (anyChunks && anyChunks.length > 0) {
+        console.log(`Found ${anyChunks.length} chunks without similarity search`);
         
-      if (!anyChunksError && anyChunks && anyChunks.length > 0) {
-        console.log(`Found ${anyChunks.length} chunks from selected documents without vector search`);
-        
-        // Get document names
+        // Try to get raw documents directly if chunks are missing
         const { data: docNames, error: docNamesError } = await supabase
           .from('documents')
           .select('id, name')
@@ -163,22 +172,31 @@ serve(async (req) => {
           }, {});
           
           // Add document names and a neutral similarity score
-          filteredChunks = anyChunks.map(chunk => ({
+          relevantChunks = anyChunks.map(chunk => ({
             ...chunk,
             document_name: docNameMap[chunk.document_id] || 'Unknown Document',
             similarity: 0.7  // Neutral score
           }));
         }
       }
-      
+
       // If still no chunks, try to extract content directly from the documents table
-      if (filteredChunks.length === 0) {
-        const { data: rawDocs, error: rawDocsError } = await supabase
-          .from('documents')
-          .select('id, name, content, type')
-          .in('id', documentIds);
-          
-        if (!rawDocsError && rawDocs && rawDocs.length > 0) {
+      if (!relevantChunks || relevantChunks.length === 0) {
+        let docsQuery = supabase.from('documents').select('id, name, content, type');
+        
+        if (projectId) {
+          docsQuery = docsQuery.eq('project_id', projectId);
+        }
+        
+        if (documentIds.length > 0) {
+          docsQuery = docsQuery.in('id', documentIds);
+        }
+        
+        const { data: rawDocs, error: rawDocsError } = await docsQuery;
+        
+        if (rawDocsError) {
+          console.error("Error retrieving raw documents:", rawDocsError);
+        } else if (rawDocs && rawDocs.length > 0) {
           console.log(`Retrieved ${rawDocs.length} documents directly from the documents table`);
           
           // Create synthetic chunks from the raw document content
@@ -203,7 +221,7 @@ serve(async (req) => {
                 const chunkText = contentText.substring(i, i + chunkSize);
                 syntheticChunks.push({
                   id: `synthetic-${doc.id}-${i}`,
-                  project_id: projectId,
+                  project_id: projectId || "unknown",
                   document_id: doc.id,
                   document_type: doc.type,
                   document_name: doc.name,
@@ -216,7 +234,7 @@ serve(async (req) => {
           }
           
           console.log(`Created ${syntheticChunks.length} synthetic chunks from raw document content`);
-          filteredChunks = syntheticChunks;
+          relevantChunks = syntheticChunks;
         }
       }
     }
@@ -224,9 +242,10 @@ serve(async (req) => {
     // Build context from the relevant chunks
     let documentsContext = '';
     let usedDocuments = new Set();
-    if (filteredChunks && filteredChunks.length > 0) {
+    
+    if (relevantChunks && relevantChunks.length > 0) {
       // Group chunks by document for better context
-      const documentGroups = filteredChunks.reduce((groups, chunk) => {
+      const documentGroups = relevantChunks.reduce((groups, chunk) => {
         const docName = chunk.document_name;
         usedDocuments.add(docName);
         if (!groups[docName]) {
@@ -342,7 +361,7 @@ serve(async (req) => {
       usage: data.usage,
       contextSize: documentsContext.length,
       documentsUsed: Array.from(usedDocuments),
-      relevantDocuments: filteredChunks ? filteredChunks.map(chunk => ({
+      relevantDocuments: relevantChunks ? relevantChunks.map(chunk => ({
         documentName: chunk.document_name,
         similarity: chunk.similarity
       })) : []
