@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { BrainCircuit } from "lucide-react";
@@ -11,9 +10,6 @@ import DocumentSelection from "@/components/cardy-mind/DocumentSelection";
 import ConversationDisplay from "@/components/cardy-mind/ConversationDisplay";
 import ChatInputForm from "@/components/cardy-mind/ChatInputForm";
 import RagInfoCard from "@/components/cardy-mind/RagInfoCard";
-import SpeechToText from "@/components/voice/SpeechToText";
-import TextToSpeech from "@/components/voice/TextToSpeech";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const CardyMindPage: React.FC = () => {
   const { projects, documents } = useProject();
@@ -30,7 +26,6 @@ const CardyMindPage: React.FC = () => {
   const { toast } = useToast();
   const [usedDocuments, setUsedDocuments] = useState<string[]>([]);
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
-  const [activeTab, setActiveTab] = useState<string>("chat");
 
   // Initialize with all documents selected when a project is selected
   useEffect(() => {
@@ -223,27 +218,6 @@ const CardyMindPage: React.FC = () => {
     setUsedDocuments([]);
   };
 
-  // Handle text from speech-to-text component
-  const handleSpeechToText = (text: string) => {
-    setUserInput(text);
-    setActiveTab("chat");
-  };
-
-  // Handle sending the last AI response to text-to-speech
-  const handleReadResponse = () => {
-    // Find the last assistant message
-    const lastAssistantMessage = [...messages].reverse().find(m => m.role === "assistant");
-    if (lastAssistantMessage) {
-      setActiveTab("tts");
-    } else {
-      toast({
-        title: "No response to read",
-        description: "There is no AI response to convert to speech",
-        variant: "destructive"
-      });
-    }
-  };
-
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
@@ -268,7 +242,6 @@ const CardyMindPage: React.FC = () => {
                 selectedProjectName={selectedProjectName}
                 usedDocuments={usedDocuments}
                 handleClearChat={handleClearChat}
-                onReadResponse={handleReadResponse}
               />
             </div>
             
@@ -284,35 +257,17 @@ const CardyMindPage: React.FC = () => {
                 handleRefreshDocuments={handleRefreshDocuments}
               />
               
-              <Tabs defaultValue="chat" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="w-full">
-                  <TabsTrigger value="chat" className="flex-1">Text Input</TabsTrigger>
-                  <TabsTrigger value="stt" className="flex-1">Voice Input</TabsTrigger>
-                  <TabsTrigger value="tts" className="flex-1">Text to Speech</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="chat">
-                  <ChatInputForm 
-                    projects={projects}
-                    selectedProject={selectedProject}
-                    selectedProjectName={selectedProjectName}
-                    isLoading={isLoading}
-                    userInput={userInput}
-                    setUserInput={setUserInput}
-                    handleSelectProject={handleSelectProject}
-                    handleClearProject={handleClearProject}
-                    handleSubmit={handleSubmit}
-                  />
-                </TabsContent>
-                
-                <TabsContent value="stt">
-                  <SpeechToText onAddToChat={handleSpeechToText} />
-                </TabsContent>
-                
-                <TabsContent value="tts">
-                  <TextToSpeech />
-                </TabsContent>
-              </Tabs>
+              <ChatInputForm
+                projects={projects}
+                selectedProject={selectedProject}
+                selectedProjectName={selectedProjectName}
+                isLoading={isLoading}
+                userInput={userInput}
+                setUserInput={setUserInput}
+                handleSelectProject={handleSelectProject}
+                handleClearProject={handleClearProject}
+                handleSubmit={handleSubmit}
+              />
               
               <RagInfoCard />
             </div>

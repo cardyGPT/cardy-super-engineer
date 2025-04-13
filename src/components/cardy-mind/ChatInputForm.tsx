@@ -1,8 +1,16 @@
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, Send, Sparkles, Braces, FileText } from "lucide-react";
+import { 
+  ChevronDown, 
+  Send, 
+  Sparkles, 
+  Braces, 
+  FileText, 
+  Mic, 
+  MicOff 
+} from "lucide-react";
 import { Project } from "@/types";
 import { 
   DropdownMenu, 
@@ -10,6 +18,8 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from "@/components/ui/dropdown-menu";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 interface ChatInputFormProps {
   projects: Project[];
@@ -35,13 +45,10 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
   handleSubmit
 }) => {
   const [rows, setRows] = useState(2);
-
-  // Handle text area auto-expand
-  const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setUserInput(e.target.value);
-    const lineCount = e.target.value.split('\n').length;
-    setRows(Math.min(5, Math.max(2, lineCount)));
-  };
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const { toast } = useToast();
 
   // Example questions for different document types
   const exampleQuestions = {
@@ -89,6 +96,113 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
   
   const insertExampleQuestion = (question: string) => {
     setUserInput(question);
+  };
+
+  // Handle text area auto-expand
+  const handleTextAreaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setUserInput(e.target.value);
+    const lineCount = e.target.value.split('\n').length;
+    setRows(Math.min(5, Math.max(2, lineCount)));
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      mediaRecorderRef.current = new MediaRecorder(stream);
+      audioChunksRef.current = [];
+      
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorderRef.current.onstop = handleAudioStop;
+      
+      mediaRecorderRef.current.start();
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording started",
+        description: "Speak clearly into your microphone",
+        variant: "default",
+      });
+    } catch (error: any) {
+      console.error("Error accessing microphone:", error);
+      toast({
+        title: "Error",
+        description: `Could not access microphone: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      
+      // Stop all audio tracks
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      
+      setIsRecording(false);
+    }
+  };
+
+  const handleAudioStop = async () => {
+    if (audioChunksRef.current.length === 0) {
+      toast({
+        title: "Error",
+        description: "No audio recorded",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      // Convert audio chunks to a single blob
+      const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(audioBlob);
+      
+      reader.onloadend = async () => {
+        // Get base64 string without the data URL prefix
+        const base64Audio = (reader.result as string).split(',')[1];
+        
+        // Call the Supabase Edge Function
+        const { data, error } = await supabase.functions.invoke("speech-to-text", {
+          body: { audioData: base64Audio, format: "webm" }
+        });
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        if (data?.text) {
+          setUserInput(data.text);
+          toast({
+            title: "Success",
+            description: "Speech transcribed successfully",
+            variant: "success",
+          });
+        } else {
+          toast({
+            title: "Warning",
+            description: "No speech was detected",
+            variant: "default",
+          });
+        }
+      };
+    } catch (error: any) {
+      console.error("Speech to text error:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to transcribe speech",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
@@ -160,21 +274,45 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
           value={userInput}
           onChange={handleTextAreaChange}
           placeholder="Ask a question about your documents..."
-          className="pr-12 resize-none"
+          className="pr-16 resize-none"
           disabled={isLoading}
           rows={rows}
         />
-        <Button 
-          type="submit" 
-          size="icon" 
-          className="absolute bottom-2 right-2"
-          disabled={isLoading || !userInput.trim()}
-        >
-          <Send className="h-4 w-4" />
-        </Button>
+        <div className="absolute bottom-2 right-2 flex items-center space-x-2">
+          {isRecording ? (
+            <Button 
+              type="button"
+              variant="destructive" 
+              size="icon"
+              onClick={stopRecording} 
+              disabled={isLoading}
+            >
+              <MicOff className="h-4 w-4" />
+            </Button>
+          ) : (
+            <Button 
+              type="button"
+              variant="outline" 
+              size="icon"
+              onClick={startRecording} 
+              disabled={isLoading}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+          )}
+          
+          <Button 
+            type="submit" 
+            size="icon"
+            disabled={isLoading || !userInput.trim()}
+          >
+            <Send className="h-4 w-4" />
+          </Button>
+        </div>
       </form>
     </div>
   );
 };
 
 export default ChatInputForm;
+
