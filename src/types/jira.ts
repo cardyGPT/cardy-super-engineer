@@ -93,7 +93,7 @@ export interface StoriesContextType {
   selectedTicket: JiraTicket | null;
   setSelectedTicket: (ticket: JiraTicket | null) => void;
   generatedContent: JiraGenerationResponse | null;
-  generateContent: (request: JiraGenerationRequest) => Promise<void>;
+  generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   ticketTypeFilter: string | null;
   setTicketTypeFilter: (type: string | null) => void;

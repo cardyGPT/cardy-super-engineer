@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import { useMarkdownComponents } from '@/utils/contentFormatters';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import remarkGfm from 'remark-gfm';
@@ -28,7 +27,6 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
   onEdit,
   generatedAt
 }) => {
-  const markdownComponents = useMarkdownComponents();
   const [editMode, setEditMode] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [copied, setCopied] = useState(false);
@@ -127,7 +125,6 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw, [rehypeHighlight, { ignoreMissing: true }]]}
-            components={markdownComponents}
           >
             {content}
           </ReactMarkdown>

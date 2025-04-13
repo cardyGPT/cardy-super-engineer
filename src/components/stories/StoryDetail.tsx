@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
@@ -12,15 +13,18 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { downloadAsPDF, formatTimestampForFilename } from "@/utils/exportUtils";
 import ContentDisplay from "./ContentDisplay";
+import { ProjectContextData } from "@/types/jira";
 
 interface StoryDetailProps {
   projectContext?: string | null;
   selectedDocuments?: string[];
+  projectContextData?: ProjectContextData | null;
 }
 
 const StoryDetail: React.FC<StoryDetailProps> = ({ 
   projectContext = null, 
-  selectedDocuments = [] 
+  selectedDocuments = [],
+  projectContextData = null
 }) => {
   const { selectedTicket, pushToJira } = useStories();
   const [activeTab, setActiveTab] = useState("lld");
