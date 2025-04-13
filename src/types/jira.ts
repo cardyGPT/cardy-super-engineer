@@ -50,6 +50,8 @@ export interface JiraGenerationRequest {
   jiraTicket: JiraTicket;
   dataModel?: any;
   documentsContext?: string;
+  projectContext?: string | null;
+  selectedDocuments?: string[];
 }
 
 export interface JiraGenerationResponse {

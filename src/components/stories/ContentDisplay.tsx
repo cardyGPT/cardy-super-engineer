@@ -184,7 +184,6 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
           <ReactMarkdown
             rehypePlugins={[rehypeHighlight, rehypeRaw]}
             remarkPlugins={[remarkGfm]}
-            className="prose dark:prose-invert prose-code:text-xs prose-code:leading-relaxed max-w-full"
           >
             {content}
           </ReactMarkdown>

@@ -19,6 +19,7 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
 
   return (
     <StoryDetail 
+      ticket={selectedTicket}
       projectContext={projectContext} 
       selectedDocuments={selectedDocuments}
       projectContextData={projectContextData}

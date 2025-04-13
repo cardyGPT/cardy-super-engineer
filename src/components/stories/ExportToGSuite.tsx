@@ -9,13 +9,14 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/lib/supabase';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
-interface ExportToGSuiteProps {
-  storyId: string;
-  artifactType: 'lld' | 'code' | 'test' | 'all';
+export interface ExportToGSuiteProps {
+  storyId?: string;
+  storyKey?: string;
   content: string;
+  contentType: "lld" | "code" | "tests";
 }
 
-const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps) => {
+const ExportToGSuite = ({ storyId, storyKey, content, contentType }: ExportToGSuiteProps) => {
   const [isExporting, setIsExporting] = useState(false);
   const [docName, setDocName] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
@@ -25,11 +26,11 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
 
   const generateDefaultDocName = () => {
     const date = new Date().toISOString().split('T')[0];
-    const type = artifactType === 'lld' ? 'Design' : 
-                artifactType === 'code' ? 'Code' : 
-                artifactType === 'test' ? 'Test Cases' : 'Complete Doc';
+    const type = contentType === 'lld' ? 'Design' : 
+                contentType === 'code' ? 'Code' : 
+                contentType === 'test' ? 'Test Cases' : 'Complete Doc';
     
-    return `Story-${storyId}-${type}-${date}`;
+    return `Story-${storyKey || storyId || 'unknown'}-${type}-${date}`;
   };
 
   const handleExport = async () => {
@@ -62,8 +63,8 @@ const ExportToGSuite = ({ storyId, artifactType, content }: ExportToGSuiteProps)
         body: {
           documentName: docName,
           content: content,
-          artifactType: artifactType,
-          storyId: storyId
+          artifactType: contentType,
+          storyId: storyId || storyKey
         }
       });
       

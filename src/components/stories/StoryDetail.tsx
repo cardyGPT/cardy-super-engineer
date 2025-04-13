@@ -218,6 +218,12 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
     window.open(url, '_blank');
   };
 
+  // Wrapper function for pushToJira to match the expected signature in ContentDisplay
+  const handlePushToJira = (content: string) => {
+    if (!ticket || !ticket.key) return Promise.resolve(false);
+    return pushToJira(ticket.key, content);
+  };
+
   if (!ticket) {
     return (
       <Card className="w-full h-fit">
@@ -409,7 +415,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                   contentType="lld"
                   storyKey={ticket.key}
                   storyId={ticket.id}
-                  onPushToJira={pushToJira}
+                  onPushToJira={handlePushToJira}
                   projectContext={projectContext}
                   selectedDocuments={selectedDocuments}
                 />
@@ -431,7 +437,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                   contentType="code"
                   storyKey={ticket.key}
                   storyId={ticket.id}
-                  onPushToJira={pushToJira}
+                  onPushToJira={handlePushToJira}
                   projectContext={projectContext}
                   selectedDocuments={selectedDocuments}
                 />
@@ -453,7 +459,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                   contentType="tests"
                   storyKey={ticket.key}
                   storyId={ticket.id}
-                  onPushToJira={pushToJira}
+                  onPushToJira={handlePushToJira}
                   projectContext={projectContext}
                   selectedDocuments={selectedDocuments}
                 />
