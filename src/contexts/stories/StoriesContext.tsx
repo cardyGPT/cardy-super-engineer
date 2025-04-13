@@ -7,7 +7,7 @@ const StoriesContext = createContext<StoriesContextType | undefined>(undefined);
 
 export const useStories = () => {
   const context = useContext(StoriesContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useStories must be used within a StoriesProvider');
   }
   return context;
