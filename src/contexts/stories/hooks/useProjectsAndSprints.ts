@@ -23,7 +23,12 @@ export const useProjectsAndSprints = (
       
       // If we already have sprints for this project, no need to fetch
       if (!sprints[selectedProject.id] || sprints[selectedProject.id].length === 0) {
-        fetchSprints(selectedProject.id);
+        try {
+          console.log(`No cached sprints for project ${selectedProject.id}, fetching...`);
+          fetchSprints(selectedProject.id);
+        } catch (err) {
+          console.error("Error initiating sprint fetch:", err);
+        }
       }
     }
   }, [selectedProject]);
@@ -81,19 +86,24 @@ export const useProjectsAndSprints = (
       console.log(`Fetching sprints for project ID: ${projectToUse}`);
       const sprintsData = await fetchJiraSprints(credentials, projectToUse);
       
-      if (sprintsData.length === 0) {
-        console.log(`No sprints found for project ID: ${projectToUse}`);
-      } else {
-        console.log(`Found ${sprintsData.length} sprints for project ID: ${projectToUse}`);
-      }
-      
       // Check if sprints received are for the current selected project
       // This prevents race conditions where project was changed during fetch
       setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
       
-      // If there's only one sprint and it's for the current selected project, select it automatically
-      if (selectedProject && selectedProject.id === projectToUse && sprintsData.length === 1) {
-        setSelectedSprint(sprintsData[0]);
+      if (sprintsData.length === 0) {
+        console.log(`No sprints found for project ID: ${projectToUse}`);
+        toast({
+          title: "No Sprints Found",
+          description: "This project doesn't have any sprints available",
+          variant: "default",
+        });
+      } else {
+        console.log(`Found ${sprintsData.length} sprints for project ID: ${projectToUse}`);
+        
+        // If there's only one sprint and it's for the current selected project, select it automatically
+        if (selectedProject && selectedProject.id === projectToUse && sprintsData.length === 1) {
+          setSelectedSprint(sprintsData[0]);
+        }
       }
     } catch (err: any) {
       console.error('Error fetching Jira sprints:', err);
@@ -103,6 +113,9 @@ export const useProjectsAndSprints = (
         description: err.message || 'Failed to fetch Jira sprints',
         variant: "destructive",
       });
+      
+      // Set an empty array for sprints to prevent continual loading state
+      setSprints(prev => ({ ...prev, [projectToUse]: [] }));
     } finally {
       setLoading(false);
     }

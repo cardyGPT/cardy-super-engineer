@@ -13,9 +13,16 @@ export const useAuthState = () => {
         const savedCreds = localStorage.getItem('jira_credentials');
         if (savedCreds) {
           const parsedCreds = JSON.parse(savedCreds) as JiraCredentials;
-          setCredentials(parsedCreds);
-          setIsAuthenticated(true);
-          console.log("Loaded Jira credentials from localStorage");
+          
+          // Validate the credentials format
+          if (parsedCreds.domain && parsedCreds.email && parsedCreds.apiToken) {
+            setCredentials(parsedCreds);
+            setIsAuthenticated(true);
+            console.log("Loaded valid Jira credentials from localStorage");
+          } else {
+            console.log("Invalid credentials format in localStorage, removing");
+            localStorage.removeItem('jira_credentials');
+          }
         } else {
           console.log("No Jira credentials found in localStorage");
         }
@@ -31,9 +38,19 @@ export const useAuthState = () => {
   // Update localStorage when credentials change
   useEffect(() => {
     if (credentials) {
-      localStorage.setItem('jira_credentials', JSON.stringify(credentials));
-      setIsAuthenticated(true);
-      console.log("Saved Jira credentials to localStorage");
+      try {
+        // Ensure domain doesn't have trailing slashes
+        const cleanCredentials = {
+          ...credentials,
+          domain: credentials.domain.replace(/\/+$/, '')
+        };
+        
+        localStorage.setItem('jira_credentials', JSON.stringify(cleanCredentials));
+        setIsAuthenticated(true);
+        console.log("Saved Jira credentials to localStorage");
+      } catch (err) {
+        console.error('Error saving credentials to localStorage:', err);
+      }
     } else {
       localStorage.removeItem('jira_credentials');
       setIsAuthenticated(false);

@@ -4,7 +4,7 @@ import { JiraCredentials } from '@/types/jira';
 
 // Set this to false to disable test data and use real data only
 // In production, this should be set to false
-export const DEV_MODE = false; 
+export const DEV_MODE = true; 
 
 // Helper function to fetch from Jira API through our edge function
 export const callJiraApi = async (credentials: JiraCredentials, path: string, method: string = 'GET', data?: any) => {
@@ -29,7 +29,7 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
     }
 
     if (responseData?.error) {
-      console.error('Jira API returned an error:', responseData.error);
+      console.error('Jira API returned an error:', responseData.error, responseData.details);
       throw new Error(responseData.error || 'Error from Jira API');
     }
 

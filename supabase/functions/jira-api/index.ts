@@ -62,7 +62,10 @@ serve(async (req) => {
             details: errorJson || { message: errorText },
             status: response.status
           }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
+            status: response.status 
+          }
         );
       }
       
