@@ -110,7 +110,7 @@ export const useProjectsAndSprints = (
           toast({
             title: "Using Test Sprints",
             description: "Could not fetch real sprints from Jira. Using test data instead.",
-            variant: "warning",
+            variant: "default", // Changed from "warning" to "default" to fix the TypeScript error
           });
         }
       }
