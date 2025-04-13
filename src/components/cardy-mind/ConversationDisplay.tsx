@@ -1,16 +1,13 @@
 
 import React, { useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChatBubble } from "lucide-react";
-import ReactMarkdown from "react-markdown";
+import { MessageCircle, Trash2, Volume2, FileText, FileJson, 
+  Info, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { 
-  FileText, Trash2, Volume2, Database, FileJson,
-  Info, CheckCircle2, CornerRightDown
-} from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import ReactMarkdown from "react-markdown";
 
 interface ConversationDisplayProps {
   messages: Array<{ role: string, content: string }>;
@@ -42,7 +39,7 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
     <Card className="h-[80vh] flex flex-col">
       <CardHeader className="px-4 py-3 flex-row justify-between items-center">
         <CardTitle className="text-lg flex items-center">
-          <ChatBubble className="h-5 w-5 mr-2" />
+          <MessageCircle className="h-5 w-5 mr-2" />
           <span>Chat</span>
           {selectedProjectName && (
             <Badge variant="outline" className="ml-2">
@@ -91,7 +88,7 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
                     : "bg-gray-100 dark:bg-gray-800"
                 }`}
               >
-                <ReactMarkdown className="prose dark:prose-invert max-w-none">
+                <ReactMarkdown>
                   {message.content}
                 </ReactMarkdown>
 
