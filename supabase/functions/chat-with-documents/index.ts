@@ -20,7 +20,8 @@ serve(async (req) => {
     console.log("Chat with documents request received:", {
       messageLength: message?.length || 0,
       projectId,
-      documentIds: documentIds.length
+      documentIds: documentIds.length,
+      message: message?.substring(0, 100) // Log first 100 chars of query for debugging
     });
     
     if (!message) {
@@ -31,7 +32,20 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
     // First, check if all referenced documents have been processed
+    let documentNames = [];
     if (documentIds.length > 0) {
+      // Get document names for logging and response context
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .select('id, name, type')
+        .in('id', documentIds);
+      
+      if (!docError && docData) {
+        documentNames = docData.map(doc => doc.name);
+        console.log("Selected documents:", documentNames);
+      }
+      
+      // Check for processed chunks
       const { data: processedDocs, error: checkError } = await supabase
         .from('project_chunks')
         .select('document_id')
@@ -102,7 +116,7 @@ serve(async (req) => {
       {
         query_embedding: embedding,
         match_threshold: 0.5,  // Threshold for similarity
-        match_count: 20,       // Increased number of matches to return
+        match_count: 30,       // Increased number of matches for better context
         filter: filter
       }
     );
@@ -130,7 +144,7 @@ serve(async (req) => {
         .from('project_chunks')
         .select('id, project_id, document_id, document_type, chunk_text, chunk_index')
         .in('document_id', documentIds)
-        .limit(10);
+        .limit(30);
         
       if (!anyChunksError && anyChunks && anyChunks.length > 0) {
         console.log(`Found ${anyChunks.length} chunks from selected documents without vector search`);
@@ -156,14 +170,65 @@ serve(async (req) => {
           }));
         }
       }
+      
+      // If still no chunks, try to extract content directly from the documents table
+      if (filteredChunks.length === 0) {
+        const { data: rawDocs, error: rawDocsError } = await supabase
+          .from('documents')
+          .select('id, name, content, type')
+          .in('id', documentIds);
+          
+        if (!rawDocsError && rawDocs && rawDocs.length > 0) {
+          console.log(`Retrieved ${rawDocs.length} documents directly from the documents table`);
+          
+          // Create synthetic chunks from the raw document content
+          const syntheticChunks = [];
+          for (const doc of rawDocs) {
+            if (doc.content) {
+              let contentText = "";
+              if (typeof doc.content === 'string') {
+                contentText = doc.content;
+              } else if (typeof doc.content === 'object') {
+                try {
+                  contentText = JSON.stringify(doc.content, null, 2);
+                } catch (e) {
+                  console.warn(`Error stringifying content for document ${doc.name}:`, e);
+                  contentText = "Error processing document content";
+                }
+              }
+              
+              // Create synthetic chunks (simplified for now)
+              const chunkSize = 1000;
+              for (let i = 0; i < contentText.length; i += chunkSize) {
+                const chunkText = contentText.substring(i, i + chunkSize);
+                syntheticChunks.push({
+                  id: `synthetic-${doc.id}-${i}`,
+                  project_id: projectId,
+                  document_id: doc.id,
+                  document_type: doc.type,
+                  document_name: doc.name,
+                  chunk_text: chunkText,
+                  chunk_index: Math.floor(i / chunkSize),
+                  similarity: 0.6  // Lower similarity to prioritize real chunks
+                });
+              }
+            }
+          }
+          
+          console.log(`Created ${syntheticChunks.length} synthetic chunks from raw document content`);
+          filteredChunks = syntheticChunks;
+        }
+      }
     }
     
     // Build context from the relevant chunks
     let documentsContext = '';
+    let usedDocuments = new Set();
     if (filteredChunks && filteredChunks.length > 0) {
       // Group chunks by document for better context
       const documentGroups = filteredChunks.reduce((groups, chunk) => {
         const docName = chunk.document_name;
+        usedDocuments.add(docName);
         if (!groups[docName]) {
           groups[docName] = [];
         }
@@ -184,19 +249,20 @@ serve(async (req) => {
       }
     }
     
-    const systemPrompt = `You are Cardy Mind, an AI assistant that helps users understand their project documents.
-    Your goal is to provide accurate, helpful responses based on the document context provided.
+    const systemPrompt = `You are Cardy Mind, an advanced RAG-powered AI assistant that helps users understand their project documents.
+    Your goal is to provide detailed, accurate, and helpful responses based on the document context provided.
     
     When responding:
-    - Be concise but thorough
-    - Focus on the facts present in the documents
-    - Cite specific sections or document names when referencing information
-    - When asked about specific documents like "BSITFFS.pdf", provide information from that document if available
-    - If the document content is available, extract and summarize the key points
-    - If you don't know something or the information isn't in the provided documents, admit that
+    - Be thorough and precise, citing specific sections from documents when relevant
+    - Always include document citations using the format [Document: NAME] when referencing information
+    - For technical documents, maintain the same level of technical detail as in the source
+    - When asked about specific documents, focus your response on those documents
+    - For JSON documents or data models, explain the structure and relationships clearly
+    - If the information isn't in the provided documents, clearly state this fact
     - Never make up information that isn't present in the documents
+    - When details are missing, suggest what additional information might be helpful
     
-    Remember, you are a professional assistant helping users understand their project documentation.`;
+    You are working on a project with critical documentation, and your responses should reflect the authoritative nature of these documents.`;
 
     // Create messages array with system prompt, document context, and user message
     const messages = [
@@ -226,6 +292,19 @@ serve(async (req) => {
       });
     }
     
+    // Add instruction to structure the response format
+    messages.push({
+      role: "system",
+      content: `
+      Format your response as follows:
+      1. Start with a direct answer to the question
+      2. Follow with supporting details from the documents, including citations
+      3. If appropriate, summarize key points at the end
+      
+      Always cite documents using [Document: Name] format when referencing specific information.
+      `
+    });
+    
     // Add user message
     messages.push({ role: "user", content: message });
 
@@ -238,10 +317,10 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',  // Using a more capable model for better document analysis
+        model: 'gpt-4o',  // Using the latest model for best results
         messages: messages,
-        temperature: 0.3,
-        max_tokens: 1500,
+        temperature: 0.2,  // Lower temperature for more factual responses
+        max_tokens: 2000,
       }),
     });
 
@@ -262,6 +341,7 @@ serve(async (req) => {
       response: data.choices[0].message.content,
       usage: data.usage,
       contextSize: documentsContext.length,
+      documentsUsed: Array.from(usedDocuments),
       relevantDocuments: filteredChunks ? filteredChunks.map(chunk => ({
         documentName: chunk.document_name,
         similarity: chunk.similarity

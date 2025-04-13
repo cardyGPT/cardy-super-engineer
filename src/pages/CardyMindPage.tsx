@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { BrainCircuit, Database } from "lucide-react";
+import { BrainCircuit } from "lucide-react";
 import { useProject } from "@/contexts/ProjectContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
@@ -32,7 +32,7 @@ const CardyMindPage: React.FC = () => {
   useEffect(() => {
     if (selectedProject) {
       const projectDocs = documents
-        .filter(doc => doc.projectId === selectedProject && doc.type !== "data-model")
+        .filter(doc => doc.projectId === selectedProject)
         .map(doc => doc.id);
       
       setSelectedDocuments(projectDocs);
@@ -55,8 +55,8 @@ const CardyMindPage: React.FC = () => {
       
       // Filter documents based on selection criteria
       const projectDocs = selectedProject 
-        ? documents.filter(doc => doc.projectId === selectedProject && doc.type !== "data-model")
-        : documents.filter(doc => doc.type !== "data-model");
+        ? documents.filter(doc => doc.projectId === selectedProject)
+        : documents;
       
       // Further filter by selected documents if any are selected
       const filteredDocs = selectedDocuments.length > 0
@@ -96,6 +96,11 @@ const CardyMindPage: React.FC = () => {
         throw new Error('Invalid response format from API');
       }
       
+      // Update used documents from API response if available
+      if (data.documentsUsed && Array.isArray(data.documentsUsed)) {
+        setUsedDocuments(data.documentsUsed);
+      }
+      
       setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
       setUserInput("");
     } catch (error: any) {
@@ -105,6 +110,12 @@ const CardyMindPage: React.FC = () => {
         description: error.message || "Failed to get response from AI",
         variant: "destructive"
       });
+      
+      // Add error message to chat
+      setMessages(prev => [...prev, { 
+        role: "assistant", 
+        content: "I'm sorry, I encountered an error while processing your request. Please try again or check the selected documents." 
+      }]);
     } finally {
       setIsLoading(false);
     }
@@ -136,7 +147,7 @@ const CardyMindPage: React.FC = () => {
   // Select all documents for the selected project
   const handleSelectAllDocuments = () => {
     const projectDocs = documents
-      .filter(doc => (!selectedProject || doc.projectId === selectedProject) && doc.type !== "data-model")
+      .filter(doc => (!selectedProject || doc.projectId === selectedProject))
       .map(doc => doc.id);
     
     setSelectedDocuments(projectDocs);

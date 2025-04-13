@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { ChevronDown, Send, Sparkles } from "lucide-react";
+import { ChevronDown, Send, Sparkles, Braces, FileText } from "lucide-react";
 import { Project } from "@/types";
 import { 
   DropdownMenu, 
@@ -43,14 +43,50 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
     setRows(Math.min(5, Math.max(2, lineCount)));
   };
 
-  // Example questions to help users
-  const exampleQuestions = [
-    "What are the key entities in our data model?",
-    "Summarize the system requirements for this project",
-    "Explain the authorization flow in the technical design",
-    "What coding guidelines should I follow for this project?",
-  ];
+  // Example questions for different document types
+  const exampleQuestions = {
+    dataModel: [
+      "Explain the entity relationships in our data model",
+      "What are the key entities in our data model?",
+      "How is the user entity related to other entities?",
+      "What attributes does the provider_management data model have?"
+    ],
+    requirements: [
+      "Summarize the system requirements for this project",
+      "What are the key functional requirements in the document?",
+      "Extract the non-functional requirements from the document",
+      "What are the user authentication requirements?"
+    ],
+    technical: [
+      "Explain the authorization flow in the technical design",
+      "How is data being secured according to the design?",
+      "What technology stack is specified in the document?",
+      "Describe the API architecture from the technical design"
+    ],
+    coding: [
+      "What coding guidelines should I follow for this project?",
+      "What are the naming conventions for variables?",
+      "Explain the error handling patterns in the guidelines",
+      "What testing practices are recommended?"
+    ]
+  };
 
+  // Determine which category to show based on selected project
+  const getExampleQuestionCategory = () => {
+    if (!selectedProject) return 'dataModel';
+    
+    const projectType = projects.find(p => p.id === selectedProject)?.type;
+    if (projectType?.includes('model')) return 'dataModel';
+    if (projectType?.includes('requirement')) return 'requirements';
+    if (projectType?.includes('design')) return 'technical';
+    if (projectType?.includes('coding')) return 'coding';
+    
+    return 'dataModel'; // default
+  };
+
+  const questionCategory = getExampleQuestionCategory();
+  const currentExamples = exampleQuestions[questionCategory as keyof typeof exampleQuestions];
+  
   const insertExampleQuestion = (question: string) => {
     setUserInput(question);
   };
@@ -94,10 +130,12 @@ const ChatInputForm: React.FC<ChatInputFormProps> = ({
         <div className="bg-muted/40 rounded-lg p-3 mb-2">
           <h4 className="text-xs font-medium mb-2 flex items-center">
             <Sparkles className="h-3 w-3 mr-1 text-amber-500" />
+            {questionCategory === 'dataModel' && <Braces className="h-3 w-3 mr-1 text-blue-500" />}
+            {questionCategory === 'requirements' && <FileText className="h-3 w-3 mr-1 text-green-500" />}
             Example Questions
           </h4>
           <div className="flex flex-wrap gap-2">
-            {exampleQuestions.map((question, index) => (
+            {currentExamples.map((question, index) => (
               <Button 
                 key={index} 
                 variant="outline" 

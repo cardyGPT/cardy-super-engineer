@@ -1,13 +1,14 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RefreshCw, FileText, Check, Filter, FileUp } from "lucide-react";
+import { RefreshCw, FileText, Check, Filter, FileUp, Search, FileJson, FileCode, FilePieChart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ProjectDocument } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Input } from "@/components/ui/input";
 
 interface DocumentSelectionProps {
   documents: ProjectDocument[];
@@ -30,10 +31,31 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
   handleClearAllDocuments,
   handleRefreshDocuments
 }) => {
-  // Filter documents based on the selected project
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Filter documents based on the selected project and search query
   const filteredDocuments = documents
     .filter(doc => !selectedProject || doc.projectId === selectedProject)
-    .filter(doc => doc.type !== "data-model");
+    .filter(doc => doc.type !== "data-model" || doc.type === "data-model") // Include both data models and other documents
+    .filter(doc => doc.name.toLowerCase().includes(searchQuery.toLowerCase()));
+
+  // Get document type icon
+  const getDocumentIcon = (type: string) => {
+    switch(type) {
+      case 'data-model':
+        return <FileJson className="h-4 w-4 text-amber-500 flex-shrink-0" />;
+      case 'requirements':
+        return <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+      case 'technical-design':
+        return <FileCode className="h-4 w-4 text-purple-500 flex-shrink-0" />;
+      case 'coding-guidelines':
+        return <FileCode className="h-4 w-4 text-green-500 flex-shrink-0" />;
+      case 'analytics':
+        return <FilePieChart className="h-4 w-4 text-orange-500 flex-shrink-0" />;
+      default:
+        return <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />;
+    }
+  };
 
   // Group documents by type for better organization
   const documentsByType = filteredDocuments.reduce((acc, doc) => {
@@ -117,6 +139,18 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
           </TooltipProvider>
         </div>
         
+        <div className="mb-3">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search documents..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-8"
+            />
+          </div>
+        </div>
+        
         {totalDocuments === 0 ? (
           <div className="text-center py-6 border border-dashed rounded-md">
             <FileUp className="h-6 w-6 mx-auto text-muted-foreground" />
@@ -142,7 +176,7 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
                         }
                       />
                       <label htmlFor={`doc-${doc.id}`} className="flex items-center gap-2 flex-1 cursor-pointer">
-                        <FileText className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                        {getDocumentIcon(doc.type)}
                         <span className="truncate flex-1">{doc.name}</span>
                       </label>
                       <Badge variant="outline" className="flex items-center bg-green-100 text-green-800 text-xs">

@@ -1,11 +1,12 @@
 
 import React, { useRef, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { RefreshCw, FileText, Clock } from "lucide-react";
+import { RefreshCw, FileText, Clock, Trash, CopyCheck, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { toast } from "@/hooks/use-toast";
 
 interface Message {
   role: "user" | "assistant";
@@ -40,30 +41,96 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
     // Check if the content contains citation patterns like [Document: X]
     const citationRegex = /\[(Document|Source): ([^\]]+)\]/g;
     if (!citationRegex.test(content)) {
-      return <p>{content}</p>;
+      return <p className="whitespace-pre-wrap">{content}</p>;
     }
 
-    // Split by citation patterns and render with badges
-    const parts = content.split(citationRegex);
-    const formattedParts = [];
+    // Split the content to preserve all parts
+    const parts = [];
+    let lastIndex = 0;
+    let match;
     
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 3 === 0) {
-        // Regular text
-        if (parts[i]) {
-          formattedParts.push(<span key={`text-${i}`}>{parts[i]}</span>);
-        }
-      } else if (i % 3 === 2) {
-        // Citation text
-        formattedParts.push(
-          <Badge key={`citation-${i}`} variant="outline" className="mx-1 bg-blue-50">
-            {parts[i]}
-          </Badge>
+    // Reset the regex before using it in a loop
+    citationRegex.lastIndex = 0;
+    
+    while ((match = citationRegex.exec(content)) !== null) {
+      // Add the text before the match
+      if (match.index > lastIndex) {
+        parts.push(
+          <span key={`text-${lastIndex}`}>
+            {content.substring(lastIndex, match.index)}
+          </span>
         );
       }
+      
+      // Add the citation
+      parts.push(
+        <Badge key={`citation-${match.index}`} variant="outline" className="mx-1 bg-blue-50">
+          {match[2]}
+        </Badge>
+      );
+      
+      lastIndex = match.index + match[0].length;
     }
     
-    return <p>{formattedParts}</p>;
+    // Add any remaining text
+    if (lastIndex < content.length) {
+      parts.push(
+        <span key={`text-${lastIndex}`}>
+          {content.substring(lastIndex)}
+        </span>
+      );
+    }
+    
+    return <p className="whitespace-pre-wrap">{parts}</p>;
+  };
+
+  // Handle copy all to clipboard
+  const handleCopyAll = () => {
+    const text = messages.map(m => {
+      const prefix = m.role === 'user' ? 'You: ' : 'Cardy Mind: ';
+      return `${prefix}${m.content}`;
+    }).join('\n\n');
+    
+    navigator.clipboard.writeText(text).then(() => {
+      toast({
+        title: "Copied to clipboard",
+        description: "The entire conversation has been copied to your clipboard",
+      });
+    }).catch(err => {
+      console.error('Could not copy text:', err);
+      toast({
+        title: "Copy failed",
+        description: "Could not copy to clipboard",
+        variant: "destructive"
+      });
+    });
+  };
+
+  // Handle copy last message
+  const handleCopyLastResponse = () => {
+    const lastAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
+    
+    if (lastAssistantMessage) {
+      navigator.clipboard.writeText(lastAssistantMessage.content).then(() => {
+        toast({
+          title: "Copied to clipboard",
+          description: "The last response has been copied to your clipboard",
+        });
+      }).catch(err => {
+        console.error('Could not copy text:', err);
+        toast({
+          title: "Copy failed",
+          description: "Could not copy to clipboard",
+          variant: "destructive"
+        });
+      });
+    } else {
+      toast({
+        title: "Nothing to copy",
+        description: "There is no assistant response to copy",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -71,16 +138,50 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
       <CardContent className="p-6">
         <div className="mb-4 flex justify-between items-center">
           <div>
-            <h2 className="text-lg font-semibold mb-2">Conversation</h2>
+            <h2 className="text-lg font-semibold mb-2 flex items-center">
+              <MessageSquare className="h-5 w-5 mr-2 text-blue-500" /> Conversation
+            </h2>
             {selectedProjectName && (
               <div className="text-sm text-muted-foreground mb-2">
-                Selected Project: {selectedProjectName}
+                Selected Project: <Badge variant="outline">{selectedProjectName}</Badge>
               </div>
             )}
           </div>
-          <Button variant="outline" size="sm" onClick={handleClearChat}>
-            Clear Chat
-          </Button>
+          <div className="flex space-x-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleCopyAll}>
+                    <CopyCheck className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy entire conversation</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleCopyLastResponse}>
+                    <CopyCheck className="h-4 w-4 mr-1" />
+                    Last
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy last response only</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="sm" onClick={handleClearChat}>
+                    <Trash className="h-4 w-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Clear the conversation</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </div>
         
         {usedDocuments.length > 0 && (
@@ -134,7 +235,7 @@ const ConversationDisplay: React.FC<ConversationDisplayProps> = ({
                 }`}>
                   {message.role === 'assistant' 
                     ? formatMessage(message.content)
-                    : <p>{message.content}</p>
+                    : <p className="whitespace-pre-wrap">{message.content}</p>
                   }
                   
                   {message.role === 'assistant' && (

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -53,11 +52,19 @@ serve(async (req) => {
     
     if (document.content) {
       // Handle JSON content (like data models)
-      if (document.type === 'data-model') {
-        textContent = JSON.stringify(document.content, null, 2);
+      if (typeof document.content === 'object') {
+        try {
+          textContent = JSON.stringify(document.content, null, 2);
+          console.log(`Successfully converted JSON object to string, length: ${textContent.length}`);
+        } catch (e) {
+          console.error(`Error stringifying JSON content: ${e.message}`);
+          textContent = `Document: ${document.name}\nType: ${document.type}\nError: Could not process JSON content.`;
+        }
       } else if (typeof document.content === 'string') {
         textContent = document.content;
+        console.log(`Using string content, length: ${textContent.length}`);
       } else {
+        console.warn(`Unknown content type: ${typeof document.content}`);
         textContent = JSON.stringify(document.content);
       }
     } else if (document.file_url) {
@@ -95,7 +102,8 @@ serve(async (req) => {
                   role: 'system',
                   content: `You are a PDF extraction tool. Extract as much text as possible from the PDF file URL. 
                   The file name is "${document.name}" and seems to be about "${document.type}".
-                  Extract meaningful content only - ignore page numbers, headers, and formatting.`
+                  Extract meaningful content only - ignore page numbers, headers, and formatting.
+                  Preserve the document structure as much as possible, including section headings and hierarchical organization.`
                 },
                 {
                   role: 'user',
@@ -142,6 +150,34 @@ serve(async (req) => {
           console.error(`Error processing PDF: ${pdfError.message}`);
           textContent = `Document: ${document.name}\nType: ${document.type}\nError: Could not process PDF content.`;
         }
+      } else if (document.file_type && document.file_type.includes('json')) {
+        // Handle JSON files
+        try {
+          const response = await fetch(document.file_url);
+          if (!response.ok) {
+            throw new Error(`Failed to download JSON file: ${response.statusText}`);
+          }
+          
+          const jsonContent = await response.json();
+          textContent = JSON.stringify(jsonContent, null, 2);
+          
+          console.log(`Successfully downloaded and parsed JSON file, length: ${textContent.length}`);
+          
+          // Save the extracted content back to the document
+          const { error: updateError } = await supabase
+            .from('documents')
+            .update({ content: jsonContent })
+            .eq('id', document.id);
+          
+          if (updateError) {
+            console.error(`Warning: Failed to update document with JSON content: ${updateError.message}`);
+          } else {
+            console.log(`Updated document with parsed JSON content`);
+          }
+        } catch (jsonError) {
+          console.error(`Error processing JSON file: ${jsonError.message}`);
+          textContent = `Document: ${document.name}\nType: ${document.type}\nError: Could not process JSON file.`;
+        }
       } else {
         // For other file types, use a generic approach
         console.log(`Document has file_url: ${document.file_url}`);
@@ -163,14 +199,14 @@ serve(async (req) => {
       console.error(`Warning: Failed to delete existing chunks: ${deleteError.message}`);
     }
 
-    // Split content into chunks (improved approach with better overlap handling)
-    const chunks = splitIntoChunks(textContent, 1500, 300);
-    console.log(`Split document into ${chunks.length} chunks`);
+    // Split content into chunks using semantic chunking
+    const chunks = splitIntoSemanticChunks(textContent, document.type);
+    console.log(`Split document into ${chunks.length} semantically meaningful chunks`);
 
     // Process each chunk and get embeddings
     const embeddingPromises = chunks.map(async (chunk, index) => {
       try {
-        const embedding = await getEmbedding(chunk);
+        const embedding = await getEmbedding(chunk.text);
         
         // Insert chunk and embedding into the database
         const { error: insertError } = await supabase
@@ -179,7 +215,7 @@ serve(async (req) => {
             project_id: document.project_id,
             document_id: document.id,
             document_type: document.type,
-            chunk_text: chunk,
+            chunk_text: chunk.text,
             chunk_index: index,
             embedding: embedding
           });
@@ -228,54 +264,215 @@ serve(async (req) => {
   }
 });
 
-// Improved function to split text into chunks with better overlap handling
-function splitIntoChunks(text: string, chunkSize: number, overlap: number): string[] {
-  const chunks: string[] = [];
-  let startIndex = 0;
-
-  while (startIndex < text.length) {
-    // Calculate the end index for this chunk
-    let endIndex = Math.min(startIndex + chunkSize, text.length);
-
-    // If we're not at the end of the text, try to find a good break point
-    if (endIndex < text.length) {
-      // Look for a good break point (sentence or paragraph)
-      const breakPoints = ['. ', '! ', '? ', '\n\n', '\n', ';', ',', ' '];
-      let breakFound = false;
-
-      for (const breakPoint of breakPoints) {
-        const breakIndex = text.lastIndexOf(breakPoint, endIndex);
-        if (breakIndex > startIndex && breakIndex < endIndex) {
-          endIndex = breakIndex + breakPoint.length;
-          breakFound = true;
-          break;
+// Function to split text into semantically meaningful chunks
+function splitIntoSemanticChunks(text: string, documentType: string): { text: string }[] {
+  const chunks: { text: string }[] = [];
+  const maxChunkSize = 1500;
+  
+  // For JSON documents, use special handling
+  if (documentType === 'data-model' || text.trim().startsWith('{') || text.trim().startsWith('[')) {
+    try {
+      // Try to parse if it's a JSON string
+      let jsonObj;
+      if (typeof text === 'string') {
+        try {
+          jsonObj = JSON.parse(text);
+        } catch (e) {
+          // If it's not valid JSON but is a data model, chunk by lines
+          return splitTextByLineGroups(text, maxChunkSize);
         }
+      } else {
+        jsonObj = text;
       }
-
-      // If no good break point, just use space to avoid cutting words
-      if (!breakFound) {
-        const lastSpace = text.lastIndexOf(' ', endIndex);
-        if (lastSpace > startIndex) {
-          endIndex = lastSpace + 1;
+      
+      // Convert back to string with formatting
+      const formattedJson = JSON.stringify(jsonObj, null, 2);
+      
+      // For small JSON documents, keep them together
+      if (formattedJson.length <= maxChunkSize * 1.5) {
+        chunks.push({ text: formattedJson });
+        return chunks;
+      }
+      
+      // For larger JSON documents, try to split by top-level keys
+      if (typeof jsonObj === 'object' && jsonObj !== null) {
+        if (Array.isArray(jsonObj)) {
+          // For arrays, chunk by items
+          let currentChunk = '';
+          for (const item of jsonObj) {
+            const itemStr = JSON.stringify(item, null, 2);
+            
+            if (currentChunk.length + itemStr.length > maxChunkSize && currentChunk.length > 0) {
+              chunks.push({ text: `[${currentChunk}]` });
+              currentChunk = '';
+            }
+            
+            if (currentChunk.length > 0) {
+              currentChunk += ',\n';
+            }
+            
+            currentChunk += itemStr;
+          }
+          
+          if (currentChunk.length > 0) {
+            chunks.push({ text: `[${currentChunk}]` });
+          }
+        } else {
+          // For objects, chunk by keys
+          const keys = Object.keys(jsonObj);
+          let currentChunk = '';
+          let currentChunkKeys = [];
+          
+          for (const key of keys) {
+            const keyValue = jsonObj[key];
+            const keyValueStr = JSON.stringify({ [key]: keyValue }, null, 2).slice(1, -1);
+            
+            if (currentChunk.length + keyValueStr.length > maxChunkSize && currentChunk.length > 0) {
+              chunks.push({ text: `{\n${currentChunk}\n}` });
+              currentChunk = '';
+              currentChunkKeys = [];
+            }
+            
+            if (currentChunk.length > 0) {
+              currentChunk += ',\n';
+            }
+            
+            currentChunk += keyValueStr;
+            currentChunkKeys.push(key);
+          }
+          
+          if (currentChunk.length > 0) {
+            chunks.push({ text: `{\n${currentChunk}\n}` });
+          }
         }
+      } else {
+        // Fallback to line-by-line chunking
+        return splitTextByLineGroups(formattedJson, maxChunkSize);
       }
+    } catch (e) {
+      console.error("Error processing JSON document:", e);
+      return splitTextByLineGroups(text, maxChunkSize);
     }
+  } else {
+    // For text documents, use semantic splitting
+    return splitTextBySemanticStructure(text, maxChunkSize);
+  }
+  
+  return chunks;
+}
 
-    // Add the chunk
-    const chunk = text.substring(startIndex, endIndex).trim();
-    if (chunk.length > 0) {
-      chunks.push(chunk);
+// Split text by natural semantic boundaries
+function splitTextBySemanticStructure(text: string, maxChunkSize: number): { text: string }[] {
+  const chunks: { text: string }[] = [];
+  const sections = text.split(/(?=#{1,6}\s|SECTION\s+\d+:|CHAPTER\s+\d+:|\n\n|\r\n\r\n)/gi);
+  
+  let currentChunk = "";
+  
+  for (const section of sections) {
+    // If adding this section exceeds the chunk size and we already have content,
+    // save the current chunk and start a new one
+    if (currentChunk.length + section.length > maxChunkSize && currentChunk.length > 0) {
+      chunks.push({ text: currentChunk.trim() });
+      currentChunk = "";
     }
-
-    // Move the start index for the next chunk, accounting for overlap
-    startIndex = Math.max(startIndex + 1, endIndex - overlap);
     
-    // Ensure we're making progress and not stuck in a loop
-    if (startIndex <= 0 || startIndex >= text.length - 1) {
-      break;
+    // If the section itself is larger than the max size, we need to split it further
+    if (section.length > maxChunkSize) {
+      // If we have content in the current chunk, save it first
+      if (currentChunk.length > 0) {
+        chunks.push({ text: currentChunk.trim() });
+        currentChunk = "";
+      }
+      
+      // Split the large section by paragraphs
+      const paragraphs = section.split(/\n\n|\r\n\r\n/);
+      let paragraphChunk = "";
+      
+      for (const paragraph of paragraphs) {
+        if (paragraphChunk.length + paragraph.length > maxChunkSize && paragraphChunk.length > 0) {
+          chunks.push({ text: paragraphChunk.trim() });
+          paragraphChunk = "";
+        }
+        
+        // If a single paragraph is too large, split by sentences
+        if (paragraph.length > maxChunkSize) {
+          if (paragraphChunk.length > 0) {
+            chunks.push({ text: paragraphChunk.trim() });
+            paragraphChunk = "";
+          }
+          
+          // Split by sentences (simple approximation)
+          const sentences = paragraph.split(/(?<=[.!?])\s+/);
+          let sentenceChunk = "";
+          
+          for (const sentence of sentences) {
+            if (sentenceChunk.length + sentence.length > maxChunkSize && sentenceChunk.length > 0) {
+              chunks.push({ text: sentenceChunk.trim() });
+              sentenceChunk = "";
+            }
+            
+            // If a single sentence is still too long, just split by size
+            if (sentence.length > maxChunkSize) {
+              if (sentenceChunk.length > 0) {
+                chunks.push({ text: sentenceChunk.trim() });
+                sentenceChunk = "";
+              }
+              
+              // Split the sentence into smaller parts
+              for (let i = 0; i < sentence.length; i += maxChunkSize) {
+                const part = sentence.substring(i, Math.min(i + maxChunkSize, sentence.length));
+                chunks.push({ text: part.trim() });
+              }
+            } else {
+              sentenceChunk += sentenceChunk.length > 0 ? " " + sentence : sentence;
+            }
+          }
+          
+          if (sentenceChunk.length > 0) {
+            chunks.push({ text: sentenceChunk.trim() });
+          }
+        } else {
+          paragraphChunk += paragraphChunk.length > 0 ? "\n\n" + paragraph : paragraph;
+        }
+      }
+      
+      if (paragraphChunk.length > 0) {
+        chunks.push({ text: paragraphChunk.trim() });
+      }
+    } else {
+      currentChunk += currentChunk.length > 0 ? "\n\n" + section : section;
     }
   }
+  
+  if (currentChunk.length > 0) {
+    chunks.push({ text: currentChunk.trim() });
+  }
+  
+  return chunks;
+}
 
+// Split text by line groups with overlap
+function splitTextByLineGroups(text: string, maxChunkSize: number): { text: string }[] {
+  const chunks: { text: string }[] = [];
+  const lines = text.split(/\r?\n/);
+  let currentChunk = "";
+  
+  for (const line of lines) {
+    if (currentChunk.length + line.length + 1 > maxChunkSize && currentChunk.length > 0) {
+      chunks.push({ text: currentChunk });
+      
+      // Create overlap by taking the last few lines of the previous chunk
+      const overlapLines = currentChunk.split(/\r?\n/).slice(-3);
+      currentChunk = overlapLines.join("\n");
+    }
+    
+    currentChunk += currentChunk.length > 0 ? "\n" + line : line;
+  }
+  
+  if (currentChunk.length > 0) {
+    chunks.push({ text: currentChunk });
+  }
+  
   return chunks;
 }
 
