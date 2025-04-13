@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { Input } from "@/components/ui/input";
@@ -54,18 +53,15 @@ const JiraSettings: React.FC = () => {
         throw new Error('Failed to connect to Jira');
       }
 
-      // If successful, save the credentials
+      // If successful, save the credentials to localStorage only
       setTestResult({
         success: true,
         message: `Successfully connected to Jira as ${data.displayName}`
       });
 
-      // Store credentials in localStorage
+      // Store credentials in localStorage only
       const jiraCredentials = { domain, email, apiToken };
       setCredentials(jiraCredentials);
-
-      // Save to database (optional)
-      await saveCredentials(jiraCredentials);
 
       toast({
         title: "Connection Successful",
@@ -89,23 +85,6 @@ const JiraSettings: React.FC = () => {
       });
     } finally {
       setLoading(false);
-    }
-  };
-
-  const saveCredentials = async (creds: { domain: string; email: string; apiToken: string }) => {
-    try {
-      const { error } = await supabase.from('api_keys').upsert({
-        service: 'jira',
-        domain: creds.domain,
-        username: creds.email,
-        api_key: creds.apiToken
-      });
-
-      if (error) {
-        console.error('Error saving Jira credentials:', error);
-      }
-    } catch (err) {
-      console.error('Error saving Jira credentials:', err);
     }
   };
 

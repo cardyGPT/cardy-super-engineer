@@ -84,7 +84,7 @@ const JiraLogin: React.FC = () => {
         );
       }
       
-      // Credentials are valid, save them permanently
+      // Credentials are valid, save them to localStorage only (not to database)
       setCredentials(newCredentials);
       setIsConnected(true);
       
