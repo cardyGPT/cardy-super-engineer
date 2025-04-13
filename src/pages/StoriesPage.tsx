@@ -2,28 +2,23 @@
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
-import { CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { Database, RefreshCw, Settings } from "lucide-react";
+import { RefreshCw, Settings, Database } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { ProjectContextData } from "@/types/jira";
+
+// Components
 import StoryList from "@/components/stories/StoryList";
 import StoryDetails from "@/components/stories/StoryDetails";
-import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
-import JiraContext from "@/components/stories/JiraContext";
-import ContextSettingsDialog from "@/components/stories/ContextSettingsDialog";
-import { ProjectContextData } from "@/types/jira";
+import ProjectSelector from "@/components/stories/ProjectSelector";
+import ContextBanner from "@/components/stories/ContextBanner";
+import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
 
 const StoriesPage: React.FC = () => {
-  const { 
-    isAuthenticated, 
-    loading,
-    refreshAll,
-    error,
-  } = useStories();
-  
+  const { isAuthenticated, loading, refreshAll, error } = useStories();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
   const [selectedProjectContext, setSelectedProjectContext] = useState<string | null>(null);
@@ -48,7 +43,6 @@ const StoriesPage: React.FC = () => {
     }
   }, [error, toast]);
   
-  // Load the saved project context from Supabase
   const loadSavedContext = async () => {
     try {
       const { data, error } = await supabase
@@ -74,7 +68,6 @@ const StoriesPage: React.FC = () => {
     }
   };
   
-  // Load project context data from Supabase
   const loadProjectContextData = async (projectId: string, documentIds: string[]) => {
     try {
       const { data: projectData, error: projectError } = await supabase
@@ -107,10 +100,9 @@ const StoriesPage: React.FC = () => {
     }
   };
   
-  // Handle saving context settings
   const handleSaveContext = async (projectId: string | null, documentIds: string[]) => {
     try {
-      const { data, error } = await supabase.functions.invoke('save-context', {
+      const { error } = await supabase.functions.invoke('save-context', {
         body: {
           projectId,
           documentIds
@@ -150,7 +142,6 @@ const StoriesPage: React.FC = () => {
     }
   };
   
-  // Handle refresh button click
   const handleRefresh = async () => {
     if (isRefreshing || loading) return;
     
@@ -158,8 +149,18 @@ const StoriesPage: React.FC = () => {
     try {
       await refreshAll();
       setLastRefreshTime(new Date());
+      
+      toast({
+        title: "Refreshed",
+        description: "Jira data has been refreshed successfully"
+      });
     } catch (err) {
       console.error("Error refreshing:", err);
+      toast({
+        title: "Error",
+        description: "Failed to refresh Jira data",
+        variant: "destructive"
+      });
     } finally {
       setIsRefreshing(false);
     }
@@ -202,14 +203,19 @@ const StoriesPage: React.FC = () => {
           </div>
         </div>
         
-        {projectContextData && <JiraContext contextData={projectContextData} onEdit={() => setIsContextDialogOpen(true)} />}
+        {projectContextData && (
+          <ContextBanner 
+            contextData={projectContextData} 
+            onEdit={() => setIsContextDialogOpen(true)}
+          />
+        )}
 
         {!isAuthenticated ? (
           <NotConnectedCard />
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
+              <ProjectSelector lastRefreshTime={lastRefreshTime} />
               <StoryList />
             </div>
             
@@ -224,7 +230,7 @@ const StoriesPage: React.FC = () => {
         )}
       </div>
       
-      <ContextSettingsDialog 
+      <ContextDialog 
         open={isContextDialogOpen}
         onOpenChange={setIsContextDialogOpen}
         projectContext={selectedProjectContext}

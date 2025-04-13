@@ -2,7 +2,7 @@
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { AlertCircle, LoaderCircle, Info, ArrowRight, RefreshCw } from "lucide-react";
+import { AlertCircle, LoaderCircle, Info, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface LoadingContentProps {

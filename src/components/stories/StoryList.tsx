@@ -2,24 +2,23 @@
 import React, { useState, useEffect } from 'react';
 import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { useJiraArtifacts } from "@/hooks/useJiraArtifacts";
-import { JiraTicket } from "@/types/jira";
 import { supabase } from "@/lib/supabase";
+import { JiraTicket } from "@/types/jira";
 import { 
-  AlertCircle, 
-  Bug, 
-  CheckCircle, 
-  Clock, 
   Search, 
   ArrowDown, 
   ArrowUp, 
-  Sparkles, 
-  AlertTriangle 
+  Clock, 
+  CheckCircle, 
+  AlertCircle,
+  Bug,
+  Sparkles,
+  AlertTriangle
 } from "lucide-react";
+import LoadingContent from "./LoadingContent";
 
 const PAGE_SIZE = 10;
 
@@ -35,8 +34,8 @@ const StoryList: React.FC = () => {
     setSearchTerm
   } = useStories();
   
-  const [filteredTickets, setFilteredTickets] = useState(tickets);
-  const [displayedTickets, setDisplayedTickets] = useState(tickets.slice(0, PAGE_SIZE));
+  const [filteredTickets, setFilteredTickets] = useState<JiraTicket[]>(tickets);
+  const [displayedTickets, setDisplayedTickets] = useState<JiraTicket[]>(tickets.slice(0, PAGE_SIZE));
   const [currentPage, setCurrentPage] = useState(1);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [ticketsWithArtifacts, setTicketsWithArtifacts] = useState<Set<string>>(new Set());
@@ -130,10 +129,10 @@ const StoryList: React.FC = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
-            <Skeleton className="h-10 w-full" />
+            <LoadingContent 
+              count={4}
+              message="Loading stories..."
+            />
           </div>
         </CardContent>
       </Card>
