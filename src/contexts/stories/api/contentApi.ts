@@ -56,8 +56,37 @@ export const generateJiraContent = async (
     response.response = data.response;
     
     return response;
-  } catch (err) {
+  } catch (err: any) {
     console.error('Error in generateJiraContent:', err);
+    throw err;
+  }
+};
+
+// Save generated content to database for persistence
+export const saveGeneratedContent = async (
+  storyId: string,
+  projectId: string,
+  sprintId: string,
+  contentType: string,
+  content: string
+): Promise<void> => {
+  try {
+    const { error } = await supabase.functions.invoke('save-story-artifacts', {
+      body: {
+        storyId,
+        projectId,
+        sprintId,
+        contentType,
+        content
+      }
+    });
+    
+    if (error) {
+      console.error('Error saving generated content:', error);
+      throw new Error(error.message || 'Failed to save generated content');
+    }
+  } catch (err) {
+    console.error('Error in saveGeneratedContent:', err);
     throw err;
   }
 };
@@ -73,7 +102,7 @@ export const pushContentToJira = async (
       throw new Error('Missing required parameters for pushing to Jira');
     }
     
-    console.log(`Pushing content to Jira ticket ${ticketId}`);
+    console.log(`Pushing content to Jira ticket ${ticketId}...`);
     
     // Convert markdown to Jira markup (a basic conversion)
     const jiraContent = content

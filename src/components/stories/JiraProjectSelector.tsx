@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Filter } from "lucide-react";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 import { useStories } from "@/contexts/StoriesContext";
 import LoadingContent from "./LoadingContent";
 
@@ -110,9 +111,30 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
         </div>
         
         <div className="space-y-2">
-          <label htmlFor="sprint-select" className="text-sm font-medium">
-            Sprint
-          </label>
+          <div className="flex items-center justify-between">
+            <label htmlFor="sprint-select" className="text-sm font-medium">
+              Sprint
+            </label>
+            {selectedProject && (
+              <HoverCard>
+                <HoverCardTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-6 w-6"
+                    onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                    <span className="sr-only">View in Jira</span>
+                  </Button>
+                </HoverCardTrigger>
+                <HoverCardContent className="w-auto p-2">
+                  <p className="text-sm">View in Jira</p>
+                </HoverCardContent>
+              </HoverCard>
+            )}
+          </div>
+          
           {isLoadingSprints ? (
             <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
               Loading sprints...
@@ -158,15 +180,6 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                 ))}
               </SelectContent>
             </Select>
-          )}
-          
-          {selectedProject && (
-            <div className="flex justify-end mt-1">
-              <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>
-                <ExternalLink className="h-4 w-4 mr-2" />
-                View in Jira
-              </Button>
-            </div>
           )}
         </div>
 

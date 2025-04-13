@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ExternalLink, CheckCircle2 } from "lucide-react";
 import { JiraTicket } from "@/types/jira";
 import { Skeleton } from "@/components/ui/skeleton";
+import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
 
 interface StoryHeaderProps {
   ticket: JiraTicket;
@@ -96,10 +97,17 @@ const StoryHeader: React.FC<StoryHeaderProps> = ({
             )}
           </div>
           {onOpenInJira && (
-            <Button variant="outline" size="sm" onClick={onOpenInJira}>
-              <ExternalLink className="h-4 w-4 mr-2" />
-              Jira
-            </Button>
+            <HoverCard>
+              <HoverCardTrigger asChild>
+                <Button variant="ghost" size="icon" onClick={onOpenInJira}>
+                  <ExternalLink className="h-4 w-4" />
+                  <span className="sr-only">View in Jira</span>
+                </Button>
+              </HoverCardTrigger>
+              <HoverCardContent className="w-auto p-2">
+                <p className="text-sm">View in Jira</p>
+              </HoverCardContent>
+            </HoverCard>
           )}
         </div>
       </div>

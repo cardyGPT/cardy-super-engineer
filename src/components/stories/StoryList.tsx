@@ -59,7 +59,7 @@ const StoryList: React.FC = () => {
     setSelectedTicketIds(new Set<string>());
   }, [tickets]);
   
-  // Apply filters
+  // Apply filters - Fix the search functionality to safely handle string checks
   const filteredTickets = useMemo(() => {
     return tickets.filter(ticket => {
       // Apply type filter
@@ -74,11 +74,11 @@ const StoryList: React.FC = () => {
       
       // Apply search filter - safely check if summary exists and is a string
       if (searchTerm && ticket.summary) {
-        // Make sure we're working with strings before calling toLowerCase
-        const summary = String(ticket.summary).toLowerCase();
-        const search = searchTerm.toLowerCase();
+        // Make sure summary is a string before doing string operations
+        const summaryText = String(ticket.summary || '');
+        const searchText = String(searchTerm || '');
         
-        if (!summary.includes(search)) {
+        if (!summaryText.toLowerCase().includes(searchText.toLowerCase())) {
           return false;
         }
       }
