@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
@@ -20,14 +19,9 @@ serve(async (req) => {
     const requestData = await req.json();
     console.log("Request data received:", {
       action: requestData.action,
-      endpoint: requestData.endpoint,
       hasCredentials: !!requestData.credentials || !!requestData.domain,
       method: requestData.method || 'GET'
     });
-    
-    // Handle both legacy 'action' and new 'endpoint' parameter formats
-    const action = requestData.action;
-    const endpoint = requestData.endpoint;
     
     // Extract credentials - handle both formats
     let domain, email, apiToken;
@@ -43,10 +37,6 @@ serve(async (req) => {
       email = requestData.email;
       apiToken = requestData.apiToken;
     }
-    
-    // Enhanced logging
-    console.log(`Processing request for domain: ${domain}`);
-    console.log(`Credential check: domain=${!!domain}, email=${!!email}, apiToken=${!!apiToken}`);
     
     // Basic validation
     if (!domain || !email || !apiToken) {
@@ -77,164 +67,238 @@ serve(async (req) => {
     let method = requestData.method || 'GET';
     let body = null;
     
-    // Handle either endpoint or legacy action pattern
-    if (endpoint) {
-      // New pattern: using endpoint
-      url = `https://${cleanDomain}/rest/${endpoint.startsWith('agile/') ? '' : 'api/2/'}${endpoint}`;
-      
-      // Add query parameters if provided
-      if (requestData.params) {
-        const queryParams = new URLSearchParams();
-        for (const [key, value] of Object.entries(requestData.params)) {
-          queryParams.append(key, String(value));
-        }
-        url += `?${queryParams.toString()}`;
-      }
-      
-      console.log(`Making request to: ${url} (${method})`);
-      
-      // Add body for POST, PUT, PATCH methods
-      if (['POST', 'PUT', 'PATCH'].includes(method.toUpperCase()) && requestData.data) {
-        body = JSON.stringify(requestData.data);
-      }
-      
-    } else if (action) {
-      // Legacy pattern: using action
-      const data = requestData.data;
-      
-      switch (action) {
-        case 'getProjects':
-          url = `https://${cleanDomain}/rest/api/2/project`;
-          console.log(`Fetching projects from: ${url}`);
-          break;
-          
-        case 'getSprints':
-          if (!data?.boardId) {
-            console.error("Missing boardId for getSprints action");
-            return new Response(
-              JSON.stringify({ error: "Board ID is required for getting sprints" }),
-              { 
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400 
-              }
-            );
-          }
-          
-          url = `https://${cleanDomain}/rest/agile/1.0/board/${data.boardId}/sprint`;
-          console.log(`Fetching sprints from: ${url}`);
-          break;
-          
-        case 'getTickets':
-          if (!data?.jql) {
-            console.error("Missing JQL for getTickets action");
-            return new Response(
-              JSON.stringify({ error: "JQL query is required for getting tickets" }),
-              { 
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400 
-              }
-            );
-          }
-          
-          url = `https://${cleanDomain}/rest/api/2/search?jql=${encodeURIComponent(data.jql)}`;
-          console.log(`Fetching tickets from: ${url}`);
-          break;
+    const action = requestData.action;
+    
+    switch (action) {
+      case 'validate':
+      case 'getProjects':
+      case 'get-projects':
+        url = `https://${cleanDomain}/rest/api/2/project`;
+        console.log(`Fetching projects from: ${url}`);
+        break;
         
-        case 'updateTicket':
-          if (!data?.ticketId || !data?.content) {
-            console.error("Missing ticketId or content for updateTicket action");
-            return new Response(
-              JSON.stringify({ error: "Ticket ID and content are required for updating a ticket" }),
-              { 
-                headers: { ...corsHeaders, "Content-Type": "application/json" },
-                status: 400 
-              }
-            );
-          }
-          
-          url = `https://${cleanDomain}/rest/api/2/issue/${data.ticketId}/comment`;
-          method = 'POST';
-          body = JSON.stringify({ body: data.content });
-          console.log(`Updating ticket at: ${url}`);
-          break;
-          
-        default:
-          console.error(`Invalid action requested: ${action}`);
+      case 'get-sprints':
+        if (!requestData.projectId) {
+          console.error("Missing projectId for getSprints action");
           return new Response(
-            JSON.stringify({ error: "Invalid action" }),
+            JSON.stringify({ error: "Project ID is required for getting sprints" }),
             { 
               headers: { ...corsHeaders, "Content-Type": "application/json" },
               status: 400 
             }
           );
-      }
-    } else {
-      console.error("No endpoint or action specified");
-      return new Response(
-        JSON.stringify({ error: "No endpoint or action specified" }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
         }
-      );
+        
+        // First we need to get the board ID for this project
+        const boardResponse = await fetch(`https://${cleanDomain}/rest/agile/1.0/board?projectKeyOrId=${requestData.projectId}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        });
+        
+        if (!boardResponse.ok) {
+          const errorData = await boardResponse.text();
+          console.error(`Error fetching boards: ${boardResponse.status}`, errorData);
+          return new Response(
+            JSON.stringify({ error: `Failed to fetch boards: ${boardResponse.statusText}` }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: boardResponse.status 
+            }
+          );
+        }
+        
+        const boardsData = await boardResponse.json();
+        
+        if (!boardsData.values || boardsData.values.length === 0) {
+          return new Response(
+            JSON.stringify({ sprints: [] }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" }
+            }
+          );
+        }
+        
+        // Use the first board
+        const boardId = boardsData.values[0].id;
+        
+        url = `https://${cleanDomain}/rest/agile/1.0/board/${boardId}/sprint`;
+        console.log(`Fetching sprints from: ${url}`);
+        break;
+        
+      case 'get-tickets':
+        if (!requestData.sprintId) {
+          console.error("Missing sprintId for getTickets action");
+          return new Response(
+            JSON.stringify({ error: "Sprint ID is required for getting tickets" }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400 
+            }
+          );
+        }
+        
+        const jql = `sprint=${requestData.sprintId}`;
+        url = `https://${cleanDomain}/rest/api/2/search?jql=${encodeURIComponent(jql)}&maxResults=100&fields=summary,description,status,issuetype,priority,labels,customfield_10016,assignee,created,updated,acceptanceCriteria`;
+        console.log(`Fetching tickets from: ${url}`);
+        break;
+      
+      case 'add-comment':
+        if (!requestData.ticketId || !requestData.comment) {
+          console.error("Missing ticketId or comment for add-comment action");
+          return new Response(
+            JSON.stringify({ error: "Ticket ID and comment are required" }),
+            { 
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 400 
+            }
+          );
+        }
+        
+        url = `https://${cleanDomain}/rest/api/2/issue/${requestData.ticketId}/comment`;
+        method = 'POST';
+        body = JSON.stringify({ body: requestData.comment });
+        console.log(`Adding comment to ticket: ${url}`);
+        break;
+        
+      default:
+        console.error(`Invalid action requested: ${action}`);
+        return new Response(
+          JSON.stringify({ error: "Invalid action" }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: 400 
+          }
+        );
     }
     
-    // Make the API request
-    response = await fetch(url, {
+    // Make the request to Jira API
+    console.log(`Making ${method} request to: ${url}`);
+    
+    const fetchResponse = await fetch(url, {
       method: method,
       headers: {
         'Authorization': authHeader,
-        'Accept': 'application/json',
-        ...(body ? { 'Content-Type': 'application/json' } : {})
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       },
-      ...(body ? { body } : {})
+      body: body
     });
     
-    // Detailed response logging
-    console.log(`Jira API response status: ${response.status}`);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
+    if (!fetchResponse.ok) {
+      const errorText = await fetchResponse.text();
+      console.error(`Jira API error: ${fetchResponse.status}`, errorText);
       
       try {
-        errorData = JSON.parse(errorText);
+        // Try to parse as JSON for better error info
+        const errorData = JSON.parse(errorText);
+        return new Response(
+          JSON.stringify({ 
+            error: `Jira API returned ${fetchResponse.status}: ${fetchResponse.statusText}`,
+            details: errorData 
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: fetchResponse.status 
+          }
+        );
       } catch (e) {
-        errorData = { message: errorText };
+        // Fall back to text error
+        return new Response(
+          JSON.stringify({ 
+            error: `Jira API returned ${fetchResponse.status}: ${fetchResponse.statusText}`,
+            message: errorText
+          }),
+          { 
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+            status: fetchResponse.status 
+          }
+        );
       }
-      
-      console.error(`Error from Jira API: ${response.status}`, errorData);
-      
-      return new Response(
-        JSON.stringify({ 
-          error: `Jira API error: ${response.status}`, 
-          details: errorData,
-          message: errorData.message || errorData.errorMessages?.join(', ') || 'Unknown error' 
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: response.status 
-        }
-      );
     }
     
-    const responseData = await response.json();
-    console.log(`Successful response, received ${JSON.stringify(responseData).substring(0, 100)}...`);
+    const responseData = await fetchResponse.json();
+    let resultData = {};
+    
+    // Format the response based on the action
+    switch (action) {
+      case 'validate':
+      case 'getProjects':
+      case 'get-projects':
+        resultData = {
+          projects: responseData.map(p => ({
+            id: p.id,
+            key: p.key,
+            name: p.name,
+            avatarUrl: p.avatarUrls?.['48x48'],
+            domain: cleanDomain
+          }))
+        };
+        break;
+        
+      case 'get-sprints':
+        resultData = {
+          sprints: responseData.values.map(s => ({
+            id: s.id,
+            name: s.name,
+            state: s.state,
+            startDate: s.startDate,
+            endDate: s.endDate,
+            boardId: s.originBoardId
+          }))
+        };
+        break;
+        
+      case 'get-tickets':
+        resultData = {
+          tickets: responseData.issues.map(issue => ({
+            id: issue.id,
+            key: issue.key,
+            summary: issue.fields.summary,
+            description: issue.fields.description,
+            status: issue.fields.status?.name,
+            issuetype: {
+              id: issue.fields.issuetype?.id,
+              name: issue.fields.issuetype?.name
+            },
+            priority: issue.fields.priority?.name,
+            assignee: issue.fields.assignee?.displayName,
+            labels: issue.fields.labels,
+            story_points: issue.fields.customfield_10016,
+            acceptance_criteria: issue.fields.acceptanceCriteria,
+            created_at: issue.fields.created,
+            updated_at: issue.fields.updated
+          }))
+        };
+        break;
+        
+      case 'add-comment':
+        resultData = {
+          success: true,
+          comment: responseData
+        };
+        break;
+        
+      default:
+        resultData = responseData;
+    }
     
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify(resultData),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
-  } catch (err) {
-    console.error("Error in Jira API function:", err);
+  } catch (error) {
+    console.error("Error processing request:", error);
     
     return new Response(
       JSON.stringify({ 
-        error: err.message || "Unknown error occurred",
-        stack: err.stack
+        error: "Failed to process request",
+        message: error.message 
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },

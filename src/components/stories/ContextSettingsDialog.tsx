@@ -1,15 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Database, FileText, RefreshCw, Save, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertTriangle } from 'lucide-react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Database, Save, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import { ProjectContextData } from '@/types/jira';
 
 interface ContextSettingsDialogProps {
@@ -17,8 +15,8 @@ interface ContextSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
   projectContext: string | null;
   selectedDocuments: string[];
-  onSave: (projectId: string | null, documentIds: string[]) => void;
-  projectContextData: ProjectContextData | null;
+  onSave: (projectId: string | null, documentIds: string[]) => Promise<void>;
+  projectContextData?: ProjectContextData | null;
 }
 
 const ContextSettingsDialog: React.FC<ContextSettingsDialogProps> = ({
@@ -29,243 +27,253 @@ const ContextSettingsDialog: React.FC<ContextSettingsDialogProps> = ({
   onSave,
   projectContextData
 }) => {
-  const [projectsForContext, setProjectsForContext] = useState<any[]>([]);
-  const [selectedProjectContext, setSelectedProjectContext] = useState<string | null>(projectContext);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [availableDocuments, setAvailableDocuments] = useState<any[]>([]);
-  const [selectedDocs, setSelectedDocs] = useState<string[]>(selectedDocuments);
-  const [loadingDocuments, setLoadingDocuments] = useState(false);
+  const [projects, setProjects] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  const [documents, setDocuments] = useState<Array<{ id: string; name: string; type: string }>>([]);
+  const [selectedProject, setSelectedProject] = useState<string | null>(null);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const [isSaving, setIsSaving] = useState(false);
 
+  // Load available projects and documents when dialog opens
   useEffect(() => {
+    const loadProjectsAndDocs = async () => {
+      setIsLoading(true);
+      try {
+        // Load projects
+        const { data: projectsData, error: projectsError } = await supabase
+          .from('projects')
+          .select('id, name, type')
+          .order('name');
+        
+        if (projectsError) throw projectsError;
+        
+        setProjects(projectsData || []);
+        
+        // Initialize selected project
+        if (projectContext && !selectedProject) {
+          setSelectedProject(projectContext);
+        }
+        
+        // Initialize selected documents
+        if (selectedDocuments.length > 0 && selectedDocs.length === 0) {
+          setSelectedDocs([...selectedDocuments]);
+        }
+        
+        // Load documents for the selected project
+        if (projectContext || selectedProject) {
+          const projectId = selectedProject || projectContext;
+          
+          const { data: docsData, error: docsError } = await supabase
+            .from('documents')
+            .select('id, name, type')
+            .eq('project_id', projectId)
+            .order('name');
+          
+          if (docsError) throw docsError;
+          
+          setDocuments(docsData || []);
+        }
+      } catch (error) {
+        console.error('Error loading projects or documents:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load projects or documents",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
     if (open) {
-      fetchProjectsForContext();
-      if (projectContext) {
-        setSelectedProjectContext(projectContext);
-        fetchDocumentsForProject(projectContext);
-      }
-      setSelectedDocs(selectedDocuments);
+      loadProjectsAndDocs();
     }
-  }, [open, projectContext, selectedDocuments]);
+  }, [open, projectContext, selectedDocuments, selectedProject, toast]);
 
-  const fetchProjectsForContext = async () => {
-    setLoadingProjects(true);
-    try {
-      const { data, error } = await supabase
-        .from('projects')
-        .select('id, name, type')
-        .order('name');
-      
-      if (error) {
-        throw error;
+  // Load documents when selected project changes
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!selectedProject) {
+        setDocuments([]);
+        return;
       }
       
-      if (data) {
-        setProjectsForContext(data);
+      setIsLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('id, name, type')
+          .eq('project_id', selectedProject)
+          .order('name');
+        
+        if (error) throw error;
+        
+        setDocuments(data || []);
+        
+        // Clear selected docs if they don't belong to this project
+        setSelectedDocs(prev => prev.filter(docId => 
+          data?.some(d => d.id === docId)
+        ));
+      } catch (error) {
+        console.error('Error loading documents:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load documents for this project",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
-    } catch (err: any) {
-      console.error("Error fetching projects for context:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load projects for context",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingProjects(false);
+    };
+    
+    if (selectedProject) {
+      loadDocuments();
     }
+  }, [selectedProject, toast]);
+
+  const handleProjectChange = (projectId: string) => {
+    setSelectedProject(projectId);
   };
 
-  const fetchDocumentsForProject = async (projectId: string) => {
-    setLoadingDocuments(true);
-    try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, name, type, file_type')
-        .eq('project_id', projectId)
-        .order('name');
-      
-      if (error) {
-        throw error;
-      }
-      
-      if (data) {
-        setAvailableDocuments(data);
-      }
-    } catch (err: any) {
-      console.error("Error fetching documents:", err);
-      toast({
-        title: "Error",
-        description: "Failed to load project documents",
-        variant: "destructive"
-      });
-    } finally {
-      setLoadingDocuments(false);
+  const handleDocumentToggle = (docId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedDocs(prev => [...prev, docId]);
+    } else {
+      setSelectedDocs(prev => prev.filter(id => id !== docId));
     }
   };
 
-  const handleProjectContextChange = (projectId: string) => {
-    setSelectedProjectContext(projectId);
-    setSelectedDocs([]);
-    fetchDocumentsForProject(projectId);
-  };
-
-  const handleDocumentSelectionChange = (documentId: string) => {
-    setSelectedDocs(prevSelected => {
-      if (prevSelected.includes(documentId)) {
-        return prevSelected.filter(id => id !== documentId);
-      } else {
-        return [...prevSelected, documentId];
-      }
-    });
-  };
-
-  const handleSave = async () => {
-    setIsSaving(true);
+  const handleSaveContext = async () => {
+    setIsLoading(true);
     try {
-      await onSave(selectedProjectContext, selectedDocs);
+      await onSave(selectedProject, selectedDocs);
       toast({
         title: "Context Saved",
-        description: "Project context settings have been saved",
-        variant: "success"
+        description: "Project context has been updated successfully"
+      });
+      onOpenChange(false);
+    } catch (error: any) {
+      console.error('Error saving context:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save context",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClearContext = async () => {
+    setIsLoading(true);
+    try {
+      await onSave(null, []);
+      setSelectedProject(null);
+      setSelectedDocs([]);
+      toast({
+        title: "Context Cleared",
+        description: "Project context has been cleared"
       });
       onOpenChange(false);
     } catch (error) {
-      console.error("Error saving context:", error);
+      console.error('Error clearing context:', error);
       toast({
         title: "Error",
-        description: "Failed to save context settings",
+        description: "Failed to clear context",
         variant: "destructive"
       });
     } finally {
-      setIsSaving(false);
+      setIsLoading(false);
     }
-  };
-
-  const getDocumentTypeLabel = (fileType: string | null, type: string) => {
-    if (fileType === 'application/pdf') return 'PDF';
-    if (fileType?.includes('json')) return 'JSON';
-    if (fileType?.includes('document')) return 'DOC';
-    return type || 'Document';
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center">
-            <Database className="h-5 w-5 mr-2" />
+          <DialogTitle className="flex items-center gap-2">
+            <Database className="h-5 w-5" />
             Project Context Settings
           </DialogTitle>
           <DialogDescription>
             Select project and documents to enhance artifact generation
           </DialogDescription>
         </DialogHeader>
-
-        <div className="space-y-4 py-2">
+        
+        <div className="space-y-4 my-2">
           <div className="space-y-2">
-            <label htmlFor="context-project-select" className="text-sm font-medium">
-              Project for Context
-            </label>
-            {loadingProjects ? (
-              <Skeleton className="h-10 w-full rounded-md" />
-            ) : projectsForContext.length === 0 ? (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>No Projects Found</AlertTitle>
-                <AlertDescription>
-                  No projects available for context. Create a project first.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Select 
-                value={selectedProjectContext || ""} 
-                onValueChange={handleProjectContextChange}
-                disabled={loadingProjects || projectsForContext.length === 0}
-              >
-                <SelectTrigger id="context-project-select" className="w-full">
-                  <SelectValue placeholder="Select a project for context" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projectsForContext.map(project => (
-                    <SelectItem key={project.id} value={project.id}>
-                      {project.name} ({project.type})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
+            <Label>Project for Context</Label>
+            <Select value={selectedProject || ""} onValueChange={handleProjectChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map(project => (
+                  <SelectItem key={project.id} value={project.id}>
+                    {project.name} ({project.type})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           
-          {selectedProjectContext && (
+          {selectedProject && (
             <div className="space-y-2">
-              <label className="text-sm font-medium flex items-center">
-                <FileText className="h-4 w-4 mr-2" />
-                Documents for Context
-              </label>
-              {loadingDocuments ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
-                  <Skeleton className="h-6 w-full" />
-                </div>
-              ) : availableDocuments.length === 0 ? (
-                <div className="p-3 bg-muted rounded-md text-sm text-muted-foreground">
-                  No documents available for this project. Upload documents in the Documents page.
+              <div className="flex items-center">
+                <Label className="flex-1">Documents for Context</Label>
+                <span className="text-xs text-muted-foreground">
+                  {selectedDocs.length} selected
+                </span>
+              </div>
+              
+              {documents.length === 0 ? (
+                <div className="text-center p-4 text-sm text-muted-foreground border rounded-md">
+                  No documents available for this project
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto p-2 border rounded-md">
-                  {availableDocuments.map(doc => (
-                    <div key={doc.id} className="flex items-start space-x-2">
+                <div className="max-h-[200px] overflow-y-auto border rounded-md p-2 space-y-2">
+                  {documents.map(doc => (
+                    <div key={doc.id} className="flex items-center space-x-2">
                       <Checkbox 
                         id={`doc-${doc.id}`} 
                         checked={selectedDocs.includes(doc.id)}
-                        onCheckedChange={() => handleDocumentSelectionChange(doc.id)}
+                        onCheckedChange={checked => handleDocumentToggle(doc.id, checked as boolean)}
                       />
-                      <label 
-                        htmlFor={`doc-${doc.id}`} 
-                        className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                      <Label 
+                        htmlFor={`doc-${doc.id}`}
+                        className="text-sm cursor-pointer flex-1"
                       >
-                        {doc.name}
-                        <span className="text-xs text-muted-foreground ml-1">
-                          ({getDocumentTypeLabel(doc.file_type, doc.type)})
-                        </span>
-                      </label>
+                        {doc.name} <span className="text-xs text-muted-foreground">({doc.type})</span>
+                      </Label>
                     </div>
                   ))}
-                </div>
-              )}
-              {selectedDocs.length > 0 && (
-                <div className="mt-2 text-sm text-muted-foreground">
-                  {selectedDocs.length} document{selectedDocs.length !== 1 ? 's' : ''} selected
                 </div>
               )}
             </div>
           )}
         </div>
-
-        <div className="flex justify-between mt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+        
+        <DialogFooter className="flex justify-between">
+          <Button 
+            variant="outline" 
+            onClick={handleClearContext}
+            disabled={isLoading || (!selectedProject && selectedDocs.length === 0)}
+          >
             <X className="h-4 w-4 mr-1" />
-            Cancel
+            Clear Context
           </Button>
           <Button 
-            onClick={handleSave} 
-            disabled={isSaving || (!selectedProjectContext && selectedDocs.length === 0)}
+            onClick={handleSaveContext}
+            disabled={isLoading || !selectedProject}
           >
-            {isSaving ? (
-              <>
-                <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                Saving...
-              </>
+            {isLoading ? (
+              <span className="h-4 w-4 animate-spin rounded-full border-b-2 mr-1"></span>
             ) : (
-              <>
-                <Save className="h-4 w-4 mr-1" />
-                Save Context
-              </>
+              <Save className="h-4 w-4 mr-1" />
             )}
+            Save Context
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

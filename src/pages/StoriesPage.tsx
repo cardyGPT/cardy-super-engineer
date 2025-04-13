@@ -5,13 +5,8 @@ import { useStories } from "@/contexts/StoriesContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { ExternalLink, RefreshCw, Settings, ChevronDown, AlertTriangle, FileText, Database, Filter, Sliders } from "lucide-react";
+import { ExternalLink, RefreshCw, Settings, AlertTriangle, Database, Filter, Sliders } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
 import {
   Select,
   SelectContent,
@@ -19,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import StoryList from "@/components/stories/StoryList";
 import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
@@ -41,7 +36,6 @@ const StoriesPage: React.FC = () => {
     fetchSprints,
     fetchTickets,
     error,
-    selectedTicket,
     ticketTypeFilter,
     setTicketTypeFilter
   } = useStories();
@@ -69,7 +63,8 @@ const StoriesPage: React.FC = () => {
         .maybeSingle();
       
       if (error) {
-        throw error;
+        console.error("Error loading saved context:", error);
+        return;
       }
       
       if (data) {
@@ -93,7 +88,10 @@ const StoriesPage: React.FC = () => {
         .eq('id', projectId)
         .single();
       
-      if (projectError) throw projectError;
+      if (projectError) {
+        console.error("Error loading project data:", projectError);
+        return;
+      }
       
       // Fetch document details
       const { data: documentsData, error: documentsError } = await supabase
@@ -101,7 +99,10 @@ const StoriesPage: React.FC = () => {
         .select('id, name, type')
         .in('id', documentIds);
       
-      if (documentsError) throw documentsError;
+      if (documentsError) {
+        console.error("Error loading document data:", documentsError);
+        return;
+      }
       
       setProjectContextData({
         project: projectData,
@@ -114,37 +115,46 @@ const StoriesPage: React.FC = () => {
 
   const handleSaveContext = async (projectId: string | null, documentIds: string[]) => {
     try {
-      if (!projectId) {
-        // If no project is selected, we're clearing the context
-        setSelectedProjectContext(null);
-        setSelectedDocuments([]);
-        setProjectContextData(null);
-        
-        // Delete any existing context records
-        await supabase.from('project_context').delete().not('id', 'is', null);
-        return;
+      const { data, error } = await supabase.functions.invoke('save-context', {
+        body: {
+          projectId,
+          documentIds
+        }
+      });
+      
+      if (error) {
+        console.error("Error saving context:", error);
+        throw new Error("Failed to save context settings");
       }
-      
-      // Save to Supabase
-      const { data, error } = await supabase
-        .from('project_context')
-        .upsert({
-          project_id: projectId,
-          document_ids: documentIds,
-          created_at: new Date().toISOString()
-        }, { onConflict: 'project_id' })
-        .select();
-      
-      if (error) throw error;
       
       // Update local state
       setSelectedProjectContext(projectId);
       setSelectedDocuments(documentIds);
       
-      // Load project and document details for context
-      await loadProjectContextData(projectId, documentIds);
+      if (projectId) {
+        // Load project and document details for context
+        await loadProjectContextData(projectId, documentIds);
+        
+        toast({
+          title: "Context Saved",
+          description: "Project context has been updated successfully"
+        });
+      } else {
+        // Clear context data
+        setProjectContextData(null);
+        
+        toast({
+          title: "Context Cleared",
+          description: "Project context has been cleared"
+        });
+      }
     } catch (err: any) {
       console.error("Error saving context:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save context",
+        variant: "destructive"
+      });
       throw err;
     }
   };

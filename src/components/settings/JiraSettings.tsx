@@ -6,42 +6,31 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Link2 } from "lucide-react";
+import { CheckCircle, Link2, Loader2 } from "lucide-react";
+import { useStories } from "@/contexts/StoriesContext";
 
 interface JiraSettingsProps {
   onConfigChange?: (configured: boolean) => void;
 }
 
 const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
+  const { credentials, setCredentials, isAuthenticated } = useStories();
   const [jiraUrl, setJiraUrl] = useState('');
   const [jiraEmail, setJiraEmail] = useState('');
   const [jiraToken, setJiraToken] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadJiraCredentials = () => {
-      try {
-        const credentials = JSON.parse(localStorage.getItem("jira_credentials") || "null");
-        if (credentials) {
-          setJiraUrl(credentials.url || '');
-          setJiraEmail(credentials.email || '');
-          setIsConnected(true);
-          if (onConfigChange) onConfigChange(true);
-        } else {
-          setIsConnected(false);
-          if (onConfigChange) onConfigChange(false);
-        }
-      } catch (err) {
-        console.error("Error loading Jira credentials:", err);
-        setIsConnected(false);
-        if (onConfigChange) onConfigChange(false);
-      }
-    };
-
-    loadJiraCredentials();
-  }, [onConfigChange]);
+    // Initialize form with existing credentials
+    if (credentials) {
+      setJiraUrl(credentials.domain || '');
+      setJiraEmail(credentials.email || '');
+      if (onConfigChange) onConfigChange(true);
+    } else {
+      if (onConfigChange) onConfigChange(false);
+    }
+  }, [credentials, onConfigChange]);
 
   const handleSaveCredentials = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,13 +41,18 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
         throw new Error("All fields are required");
       }
 
+      // Clean up domain to prevent double https:// issues
+      const cleanDomain = jiraUrl.trim()
+        .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
+        .replace(/\/+$/, ''); // Remove trailing slashes
+
       // Validate the Jira credentials
-      const { error } = await supabase.functions.invoke('jira-api', {
+      const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
           action: 'validate',
-          url: jiraUrl,
-          email: jiraEmail,
-          token: jiraToken
+          domain: cleanDomain,
+          email: jiraEmail.trim(),
+          apiToken: jiraToken.trim()
         }
       });
 
@@ -66,17 +60,19 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
         throw new Error(error.message || "Failed to validate Jira credentials");
       }
 
-      // Store credentials in localStorage
-      const credentials = {
-        url: jiraUrl,
-        email: jiraEmail,
-        token: jiraToken
-      };
+      if (data?.error) {
+        throw new Error(data.error || "Invalid Jira credentials");
+      }
 
-      localStorage.setItem("jira_credentials", JSON.stringify(credentials));
-      setIsConnected(true);
-      if (onConfigChange) onConfigChange(true);
-      setJiraToken(''); // Clear token for security
+      // Store credentials in context
+      setCredentials({
+        domain: cleanDomain,
+        email: jiraEmail.trim(),
+        apiToken: jiraToken.trim()
+      });
+
+      // Clear token field for security
+      setJiraToken('');
 
       toast({
         title: "Jira Connected",
@@ -84,9 +80,10 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
         variant: "success",
       });
     } catch (error: any) {
+      console.error("Connection error:", error);
       toast({
-        title: "Error",
-        description: error.message || "Failed to save Jira credentials",
+        title: "Connection Failed",
+        description: error.message || "Failed to connect to Jira",
         variant: "destructive",
       });
     } finally {
@@ -95,8 +92,7 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
   };
 
   const handleDisconnect = () => {
-    localStorage.removeItem("jira_credentials");
-    setIsConnected(false);
+    setCredentials(null);
     setJiraUrl('');
     setJiraEmail('');
     setJiraToken('');
@@ -113,23 +109,23 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>Jira Settings</span>
-          {isConnected && <CheckCircle className="h-5 w-5 text-green-500" />}
+          {isAuthenticated && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
         <CardDescription>
-          {isConnected
+          {isAuthenticated
             ? "Your Jira account is connected"
             : "Connect to Jira to import and manage your stories"}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSaveCredentials}>
         <CardContent className="space-y-4">
-          {isConnected ? (
-            <div className="bg-green-50 border border-green-200 rounded-md p-4">
+          {isAuthenticated ? (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-md p-4">
               <div className="flex">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
                 <div>
-                  <p className="text-green-800 font-medium">Connected to Jira</p>
-                  <p className="text-green-700 text-sm mt-1">
+                  <p className="text-green-800 dark:text-green-300 font-medium">Connected to Jira</p>
+                  <p className="text-green-700 dark:text-green-400 text-sm mt-1">
                     Your credentials are securely stored.
                   </p>
                 </div>
@@ -138,14 +134,17 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
           ) : (
             <>
               <div className="space-y-2">
-                <Label htmlFor="jira-url">Jira URL</Label>
+                <Label htmlFor="jira-url">Jira Domain</Label>
                 <Input
                   id="jira-url"
-                  placeholder="https://your-domain.atlassian.net"
+                  placeholder="your-company.atlassian.net"
                   value={jiraUrl}
                   onChange={(e) => setJiraUrl(e.target.value)}
                   required
                 />
+                <p className="text-xs text-muted-foreground">
+                  This is usually your-company.atlassian.net (without https://)
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="jira-email">Email</Label>
@@ -169,7 +168,7 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
                   required
                 />
                 <p className="text-sm text-muted-foreground">
-                  You can generate an API token from your{" "}
+                  You can generate an API token in your{" "}
                   <a 
                     href="https://id.atlassian.com/manage-profile/security/api-tokens" 
                     target="_blank" 
@@ -184,7 +183,7 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
           )}
         </CardContent>
         <CardFooter>
-          {isConnected ? (
+          {isAuthenticated ? (
             <div className="flex gap-2 w-full justify-between">
               <Button
                 variant="outline"
@@ -208,7 +207,7 @@ const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-b-2"></span>
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Connecting...
                 </span>
               ) : (

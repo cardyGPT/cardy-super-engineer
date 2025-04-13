@@ -26,7 +26,6 @@ const JiraLogin: React.FC = () => {
     if (credentials) {
       setDomain(credentials.domain || "");
       setEmail(credentials.email || "");
-      setApiToken(credentials.apiToken || "");
       setIsConnected(true);
     }
   }, [credentials]);

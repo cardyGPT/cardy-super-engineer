@@ -1,66 +1,47 @@
 
 import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import jsPDF from 'jspdf';
 
-/**
- * Generates and downloads a PDF from a given HTML element
- * @param element The HTML element to convert to PDF
- * @param fileName The name of the PDF file (without extension)
- */
-export const downloadAsPDF = async (element: HTMLElement, fileName: string = 'document') => {
-  if (!element) {
-    console.error('No element provided for PDF download');
-    return false;
-  }
-  
+export const formatTimestampForFilename = (): string => {
+  const now = new Date();
+  return now.toISOString()
+    .replace(/[-:]/g, '')
+    .replace('T', '_')
+    .split('.')[0];
+};
+
+export const downloadAsPDF = async (
+  element: HTMLElement, 
+  fileName: string = 'document'
+): Promise<boolean> => {
   try {
-    // Create a canvas from the element
+    // Wait a moment for any rendering to complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
+    // Create canvas from the element
     const canvas = await html2canvas(element, {
-      scale: 2, // Higher scale for better quality
-      useCORS: true, // Enable CORS for images
+      scale: 1.5, // Higher scale for better quality
+      useCORS: true,
       logging: false,
-      backgroundColor: '#ffffff'
+      allowTaint: true
     });
     
     // Calculate dimensions
-    const imgWidth = 210; // A4 width in mm (210mm)
-    const pageHeight = 297; // A4 height in mm (297mm)
+    const imgWidth = 208; // A4 width in mm
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
-    let heightLeft = imgHeight;
-    let position = 0;
     
-    // Create PDF document
-    const pdf = new jsPDF('p', 'mm', 'a4');
-    let currentPage = 1;
+    // Create PDF
+    const pdf = new jsPDF({
+      orientation: imgHeight > imgWidth ? 'portrait' : 'landscape',
+      unit: 'mm'
+    });
     
-    // Add first page
-    pdf.addImage(
-      canvas.toDataURL('image/png'), 
-      'PNG', 
-      0, 
-      position, 
-      imgWidth, 
-      imgHeight
-    );
-    heightLeft -= pageHeight;
+    const imgData = canvas.toDataURL('image/png');
     
-    // Add more pages if content overflows
-    while (heightLeft > 0) {
-      position = -pageHeight * currentPage;
-      pdf.addPage();
-      pdf.addImage(
-        canvas.toDataURL('image/png'), 
-        'PNG', 
-        0, 
-        position, 
-        imgWidth, 
-        imgHeight
-      );
-      heightLeft -= pageHeight;
-      currentPage++;
-    }
+    // Add image to PDF
+    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
     
-    // Download the PDF
+    // Save the PDF
     pdf.save(`${fileName}.pdf`);
     
     return true;
@@ -68,49 +49,4 @@ export const downloadAsPDF = async (element: HTMLElement, fileName: string = 'do
     console.error('Error generating PDF:', error);
     return false;
   }
-};
-
-/**
- * Downloads content as a simple text file
- * @param content Text content to download
- * @param fileName Name of the file (without extension)
- * @param extension File extension (default: 'txt')
- */
-export const downloadAsTextFile = (
-  content: string | any, 
-  fileName: string = 'document',
-  extension: string = 'txt'
-) => {
-  // Ensure content is a string
-  const safeContent = typeof content === 'string' 
-    ? content 
-    : typeof content === 'object'
-      ? JSON.stringify(content, null, 2)
-      : String(content || '');
-  
-  const blob = new Blob([safeContent], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  
-  a.href = url;
-  a.download = `${fileName}.${extension}`;
-  document.body.appendChild(a);
-  a.click();
-  
-  // Cleanup
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
-};
-
-/**
- * Format a timestamp as a string suitable for filenames
- * @returns String like "2023-04-12_143045"
- */
-export const formatTimestampForFilename = () => {
-  const now = new Date();
-  const date = now.toISOString().split('T')[0];
-  const time = now.toTimeString().split(' ')[0].replace(/:/g, '');
-  return `${date}_${time}`;
 };
