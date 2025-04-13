@@ -15,6 +15,9 @@ export const useAuthState = () => {
           const parsedCreds = JSON.parse(savedCreds) as JiraCredentials;
           setCredentials(parsedCreds);
           setIsAuthenticated(true);
+          console.log("Loaded Jira credentials from localStorage");
+        } else {
+          console.log("No Jira credentials found in localStorage");
         }
       } catch (err) {
         console.error('Error loading Jira credentials:', err);
@@ -30,9 +33,11 @@ export const useAuthState = () => {
     if (credentials) {
       localStorage.setItem('jira_credentials', JSON.stringify(credentials));
       setIsAuthenticated(true);
+      console.log("Saved Jira credentials to localStorage");
     } else {
       localStorage.removeItem('jira_credentials');
       setIsAuthenticated(false);
+      console.log("Removed Jira credentials from localStorage");
     }
   }, [credentials]);
 

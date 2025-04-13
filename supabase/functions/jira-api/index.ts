@@ -5,153 +5,85 @@ import { corsHeaders } from "../_shared/cors.ts";
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const requestBody = await req.json();
-    const { domain, email, apiToken, path, method = 'GET', data } = requestBody;
+    // Parse request body
+    const { domain, email, apiToken, path, method = 'GET', data } = await req.json();
 
-    // Validate all required parameters
-    const missingParams = [];
-    if (!domain) missingParams.push('domain');
-    if (!email) missingParams.push('email');
-    if (!apiToken) missingParams.push('apiToken');
-    if (!path) missingParams.push('path');
+    // Validate required parameters
+    if (!domain || !email || !apiToken || !path) {
+      throw new Error('Missing required parameters: domain, email, apiToken, path');
+    }
 
-    if (missingParams.length > 0) {
-      console.error(`Missing required parameters: ${missingParams.join(', ')}`);
+    // Create Basic auth token from email and api token
+    const authToken = btoa(`${email}:${apiToken}`);
+
+    // Ensure domain doesn't have trailing slash
+    const domainWithoutTrailingSlash = domain.replace(/\/+$/, '');
+
+    // Build Jira API url
+    const apiUrl = `${domainWithoutTrailingSlash}/rest/api/3/${path.replace(/^\/+/, '')}`;
+
+    console.log(`Making ${method} request to Jira API at: ${apiUrl}`);
+
+    // Set up fetch options
+    const fetchOptions = {
+      method,
+      headers: {
+        'Authorization': `Basic ${authToken}`,
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
+      },
+      body: method !== 'GET' && data ? JSON.stringify(data) : undefined
+    };
+
+    // Call Jira API
+    const response = await fetch(apiUrl, fetchOptions);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Jira API error: ${response.status} - ${errorText}`);
+      
+      // Try to parse error text as JSON
+      let errorJson;
+      try {
+        errorJson = JSON.parse(errorText);
+      } catch (e) {
+        // Not JSON, use as is
+      }
+      
+      // Return detailed error information
       return new Response(
-        JSON.stringify({ 
-          error: 'Missing Jira credentials', 
-          details: `Required parameters: ${missingParams.join(', ')}` 
+        JSON.stringify({
+          error: `Jira API returned status ${response.status}`,
+          details: errorJson || { message: errorText },
+          status: response.status
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
-
-    // Construct the Jira API URL - ensure proper formatting of URL
-    const baseUrl = domain.includes('://') ? domain : `https://${domain}`;
-    const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-    const apiPath = path.startsWith('/') ? path.substring(1) : path;
-    const url = `${cleanBaseUrl}/rest/api/3/${apiPath}`;
     
-    console.log(`Making Jira API request to: ${url}, method: ${method}`);
-
-    // Create auth header with base64 encoding
-    const auth = btoa(`${email}:${apiToken}`);
-
-    // Set headers
-    const headers = {
-      'Authorization': `Basic ${auth}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json'
-    };
-
-    // Log specific request details for debugging
-    if (apiPath.includes('project')) {
-      console.log(`Fetching projects with enhanced logging`);
-    } else if (apiPath.includes('board')) {
-      console.log(`Fetching boards for project with enhanced handling`);
-    } else if (apiPath.includes('sprint')) {
-      console.log(`Fetching sprints with path: ${apiPath}`);
-    } else if (apiPath.includes('search') && apiPath.includes('jql')) {
-      console.log(`Executing JQL search: ${apiPath}`);
-    }
-
-    // Make the request to Jira
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: method !== 'GET' && data ? JSON.stringify(data) : undefined
-    });
-
-    // Check if the response is successful
-    if (!response.ok) {
-      const errorText = await response.text();
-      let errorData;
-      try {
-        errorData = JSON.parse(errorText);
-      } catch (e) {
-        errorData = { error: errorText };
-      }
-      
-      console.error(`Jira API error (${response.status}):`, errorData);
-      
-      // Special handling for 404 errors on specific paths
-      if (response.status === 404) {
-        if (apiPath.includes('agile/1.0/board')) {
-          console.log("Board not found, returning empty values array");
-          return new Response(
-            JSON.stringify({ values: [] }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-          );
-        } else if (apiPath.includes('agile/1.0/sprint')) {
-          console.log("Sprint not found, returning empty values array");
-          return new Response(
-            JSON.stringify({ values: [] }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-          );
-        }
-      }
-      
-      // Provide more specific error messages based on path and status code
-      let errorMessage = `Jira API error: ${response.status} ${response.statusText}`;
-      
-      if (response.status === 401) {
-        errorMessage = "Authentication failed. Please check your Jira credentials.";
-      } else if (response.status === 403) {
-        errorMessage = "You don't have permission to access this Jira resource.";
-      } else if (response.status === 404) {
-        errorMessage = "The requested Jira resource was not found.";
-      } else if (apiPath.includes('agile/1.0/board')) {
-        errorMessage = "Failed to fetch Jira boards. Please verify your Jira account has access to Agile boards.";
-      } else if (apiPath.includes('agile/1.0/sprint')) {
-        errorMessage = "Failed to fetch Jira sprints. Please verify your project is using Scrum methodology.";
-      }
-      
-      return new Response(
-        JSON.stringify({ 
-          error: errorMessage,
-          statusCode: response.status,
-          details: errorData
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
-      );
-    }
-
-    // Parse the response
-    const responseData = await response.json();
-    
-    // Enhanced logging for specific response types
-    if (apiPath.includes('project')) {
-      console.log(`Project API response: Found ${responseData.length || 0} projects`);
-    } else if (apiPath.includes('agile/1.0/board')) {
-      console.log(`Board API response: Found ${responseData.values?.length || 0} boards`);
-    } else if (apiPath.includes('agile/1.0/sprint')) {
-      console.log(`Sprint API response: Found ${responseData.values?.length || 0} sprints`);
-    } else if (apiPath.includes('search') && apiPath.includes('sprint')) {
-      console.log(`Search API for sprints: Found ${responseData.issues?.length || 0} issues`);
-    }
-    
-    // If we're fetching sprint issues but got no results, return an empty array instead of undefined
-    if (apiPath.includes('search') && responseData && !responseData.issues) {
-      console.log('No issues found in sprint search, returning empty issues array');
-      responseData.issues = [];
-    }
-
+    // Successfully got a response
+    const data = await response.json();
     return new Response(
-      JSON.stringify(responseData),
+      JSON.stringify(data),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+
   } catch (error) {
-    console.error('Error in Jira API function:', error);
+    // Log and return any errors
+    console.error(`Error processing request:`, error);
+    
     return new Response(
-      JSON.stringify({ 
-        error: error.message || 'An error occurred',
-        stack: Deno.env.get('SUPABASE_ENV') === 'dev' ? error.stack : undefined 
+      JSON.stringify({
+        error: error.message || 'Unknown error occurred',
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
+      }
     );
   }
 });
