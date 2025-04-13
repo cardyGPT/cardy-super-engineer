@@ -217,47 +217,12 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       return sortedSprints;
     }
     
-    // Fallback to test data in DEV_MODE if nothing was found
-    if (DEV_MODE) {
-      console.log('[DEV MODE] Returning test sprints since no real sprints were found');
-      return [
-        {
-          id: `test-${projectId}-active`,
-          name: 'Current Sprint (Test)',
-          state: 'active',
-          boardId: 'test-board',
-          projectId
-        },
-        {
-          id: `test-${projectId}-closed`,
-          name: 'Previous Sprint (Test)',
-          state: 'closed',
-          boardId: 'test-board',
-          projectId
-        }
-      ];
-    }
-    
-    // If all else fails and DEV_MODE is disabled, return an empty array
+    // Return an empty array if no sprints were found
+    console.log('No sprints found for this project');
     return [];
     
   } catch (error) {
     console.error('Error fetching Jira sprints:', error);
-    
-    // Return test data in dev mode if there's an error
-    if (DEV_MODE) {
-      console.log('[DEV MODE] Returning test sprints due to error');
-      return [
-        {
-          id: `test-${projectId}-active`,
-          name: 'Current Sprint (Test)',
-          state: 'active',
-          boardId: 'test-board',
-          projectId
-        }
-      ];
-    }
-    
     throw error;
   }
 };

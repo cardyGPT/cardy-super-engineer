@@ -104,15 +104,6 @@ export const useProjectsAndSprints = (
         if (selectedProject && selectedProject.id === projectToUse && sprintsData.length === 1) {
           setSelectedSprint(sprintsData[0]);
         }
-        
-        // If we found test data only, show a message
-        if (sprintsData.length > 0 && sprintsData[0].id.startsWith('test-')) {
-          toast({
-            title: "Using Test Sprints",
-            description: "Could not fetch real sprints from Jira. Using test data instead.",
-            variant: "default", // Changed from "warning" to "default" to fix the TypeScript error
-          });
-        }
       }
     } catch (err: any) {
       console.error('Error fetching Jira sprints:', err);
