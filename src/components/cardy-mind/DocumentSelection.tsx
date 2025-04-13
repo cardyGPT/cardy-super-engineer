@@ -9,6 +9,8 @@ import { ProjectDocument } from "@/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useProject } from "@/contexts/ProjectContext";
 
 interface DocumentSelectionProps {
   documents: ProjectDocument[];
@@ -33,6 +35,7 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
 }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [visibleDocuments, setVisibleDocuments] = useState<ProjectDocument[]>([]);
+  const { projects } = useProject();
 
   // Update visible documents when dependencies change
   useEffect(() => {
@@ -89,6 +92,30 @@ const DocumentSelection: React.FC<DocumentSelectionProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0 pb-4">
+        {/* Project Selection */}
+        <div className="mb-3">
+          <label htmlFor="project-select" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            Select Project
+          </label>
+          <Select 
+            value={selectedProject || ""} 
+            onValueChange={(value) => {
+              if (value) handleDocumentToggle(value, true);
+            }}
+          >
+            <SelectTrigger id="project-select">
+              <SelectValue placeholder="Select a project" />
+            </SelectTrigger>
+            <SelectContent>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      
         <div className="flex space-x-2 mb-3">
           <TooltipProvider>
             <Tooltip>
