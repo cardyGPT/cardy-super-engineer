@@ -39,39 +39,49 @@ serve(async (req) => {
       body: method !== 'GET' && data ? JSON.stringify(data) : undefined
     };
 
-    // Call Jira API
-    const response = await fetch(apiUrl, fetchOptions);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Jira API error: ${response.status} - ${errorText}`);
+    try {
+      // Call Jira API
+      const response = await fetch(apiUrl, fetchOptions);
       
-      // Try to parse error text as JSON
-      let errorJson;
-      try {
-        errorJson = JSON.parse(errorText);
-      } catch (e) {
-        // Not JSON, use as is
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`Jira API error: ${response.status} - ${errorText}`);
+        
+        // Try to parse error text as JSON
+        let errorJson;
+        try {
+          errorJson = JSON.parse(errorText);
+        } catch (e) {
+          // Not JSON, use as is
+        }
+        
+        // Return detailed error information
+        return new Response(
+          JSON.stringify({
+            error: `Jira API returned status ${response.status}`,
+            details: errorJson || { message: errorText },
+            status: response.status
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        );
       }
       
-      // Return detailed error information
+      // Successfully got a response
+      const responseData = await response.json();
+      return new Response(
+        JSON.stringify(responseData),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (fetchError) {
+      console.error(`Fetch error: ${fetchError.message}`);
       return new Response(
         JSON.stringify({
-          error: `Jira API returned status ${response.status}`,
-          details: errorJson || { message: errorText },
-          status: response.status
+          error: `Failed to fetch from Jira API: ${fetchError.message}`,
+          details: fetchError
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
     }
-    
-    // Successfully got a response
-    const responseData = await response.json();
-    return new Response(
-      JSON.stringify(responseData),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
   } catch (error) {
     // Log and return any errors
     console.error(`Error processing request:`, error);

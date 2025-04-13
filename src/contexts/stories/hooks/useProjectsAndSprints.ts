@@ -40,8 +40,14 @@ export const useProjectsAndSprints = (
     try {
       console.log('Fetching Jira projects...');
       const projectsData = await fetchJiraProjects(credentials);
-      setProjects(projectsData);
-      console.log(`Fetched ${projectsData.length} Jira projects`);
+      
+      if (projectsData && Array.isArray(projectsData)) {
+        setProjects(projectsData);
+        console.log(`Fetched ${projectsData.length} Jira projects`);
+      } else {
+        console.error('Invalid projects data format:', projectsData);
+        throw new Error('Invalid response format for projects');
+      }
     } catch (err: any) {
       console.error('Error fetching Jira projects:', err);
       setError(err.message || 'Failed to fetch Jira projects');
@@ -83,14 +89,9 @@ export const useProjectsAndSprints = (
       
       // Check if sprints received are for the current selected project
       // This prevents race conditions where project was changed during fetch
-      if (selectedProject && selectedProject.id === projectToUse) {
-        setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
-      } else {
-        // If project id changed, still update sprints for that project
-        setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
-      }
+      setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
       
-      // If there's only one sprint, select it automatically
+      // If there's only one sprint and it's for the current selected project, select it automatically
       if (selectedProject && selectedProject.id === projectToUse && sprintsData.length === 1) {
         setSelectedSprint(sprintsData[0]);
       }
