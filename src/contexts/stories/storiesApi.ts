@@ -61,46 +61,56 @@ export const fetchJiraSprints = async (
   }
 
   try {
-    // Try to get all active and future sprints for the project directly
-    console.log(`Attempting to fetch active sprints directly for project ${projectId}`);
+    // We'll use multiple approaches to fetch sprints, trying each one until we find sprints
+    console.log(`Attempting to fetch sprints for project ID: ${projectId}`);
+    
+    // APPROACH 1: Try to get active and future sprints directly using JQL search
+    console.log(`APPROACH 1: Fetching active sprints directly for project ${projectId} using JQL`);
     const { data: projectSprintData, error: projectSprintError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
         email,
         apiToken,
-        // Try to get active sprints directly using JQL
-        path: `search?jql=project=${projectId}%20AND%20sprint%20in%20openSprints()&fields=sprint`
+        path: `search?jql=project=${projectId}%20AND%20sprint%20in%20openSprints()&fields=sprint,summary&maxResults=100`
       }
     });
     
     if (projectSprintError) {
       console.error('Error fetching project sprints directly:', projectSprintError);
-      throw new Error(projectSprintError.message || 'Failed to fetch sprints directly');
-    }
-    
-    if (projectSprintData?.issues && projectSprintData.issues.length > 0) {
+      console.log('Trying next approach...');
+    } else if (projectSprintData?.issues && projectSprintData.issues.length > 0) {
       // Extract unique sprints from the issues
       const sprintsSet = new Set();
       const sprints = [];
       
       // Extract sprints from each issue
       projectSprintData.issues.forEach((issue: any) => {
-        const issueSprints = issue.fields.sprint || [];
-        if (Array.isArray(issueSprints)) {
-          issueSprints.forEach((sprint: any) => {
-            if (!sprintsSet.has(sprint.id) && (sprint.state === 'active' || sprint.state === 'future')) {
-              sprintsSet.add(sprint.id);
-              sprints.push({
-                id: sprint.id,
-                name: sprint.name,
-                state: sprint.state,
-                startDate: sprint.startDate,
-                endDate: sprint.endDate,
-                boardId: sprint.originBoardId || 'unknown'
-              });
-            }
-          });
-        }
+        const customFields = Object.keys(issue.fields).filter(key => 
+          key.startsWith('customfield_') && 
+          Array.isArray(issue.fields[key]) && 
+          issue.fields[key].length > 0 &&
+          issue.fields[key][0]?.id && 
+          issue.fields[key][0]?.state
+        );
+        
+        customFields.forEach(fieldKey => {
+          const issueSprints = issue.fields[fieldKey];
+          if (Array.isArray(issueSprints)) {
+            issueSprints.forEach((sprint: any) => {
+              if (!sprintsSet.has(sprint.id) && (sprint.state === 'active' || sprint.state === 'future')) {
+                sprintsSet.add(sprint.id);
+                sprints.push({
+                  id: sprint.id,
+                  name: sprint.name,
+                  state: sprint.state,
+                  startDate: sprint.startDate,
+                  endDate: sprint.endDate,
+                  boardId: sprint.originBoardId || 'unknown'
+                });
+              }
+            });
+          }
+        });
       });
       
       if (sprints.length > 0) {
@@ -109,9 +119,8 @@ export const fetchJiraSprints = async (
       }
     }
     
-    // If no sprints from issues, try the agile API
-    // First get agile boards for the project
-    console.log(`Fetching boards for project ${projectId}`);
+    // APPROACH 2: Get agile boards for the project
+    console.log(`APPROACH 2: Fetching boards for project ${projectId}`);
     const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
@@ -123,76 +132,94 @@ export const fetchJiraSprints = async (
 
     if (boardError) {
       console.error('Error fetching Jira boards:', boardError);
-      throw new Error(`Failed to fetch Jira boards: ${boardError.message}`);
-    }
+      console.log('Trying next approach...');
+    } else if (boardData?.values && boardData.values.length > 0) {
+      // Try each board to find sprints
+      for (const board of boardData.values) {
+        const boardId = board.id;
+        console.log(`Checking board ID ${boardId} for sprints`);
+        
+        const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
+          body: {
+            domain,
+            email,
+            apiToken,
+            path: `agile/1.0/board/${boardId}/sprint?state=active,future`
+          }
+        });
 
-    // Check if values array exists and has items
-    if (!boardData.values || boardData.values.length === 0) {
-      console.log('No boards found for this project, trying to fetch all active sprints');
-      
-      // Try a different approach - get all active sprints regardless of board
-      const { data: allSprintsData, error: allSprintsError } = await supabase.functions.invoke('jira-api', {
-        body: {
-          domain,
-          email,
-          apiToken,
-          path: `search?jql=project=${projectId}%20AND%20sprint%20not%20in%20closedSprints()&maxResults=100`
+        if (sprintError) {
+          console.error(`Error fetching sprints for board ${boardId}:`, sprintError);
+          continue; // Try next board
         }
-      });
-      
-      if (allSprintsError) {
-        console.error('Error fetching all sprints:', allSprintsError);
-        return [];
+
+        if (sprintData?.values && sprintData.values.length > 0) {
+          console.log(`Successfully fetched ${sprintData.values.length} sprints for board ${boardId}`);
+          
+          return sprintData.values.map((sprint: any) => ({
+            id: sprint.id,
+            name: sprint.name,
+            state: sprint.state,
+            startDate: sprint.startDate,
+            endDate: sprint.endDate,
+            boardId: boardId
+          }));
+        }
       }
-      
-      if (allSprintsData && allSprintsData.total > 0) {
-        // Try to extract sprint info from the issues
-        console.log(`Found ${allSprintsData.total} issues in active sprints`);
-        return [];
-      }
-      
-      return [];
     }
-
-    // Use the first board to get sprints
-    const boardId = boardData.values[0].id;
-    console.log(`Using board ID ${boardId} to fetch sprints`);
-
-    const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
+    
+    // APPROACH 3: Try another JQL query approach
+    console.log(`APPROACH 3: Trying alternative JQL query for sprints in project ${projectId}`);
+    const { data: allIssuesData, error: allIssuesError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
         email,
         apiToken,
-        path: `agile/1.0/board/${boardId}/sprint?state=active,future`
+        path: `search?jql=project=${projectId}&fields=id,summary,sprint&maxResults=50`
       }
     });
-
-    if (sprintError) {
-      console.error('Error fetching Jira sprints:', sprintError);
-      throw new Error(`Failed to fetch Jira sprints: ${sprintError.message}`);
-    }
-
-    if (!sprintData) {
-      console.warn('No sprint data returned from Jira API');
-      return [];
-    }
-
-    // Check if values array exists
-    if (!sprintData.values) {
-      console.warn('Invalid sprint data format:', sprintData);
-      return [];
-    }
-
-    console.log(`Successfully fetched ${sprintData.values.length} sprints for board ${boardId}`);
     
-    return sprintData.values.map((sprint: any) => ({
-      id: sprint.id,
-      name: sprint.name,
-      state: sprint.state,
-      startDate: sprint.startDate,
-      endDate: sprint.endDate,
-      boardId: boardId
-    }));
+    if (!allIssuesError && allIssuesData?.issues && allIssuesData.issues.length > 0) {
+      // Try to extract sprint info from any custom fields that might hold sprint data
+      const sprintMap = new Map();
+      
+      allIssuesData.issues.forEach((issue: any) => {
+        // Look through all fields for any that might be sprint fields (typically customfield_XXXXX)
+        Object.entries(issue.fields).forEach(([fieldKey, fieldValue]) => {
+          if (Array.isArray(fieldValue) && fieldValue.length > 0 && typeof fieldValue[0] === 'object') {
+            const possibleSprints = fieldValue.filter((item: any) => 
+              item && item.id && item.name && item.state &&
+              (item.state === 'active' || item.state === 'future')
+            );
+            
+            if (possibleSprints.length > 0) {
+              possibleSprints.forEach((sprint: any) => {
+                if (!sprintMap.has(sprint.id)) {
+                  sprintMap.set(sprint.id, {
+                    id: sprint.id,
+                    name: sprint.name,
+                    state: sprint.state,
+                    startDate: sprint.startDate,
+                    endDate: sprint.endDate,
+                    boardId: sprint.originBoardId || 'unknown'
+                  });
+                }
+              });
+            }
+          }
+        });
+      });
+      
+      if (sprintMap.size > 0) {
+        console.log(`Found ${sprintMap.size} sprints from issue custom fields`);
+        return Array.from(sprintMap.values());
+      }
+    }
+    
+    // If we've exhausted all approaches and found no sprints, return an empty array
+    console.log(`No active or future sprints found for project ${projectId} after trying all approaches`);
+    return [];
+    
   } catch (error: any) {
     console.error('Error in fetchJiraSprints:', error);
     throw error instanceof Error ? error : new Error('Failed to fetch Jira sprints');

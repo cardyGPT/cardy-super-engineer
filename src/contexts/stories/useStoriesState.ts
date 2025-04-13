@@ -100,8 +100,16 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
     setError(null);
 
     try {
+      console.log(`Fetching sprints for project ID: ${projectToUse}`);
       const sprintsData = await fetchJiraSprints(credentials, projectToUse);
-      setSprints({ ...sprints, [projectToUse]: sprintsData });
+      
+      if (sprintsData.length === 0) {
+        console.log(`No sprints found for project ID: ${projectToUse}`);
+      } else {
+        console.log(`Found ${sprintsData.length} sprints for project ID: ${projectToUse}`);
+      }
+      
+      setSprints(prev => ({ ...prev, [projectToUse]: sprintsData }));
     } catch (err: any) {
       console.error('Error fetching Jira sprints:', err);
       setError(err.message || 'Failed to fetch Jira sprints');
@@ -217,7 +225,9 @@ export const useStoriesState = (): StoriesContextState & StoriesContextActions =
     credentials,
     setCredentials,
     isAuthenticated,
-    tickets: filteredTickets,
+    tickets: ticketTypeFilter
+      ? tickets.filter(ticket => ticket.issuetype?.name === ticketTypeFilter)
+      : tickets,
     loading,
     error,
     projects,

@@ -2,7 +2,7 @@
 import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card } from "@/components/ui/card";
-import { AlertCircle, LoaderCircle } from "lucide-react";
+import { AlertCircle, LoaderCircle, Info } from "lucide-react";
 
 interface LoadingContentProps {
   count?: number;
@@ -10,6 +10,7 @@ interface LoadingContentProps {
   showTitle?: boolean;
   message?: string;
   isError?: boolean;
+  isInfo?: boolean;
 }
 
 const LoadingContent: React.FC<LoadingContentProps> = ({ 
@@ -17,7 +18,8 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
   titleWidth = "w-1/3",
   showTitle = true,
   message = "Loading content...",
-  isError = false
+  isError = false,
+  isInfo = false
 }) => {
   return (
     <Card className="p-4">
@@ -29,9 +31,13 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
             className={`h-4 ${i % 2 === 0 ? 'w-full' : (i % 3 === 0 ? 'w-2/3' : 'w-3/4')}`} 
           />
         ))}
-        <div className={`flex items-center justify-center gap-2 text-center text-sm ${isError ? 'text-red-500' : 'text-muted-foreground'} mt-2`}>
+        <div className={`flex items-center justify-center gap-2 text-center text-sm ${
+          isError ? 'text-red-500' : (isInfo ? 'text-blue-500' : 'text-muted-foreground')
+        } mt-2`}>
           {isError ? (
             <AlertCircle className="h-4 w-4" />
+          ) : isInfo ? (
+            <Info className="h-4 w-4" />
           ) : (
             <LoaderCircle className="h-4 w-4 animate-spin" />
           )}

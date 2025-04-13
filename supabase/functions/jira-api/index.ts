@@ -36,7 +36,7 @@ serve(async (req) => {
     const apiPath = path.startsWith('/') ? path.substring(1) : path;
     const url = `${cleanBaseUrl}/rest/api/3/${apiPath}`;
     
-    console.log(`Making Jira API request to: ${url}`);
+    console.log(`Making Jira API request to: ${url}, method: ${method}`);
 
     // Create auth header with base64 encoding
     const auth = btoa(`${email}:${apiToken}`);
@@ -117,6 +117,8 @@ serve(async (req) => {
       console.log(`Board API response: Found ${responseData.values?.length || 0} boards`);
     } else if (apiPath.includes('agile/1.0/sprint')) {
       console.log(`Sprint API response: Found ${responseData.values?.length || 0} sprints`);
+    } else if (apiPath.includes('search') && apiPath.includes('sprint')) {
+      console.log(`Search API for sprints: Found ${responseData.issues?.length || 0} issues`);
     }
 
     return new Response(
