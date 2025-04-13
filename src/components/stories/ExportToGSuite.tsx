@@ -28,7 +28,7 @@ const ExportToGSuite = ({ storyId, storyKey, content, contentType }: ExportToGSu
     const date = new Date().toISOString().split('T')[0];
     const type = contentType === 'lld' ? 'Design' : 
                 contentType === 'code' ? 'Code' : 
-                contentType === 'test' ? 'Test Cases' : 'Complete Doc';
+                contentType === 'tests' ? 'Test Cases' : 'Complete Doc';
     
     return `Story-${storyKey || storyId || 'unknown'}-${type}-${date}`;
   };

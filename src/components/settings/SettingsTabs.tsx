@@ -20,10 +20,6 @@ interface SettingsTabsProps {
   setBitbucketConnected: (connected: boolean) => void;
 }
 
-interface ConfigComponentProps {
-  onConfigChange: (connected: boolean) => void;
-}
-
 const SettingsTabs: React.FC<SettingsTabsProps> = ({
   activeTab,
   setActiveTab,
@@ -66,7 +62,7 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
       </TabsList>
       
       <TabsContent value="jira">
-        <JiraSettings onConfigChange={setJiraConnected} />
+        <JiraSettings />
       </TabsContent>
       
       <TabsContent value="openai">

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
@@ -133,7 +132,7 @@ function formatContentForDocs(content: string, artifactType: string): string {
     formattedContent = `# Low-Level Design Document\n\n${formattedContent}`;
   } else if (artifactType === 'code') {
     formattedContent = `# Code Implementation\n\n${formattedContent}`;
-  } else if (artifactType === 'test') {
+  } else if (artifactType === 'tests') {
     formattedContent = `# Test Cases\n\n${formattedContent}`;
   }
   
@@ -145,7 +144,7 @@ async function updateStoryArtifact(supabase, storyId: string, artifactType: stri
   const columnMap = {
     'lld': 'lld_gsuite_id',
     'code': 'code_gsuite_id',
-    'test': 'test_gsuite_id'
+    'tests': 'test_gsuite_id'
   };
   
   const column = columnMap[artifactType];
