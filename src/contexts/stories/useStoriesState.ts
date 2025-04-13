@@ -58,6 +58,9 @@ export const useStoriesState = () => {
   // Generated content
   const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse | null>(null);
   
+  // Track whether we're loading from project directly instead of sprint
+  const [loadFromProject, setLoadFromProject] = useState(false);
+  
   // Computed state - combined loading state
   const loading = projectsLoading || sprintsLoading || ticketsLoading || contentLoading;
   
@@ -173,7 +176,7 @@ export const useStoriesState = () => {
     
     try {
       console.log(`Fetching tickets for sprint ${sprintId}...`);
-      const { tickets: ticketsData, total } = await fetchJiraTickets(
+      const result = await fetchJiraTickets(
         credentials, 
         sprintId, 
         selectedProject,
@@ -181,10 +184,10 @@ export const useStoriesState = () => {
         pageSize
       );
       
-      setTickets(ticketsData);
-      setTotalTickets(total);
-      setHasMore(ticketsData.length < total);
-      console.log(`Fetched ${ticketsData.length} tickets for sprint ${sprintId} (total: ${total})`);
+      setTickets(result.tickets);
+      setTotalTickets(result.total);
+      setHasMore(result.tickets.length < result.total);
+      console.log(`Fetched ${result.tickets.length} tickets for sprint ${sprintId} (total: ${result.total})`);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to fetch Jira tickets';
       console.error('Error fetching tickets:', errorMessage);
@@ -256,9 +259,6 @@ export const useStoriesState = () => {
       setLoadingMore(false);
     }
   }, [credentials, selectedProject, selectedSprint, currentPage, pageSize, hasMore, loadingMore, loadFromProject, toast]);
-
-  // Track whether we're loading from project directly instead of sprint
-  const [loadFromProject, setLoadFromProject] = useState(false);
   
   // API method - Fetch tickets directly from a project
   const fetchTicketsByProject = useCallback(async (projectId: string) => {
@@ -275,22 +275,22 @@ export const useStoriesState = () => {
     
     try {
       console.log(`Fetching tickets for project ${projectId}...`);
-      const { tickets: ticketsData, total } = await fetchJiraTicketsByProject(
+      const result = await fetchJiraTicketsByProject(
         credentials,
         selectedProject,
         0,
         pageSize
       );
       
-      setTickets(ticketsData);
-      setTotalTickets(total);
-      setHasMore(ticketsData.length < total);
+      setTickets(result.tickets);
+      setTotalTickets(result.total);
+      setHasMore(result.tickets.length < result.total);
       
-      console.log(`Fetched ${ticketsData.length} tickets for project ${projectId} (total: ${total})`);
+      console.log(`Fetched ${result.tickets.length} tickets for project ${projectId} (total: ${result.total})`);
       
       toast({
         title: "Project Stories Loaded",
-        description: `Loaded ${ticketsData.length} stories from the project directly.`,
+        description: `Loaded ${result.tickets.length} stories from the project directly.`,
         variant: "default",
       });
     } catch (err: any) {
