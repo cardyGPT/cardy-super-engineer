@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      api_keys: {
+        Row: {
+          api_key: string
+          created_at: string
+          domain: string | null
+          id: string
+          service: string
+          username: string | null
+        }
+        Insert: {
+          api_key: string
+          created_at?: string
+          domain?: string | null
+          id?: string
+          service: string
+          username?: string | null
+        }
+        Update: {
+          api_key?: string
+          created_at?: string
+          domain?: string | null
+          id?: string
+          service?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       documents: {
         Row: {
           content: Json | null
@@ -97,6 +124,27 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      project_context: {
+        Row: {
+          created_at: string
+          document_ids: string[] | null
+          id: string
+          project_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_ids?: string[] | null
+          id?: string
+          project_id: string
+        }
+        Update: {
+          created_at?: string
+          document_ids?: string[] | null
+          id?: string
+          project_id?: string
+        }
+        Relationships: []
       }
       projects: {
         Row: {

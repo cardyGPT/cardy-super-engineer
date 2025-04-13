@@ -1,225 +1,225 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/lib/supabase";
-import { useToast } from "@/hooks/use-toast";
-import { CheckCircle, Link2, Loader2 } from "lucide-react";
+import React, { useState, useEffect } from "react";
 import { useStories } from "@/contexts/StoriesContext";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle, AlertTriangle, Trash2, Info, Shield } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 
-interface JiraSettingsProps {
-  onConfigChange?: (configured: boolean) => void;
-}
-
-const JiraSettings: React.FC<JiraSettingsProps> = ({ onConfigChange }) => {
-  const { credentials, setCredentials, isAuthenticated } = useStories();
-  const [jiraUrl, setJiraUrl] = useState('');
-  const [jiraEmail, setJiraEmail] = useState('');
-  const [jiraToken, setJiraToken] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+const JiraSettings: React.FC = () => {
+  const { credentials, setCredentials, isAuthenticated, fetchProjects } = useStories();
+  const [domain, setDomain] = useState("");
+  const [email, setEmail] = useState("");
+  const [apiToken, setApiToken] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Initialize form with existing credentials
     if (credentials) {
-      setJiraUrl(credentials.domain || '');
-      setJiraEmail(credentials.email || '');
-      if (onConfigChange) onConfigChange(true);
-    } else {
-      if (onConfigChange) onConfigChange(false);
+      setDomain(credentials.domain);
+      setEmail(credentials.email);
+      setApiToken(credentials.apiToken); // Note: This will be masked in the UI
     }
-  }, [credentials, onConfigChange]);
+  }, [credentials]);
 
-  const handleSaveCredentials = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
+  const testConnection = async () => {
+    if (!domain || !email || !apiToken) {
+      setTestResult({
+        success: false,
+        message: "Please fill in all the required fields."
+      });
+      return;
+    }
+
+    setLoading(true);
+    setTestResult(null);
 
     try {
-      if (!jiraUrl.trim() || !jiraEmail.trim() || !jiraToken.trim()) {
-        throw new Error("All fields are required");
-      }
-
-      // Clean up domain to prevent double https:// issues
-      const cleanDomain = jiraUrl.trim()
-        .replace(/^https?:\/\//i, '') // Remove any existing http:// or https://
-        .replace(/\/+$/, ''); // Remove trailing slashes
-
-      // Validate the Jira credentials
+      // Use the Jira API edge function to test the connection
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'validate',
-          domain: cleanDomain,
-          email: jiraEmail.trim(),
-          apiToken: jiraToken.trim()
+          domain,
+          email,
+          apiToken,
+          path: 'myself'
         }
       });
 
       if (error) {
-        throw new Error(error.message || "Failed to validate Jira credentials");
+        throw new Error('Failed to connect to Jira');
       }
 
-      if (data?.error) {
-        throw new Error(data.error || "Invalid Jira credentials");
-      }
-
-      // Store credentials in context
-      setCredentials({
-        domain: cleanDomain,
-        email: jiraEmail.trim(),
-        apiToken: jiraToken.trim()
+      // If successful, save the credentials
+      setTestResult({
+        success: true,
+        message: `Successfully connected to Jira as ${data.displayName}`
       });
 
-      // Clear token field for security
-      setJiraToken('');
+      // Store credentials in localStorage
+      const jiraCredentials = { domain, email, apiToken };
+      setCredentials(jiraCredentials);
+
+      // Save to database (optional)
+      await saveCredentials(jiraCredentials);
 
       toast({
-        title: "Jira Connected",
-        description: "Your Jira credentials have been saved successfully",
+        title: "Connection Successful",
+        description: `Connected to Jira as ${data.displayName}`,
         variant: "success",
       });
-    } catch (error: any) {
-      console.error("Connection error:", error);
+
+      // Fetch projects after successful connection
+      fetchProjects();
+    } catch (err: any) {
+      console.error('Error testing Jira connection:', err);
+      setTestResult({
+        success: false,
+        message: err.message || 'Failed to connect to Jira'
+      });
+      
       toast({
         title: "Connection Failed",
-        description: error.message || "Failed to connect to Jira",
+        description: err.message || 'Failed to connect to Jira',
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  const handleDisconnect = () => {
+  const saveCredentials = async (creds: { domain: string; email: string; apiToken: string }) => {
+    try {
+      const { error } = await supabase.from('api_keys').upsert({
+        service: 'jira',
+        domain: creds.domain,
+        username: creds.email,
+        api_key: creds.apiToken
+      });
+
+      if (error) {
+        console.error('Error saving Jira credentials:', error);
+      }
+    } catch (err) {
+      console.error('Error saving Jira credentials:', err);
+    }
+  };
+
+  const disconnectJira = () => {
     setCredentials(null);
-    setJiraUrl('');
-    setJiraEmail('');
-    setJiraToken('');
-    if (onConfigChange) onConfigChange(false);
+    setDomain("");
+    setEmail("");
+    setApiToken("");
+    setTestResult(null);
     
     toast({
       title: "Disconnected",
-      description: "Your Jira credentials have been removed",
+      description: "Jira connection has been removed",
+      variant: "default",
     });
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Jira Settings</span>
-          {isAuthenticated && <CheckCircle className="h-5 w-5 text-green-500" />}
+        <CardTitle className="flex items-center">
+          <Shield className="mr-2 h-5 w-5" />
+          Jira Integration
         </CardTitle>
         <CardDescription>
-          {isAuthenticated
-            ? "Your Jira account is connected"
-            : "Connect to Jira to import and manage your stories"}
+          Connect to your Jira account to access and manage your issues
         </CardDescription>
       </CardHeader>
-      <form onSubmit={handleSaveCredentials}>
-        <CardContent className="space-y-4">
-          {isAuthenticated ? (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 rounded-md p-4">
-              <div className="flex">
-                <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                <div>
-                  <p className="text-green-800 dark:text-green-300 font-medium">Connected to Jira</p>
-                  <p className="text-green-700 dark:text-green-400 text-sm mt-1">
-                    Your credentials are securely stored.
-                  </p>
-                </div>
-              </div>
+      <CardContent className="space-y-4">
+        {isAuthenticated ? (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertTitle className="text-green-800 dark:text-green-400">Connected to Jira</AlertTitle>
+            <AlertDescription className="text-green-700 dark:text-green-500">
+              Your Jira account is connected and working properly.
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="domain">Jira Domain URL</Label>
+              <Input
+                id="domain"
+                placeholder="https://your-domain.atlassian.net"
+                value={domain}
+                onChange={(e) => setDomain(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground">
+                Your Atlassian domain URL, e.g., https://your-domain.atlassian.net
+              </p>
             </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label htmlFor="jira-url">Jira Domain</Label>
-                <Input
-                  id="jira-url"
-                  placeholder="your-company.atlassian.net"
-                  value={jiraUrl}
-                  onChange={(e) => setJiraUrl(e.target.value)}
-                  required
-                />
-                <p className="text-xs text-muted-foreground">
-                  This is usually your-company.atlassian.net (without https://)
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="jira-email">Email</Label>
-                <Input
-                  id="jira-email"
-                  type="email"
-                  placeholder="your-email@example.com"
-                  value={jiraEmail}
-                  onChange={(e) => setJiraEmail(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="jira-token">API Token</Label>
-                <Input
-                  id="jira-token"
-                  type="password"
-                  placeholder="Your Jira API token"
-                  value={jiraToken}
-                  onChange={(e) => setJiraToken(e.target.value)}
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  You can generate an API token in your{" "}
-                  <a 
-                    href="https://id.atlassian.com/manage-profile/security/api-tokens" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-500 hover:underline"
-                  >
-                    Atlassian account settings
-                  </a>
-                </p>
-              </div>
-            </>
-          )}
-        </CardContent>
-        <CardFooter>
-          {isAuthenticated ? (
-            <div className="flex gap-2 w-full justify-between">
-              <Button
-                variant="outline"
-                onClick={handleDisconnect}
-                disabled={isLoading}
-              >
-                Disconnect
-              </Button>
-              <Button
-                type="submit"
-                disabled={isLoading}
-              >
-                Update
-              </Button>
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your-email@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
             </div>
-          ) : (
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Connecting...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Link2 className="h-4 w-4" />
-                  Connect to Jira
-                </span>
-              )}
-            </Button>
-          )}
-        </CardFooter>
-      </form>
+            <div className="space-y-2">
+              <Label htmlFor="apiToken">API Token</Label>
+              <Input
+                id="apiToken"
+                type="password"
+                placeholder="Your Jira API token"
+                value={apiToken}
+                onChange={(e) => setApiToken(e.target.value)}
+              />
+              <p className="text-sm text-muted-foreground flex items-center">
+                <Info className="h-3 w-3 mr-1" />
+                <a
+                  href="https://support.atlassian.com/atlassian-account/docs/manage-api-tokens-for-your-atlassian-account/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline"
+                >
+                  How to generate an API token
+                </a>
+              </p>
+            </div>
+
+            {testResult && (
+              <Alert
+                variant={testResult.success ? "default" : "destructive"}
+                className={testResult.success ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" : ""}
+              >
+                {testResult.success ? (
+                  <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                <AlertTitle>{testResult.success ? "Success" : "Error"}</AlertTitle>
+                <AlertDescription>
+                  {testResult.message}
+                </AlertDescription>
+              </Alert>
+            )}
+          </>
+        )}
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        {isAuthenticated ? (
+          <Button variant="destructive" onClick={disconnectJira}>
+            <Trash2 className="h-4 w-4 mr-2" />
+            Disconnect
+          </Button>
+        ) : (
+          <Button onClick={testConnection} disabled={loading}>
+            {loading ? "Testing..." : "Connect to Jira"}
+          </Button>
+        )}
+      </CardFooter>
     </Card>
   );
 };

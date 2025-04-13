@@ -14,7 +14,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { storyId, projectId, sprintId, contentType, content, contextProjectId } = await req.json();
+    const { storyId, projectId, sprintId, contentType, content, contextProjectId, gsuiteId } = await req.json();
 
     if (!storyId) {
       return new Response(
@@ -55,10 +55,13 @@ serve(async (req) => {
     // Set the content field based on the contentType
     if (contentType === 'lld') {
       updateData.lld_content = content;
+      if (gsuiteId) updateData.lld_gsuite_id = gsuiteId;
     } else if (contentType === 'code') {
       updateData.code_content = content;
+      if (gsuiteId) updateData.code_gsuite_id = gsuiteId;
     } else if (contentType === 'tests') {
       updateData.test_content = content;
+      if (gsuiteId) updateData.test_gsuite_id = gsuiteId;
     }
 
     let result;

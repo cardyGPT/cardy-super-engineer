@@ -1,802 +1,466 @@
 
-import React, { useState, useEffect, useRef } from "react";
-import { useStories } from "@/contexts/StoriesContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import React, { useState, useEffect } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Code, FileText, TestTube, RefreshCw, Copy, Check, FileDown, Upload, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabase";
-import { downloadAsPDF, formatTimestampForFilename } from "@/utils/exportUtils";
+import { AlertCircle, FileText, Code, TestTube, RefreshCw, ArrowUpRight } from "lucide-react";
+import { useStories } from "@/contexts/StoriesContext";
+import { JiraTicket, ProjectContextData } from "@/types/jira";
+import { Skeleton } from "@/components/ui/skeleton";
 import ContentDisplay from "./ContentDisplay";
-import { ProjectContextData } from "@/types/jira";
+import { supabase } from "@/lib/supabase";
 
 interface StoryDetailProps {
+  ticket: JiraTicket | null;
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: ProjectContextData | null;
 }
 
 const StoryDetail: React.FC<StoryDetailProps> = ({ 
-  projectContext = null, 
-  selectedDocuments = [],
-  projectContextData = null
+  ticket, 
+  projectContext, 
+  selectedDocuments,
+  projectContextData
 }) => {
-  const { selectedTicket, pushToJira } = useStories();
-  const [activeTab, setActiveTab] = useState("lld");
-  const [lldContent, setLldContent] = useState("");
-  const [codeContent, setCodeContent] = useState("");
-  const [testContent, setTestContent] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [generationError, setGenerationError] = useState<string | null>(null);
-  const [copiedState, setCopiedState] = useState<{[key: string]: boolean}>({});
-  const { toast } = useToast();
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const { generateContent, pushToJira } = useStories();
+  const [activeTab, setActiveTab] = useState("overview");
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lldContent, setLldContent] = useState<string | null>(null);
+  const [codeContent, setCodeContent] = useState<string | null>(null);
+  const [testContent, setTestContent] = useState<string | null>(null);
+  const [isLldGenerated, setIsLldGenerated] = useState<boolean>(false);
+  const [isCodeGenerated, setIsCodeGenerated] = useState<boolean>(false);
+  const [isTestsGenerated, setIsTestsGenerated] = useState<boolean>(false);
 
-  const safeStringify = (content: any): string => {
-    if (content === null || content === undefined) return "";
-    
-    if (typeof content === 'string') return content;
-    
-    if (typeof content === 'object') {
-      try {
-        return JSON.stringify(content);
-      } catch (e) {
-        console.error("Error stringifying content object:", e);
-        return "[Content formatting error]";
-      }
-    }
-    
-    return String(content);
-  };
-
-  const formatContent = (content: string, type: string): string => {
-    if (!content) return "";
-    
-    if (type === 'code') {
-      return content.replace(/```(\w+)?\s*\n([\s\S]*?)```/g, (match, language, code) => {
-        return `\n\n\`\`\`${language || 'javascript'}\n${code.trim()}\n\`\`\`\n\n`;
-      });
-    } else if (type === 'lld') {
-      let formattedContent = content;
-      if (!formattedContent.startsWith("# ")) {
-        formattedContent = `# Low Level Design\n\n${formattedContent}`;
-      }
-      formattedContent = formattedContent.replace(/^(#{1,6})\s*(.+)$/gm, '$1 $2');
-      return formattedContent;
-    } else if (type === 'tests') {
-      let formattedContent = content;
-      if (!formattedContent.startsWith("# ")) {
-        formattedContent = `# Test Cases\n\n${formattedContent}`;
-      }
-      formattedContent = formattedContent.replace(/^(#{1,6})\s*(.+)$/gm, '$1 $2');
-      return formattedContent;
-    }
-    
-    return content;
-  };
-
+  // Check if artifacts already exist when ticket changes
   useEffect(() => {
-    setLldContent("");
-    setCodeContent("");
-    setTestContent("");
-    setGenerationError(null);
-    setActiveTab("lld");
-    
-    const loadArtifacts = async () => {
-      if (!selectedTicket) return;
-      
-      setIsLoading(true);
-      
-      try {
-        console.log(`Loading artifacts for story ${selectedTicket.key}`);
-        const { data, error } = await supabase
-          .from('story_artifacts')
-          .select('*')
-          .eq('story_id', safeStringify(selectedTicket.key))
-          .maybeSingle();
-        
-        if (error) {
-          console.error("Error loading artifacts:", error);
-        } else if (data) {
-          console.log(`Found existing artifacts for story ${selectedTicket.key}`, data);
-          setLldContent(data.lld_content || "");
-          setCodeContent(data.code_content || "");
-          setTestContent(data.test_content || "");
-          
-          toast({
-            title: "Loaded saved content",
-            description: "Previously generated content has been loaded.",
-            variant: "success"
-          });
-        }
-      } catch (err) {
-        console.error("Error loading artifacts:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadArtifacts();
-  }, [selectedTicket, toast]);
-
-  useEffect(() => {
-    const saveArtifacts = async () => {
-      if (!selectedTicket || isSaving) return;
-      if (!lldContent && !codeContent && !testContent) return;
-      
-      setIsSaving(true);
-      
-      try {
-        const storyId = safeStringify(selectedTicket.key);
-        const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
-        const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
-        
-        console.log(`Saving artifacts for story ${storyId}`);
-        
-        let savedSuccessfully = true;
-        
-        if (lldContent) {
-          const { error: lldError } = await saveStoryArtifact('lld', lldContent, storyId, projectId, sprintId);
-          if (lldError) {
-            console.error("Error saving LLD:", lldError);
-            savedSuccessfully = false;
-          }
-        }
-        
-        if (codeContent) {
-          const { error: codeError } = await saveStoryArtifact('code', codeContent, storyId, projectId, sprintId);
-          if (codeError) {
-            console.error("Error saving code:", codeError);
-            savedSuccessfully = false;
-          }
-        }
-        
-        if (testContent) {
-          const { error: testError } = await saveStoryArtifact('tests', testContent, storyId, projectId, sprintId);
-          if (testError) {
-            console.error("Error saving tests:", testError);
-            savedSuccessfully = false;
-          }
-        }
-        
-        if (!savedSuccessfully) {
-          toast({
-            title: "Error",
-            description: "Failed to save some generated content",
-            variant: "destructive"
-          });
-        }
-      } catch (err) {
-        console.error("Error saving artifacts:", err);
-      } finally {
-        setIsSaving(false);
-      }
-    };
-    
-    const timer = setTimeout(() => {
-      if (selectedTicket && (lldContent || codeContent || testContent)) {
-        saveArtifacts();
-      }
-    }, 2000);
-    
-    return () => clearTimeout(timer);
-  }, [selectedTicket, lldContent, codeContent, testContent, isSaving, toast]);
-
-  useEffect(() => {
-    const timeouts: number[] = [];
-    
-    Object.keys(copiedState).forEach(key => {
-      if (copiedState[key]) {
-        const timeout = window.setTimeout(() => {
-          setCopiedState(prev => ({ ...prev, [key]: false }));
-        }, 2000);
-        timeouts.push(timeout);
-      }
-    });
-    
-    return () => {
-      timeouts.forEach(timeout => clearTimeout(timeout));
-    };
-  }, [copiedState]);
-
-  const handleCopyContent = (content: string, type: string) => {
-    navigator.clipboard.writeText(content);
-    setCopiedState({ ...copiedState, [type]: true });
-    
-    toast({
-      title: "Copied to clipboard",
-      description: `${type.toUpperCase()} content has been copied to your clipboard.`
-    });
-  };
-
-  const handleGenerateContent = async (type: 'lld' | 'code' | 'tests') => {
-    if (!selectedTicket) return;
-    
-    if ((type === 'lld' && lldContent) || 
-        (type === 'code' && codeContent) || 
-        (type === 'tests' && testContent)) {
-      toast({
-        title: "Content Already Exists",
-        description: `${type.toUpperCase()} has already been generated for this ticket. Edit or download the existing content.`,
-        variant: "default"
-      });
-      return;
+    if (ticket) {
+      checkExistingArtifacts();
+    } else {
+      // Reset state when no ticket selected
+      setLldContent(null);
+      setCodeContent(null);
+      setTestContent(null);
+      setIsLldGenerated(false);
+      setIsCodeGenerated(false);
+      setIsTestsGenerated(false);
     }
-    
-    setIsGenerating(true);
-    setGenerationError(null);
-    
+  }, [ticket]);
+
+  const checkExistingArtifacts = async () => {
+    if (!ticket) return;
+
     try {
-      const { data: openAIData, error: openAIError } = await supabase.functions.invoke('validate-openai', {});
-      
-      if (openAIError || !openAIData?.valid) {
-        throw new Error("OpenAI API is not configured. Please set up your API key in Settings.");
-      }
-      
-      let prompt = "";
-      let systemPrompt = "";
-      
-      if (type === 'lld') {
-        systemPrompt = "You are a senior software architect. Create a detailed low-level design document for the following user story.";
-        prompt = `Create a comprehensive low-level design document for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
-      } else if (type === 'code') {
-        systemPrompt = "You are a senior software developer. Generate production-ready code for the following user story.";
-        prompt = `Generate production-ready code for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
-      } else if (type === 'tests') {
-        systemPrompt = "You are a QA automation expert. Create comprehensive test cases for the following user story.";
-        prompt = `Create comprehensive test cases for this user story: "${safeStringify(selectedTicket.summary)}"\n\nDescription: ${safeStringify(selectedTicket.description || "No description provided.")}`;
+      const { data, error } = await supabase
+        .from('story_artifacts')
+        .select('*')
+        .eq('story_id', ticket.key)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error checking existing artifacts:', error);
+        return;
       }
 
-      if (projectContext) {
-        prompt += `\n\nUse the context from project ID: ${projectContext}`;
+      if (data) {
+        if (data.lld_content) {
+          setLldContent(data.lld_content);
+          setIsLldGenerated(true);
+        }
         
-        if (selectedDocuments && selectedDocuments.length > 0) {
-          prompt += `\nWith the following document contexts: ${selectedDocuments.join(", ")}`;
+        if (data.code_content) {
+          setCodeContent(data.code_content);
+          setIsCodeGenerated(true);
+        }
+        
+        if (data.test_content) {
+          setTestContent(data.test_content);
+          setIsTestsGenerated(true);
         }
       }
+    } catch (err) {
+      console.error('Error checking artifacts:', err);
+    }
+  };
 
-      if (type === 'lld') {
-        prompt += `\n\nInclude the following sections:\n1. Overview\n2. Component Breakdown\n3. Data Models\n4. API Endpoints\n5. Sequence Diagrams (in text format)\n6. Error Handling\n7. Security Considerations\n\nUse proper markdown formatting with headers, lists, and code blocks where appropriate.`;
-      } else if (type === 'code') {
-        prompt += `\n\nPlease include:\n1. Frontend Angular.js code\n2. Backend Node.js code\n3. PostgreSQL database scripts (including stored procedures, triggers, and functions)\n\nEnsure the code follows best practices, includes error handling, and is well-documented. Use markdown code blocks with language syntax highlighting.`;
-      } else if (type === 'tests') {
-        prompt += `\n\nInclude:\n1. Unit Tests\n2. Integration Tests\n3. End-to-End Tests\n4. Edge Cases\n5. Performance Test Considerations\n\nFormat your response with proper markdown and code examples where applicable.`;
-      }
-      
-      const { data, error } = await supabase.functions.invoke('generate-content', {
-        body: {
-          prompt,
-          systemPrompt,
-          maxTokens: 2500,
-          temperature: 0.7,
-          projectContext,
-          selectedDocuments
-        }
+  const handleGenerateLLD = async () => {
+    if (!ticket) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateContent({
+        type: 'lld',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments
       });
       
-      if (error) throw new Error(error.message || "Failed to generate content");
-      
-      const rawResponseContent = safeStringify(data.content);
-      const formattedResponseContent = formatContent(rawResponseContent, type);
-      
-      if (type === 'lld') {
-        setLldContent(formattedResponseContent);
-      } else if (type === 'code') {
-        setCodeContent(formattedResponseContent);
-      } else if (type === 'tests') {
-        setTestContent(formattedResponseContent);
+      if (response && response.lld) {
+        setLldContent(response.lld);
+        setIsLldGenerated(true);
+        setActiveTab('lld');
       }
-      
-      setActiveTab(type);
-      
-      setTimeout(() => {
-        if (contentRef.current) {
-          contentRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-      }, 100);
-      
-      const storyId = safeStringify(selectedTicket.key);
-      const projectId = selectedTicket.projectId ? safeStringify(selectedTicket.projectId) : null;
-      const sprintId = selectedTicket.sprintId ? safeStringify(selectedTicket.sprintId) : null;
-      
-      const { error: saveError } = await saveStoryArtifact(
-        type, 
-        formattedResponseContent, 
-        storyId, 
-        projectId, 
-        sprintId,
-        projectContext
-      );
-      
-      if (saveError) {
-        console.error("Error saving to database:", saveError);
-        toast({
-          title: "Content Generated But Not Saved",
-          description: "Content was generated but couldn't be saved to the database.",
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Content Generated",
-          description: `${type.toUpperCase()} has been successfully generated and saved.`,
-          variant: "success"
-        });
-      }
-    } catch (error: any) {
-      console.error(`Error generating ${type}:`, error);
-      setGenerationError(error.message || `Failed to generate ${type}`);
-      
-      toast({
-        title: "Generation Failed",
-        description: error.message || `Failed to generate ${type}`,
-        variant: "destructive"
-      });
+    } catch (err: any) {
+      console.error('Error generating LLD:', err);
+      setError(err.message || 'Failed to generate Low Level Design');
     } finally {
-      setIsGenerating(false);
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    if (!ticket) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateContent({
+        type: 'code',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments
+      });
+      
+      if (response && response.code) {
+        setCodeContent(response.code);
+        setIsCodeGenerated(true);
+        setActiveTab('code');
+      }
+    } catch (err: any) {
+      console.error('Error generating code:', err);
+      setError(err.message || 'Failed to generate code');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateTests = async () => {
+    if (!ticket) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await generateContent({
+        type: 'tests',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments
+      });
+      
+      if (response && response.tests) {
+        setTestContent(response.tests);
+        setIsTestsGenerated(true);
+        setActiveTab('tests');
+      }
+    } catch (err: any) {
+      console.error('Error generating tests:', err);
+      setError(err.message || 'Failed to generate tests');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGenerateAll = async () => {
-    if (!selectedTicket) return;
-    
-    if (lldContent && codeContent && testContent) {
-      toast({
-        title: "Content Already Exists",
-        description: "All content has already been generated for this ticket.",
-        variant: "default"
-      });
-      return;
-    }
-    
-    setIsGeneratingAll(true);
-    setGenerationError(null);
-    
-    try {
-      if (!lldContent) await handleGenerateContent('lld');
-      if (!codeContent) await handleGenerateContent('code');
-      if (!testContent) await handleGenerateContent('tests');
-      
-      toast({
-        title: "All Content Generated",
-        description: "LLD, Code, and Test Cases have been successfully generated and saved.",
-        variant: "default"
-      });
-    } catch (error: any) {
-      console.error("Error generating all content:", error);
-      setGenerationError(error.message || "Failed to generate all content");
-      
-      toast({
-        title: "Generation Failed",
-        description: error.message || "Failed to generate all content",
-        variant: "destructive"
-      });
-    } finally {
-      setIsGeneratingAll(false);
-    }
-  };
+    if (!ticket) return;
 
-  const handleDownloadPDF = async (contentType: 'lld' | 'code' | 'tests' | 'all') => {
-    if (!contentRef.current || !selectedTicket) {
-      toast({
-        title: "Download Error",
-        description: "No content available to download",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    toast({
-      title: "Preparing Download",
-      description: "Creating PDF document..."
-    });
+    setLoading(true);
+    setError(null);
 
     try {
-      const ticketKey = safeStringify(selectedTicket.key) || 'document';
-      const timestamp = formatTimestampForFilename();
-      const contentLabel = contentType === 'lld' ? 'LLD' : 
-                          contentType === 'code' ? 'Code' : 
-                          contentType === 'tests' ? 'Tests' : 'All';
-      
-      const fileName = `${ticketKey}_${contentLabel}_${timestamp}`;
-      
-      const result = await downloadAsPDF(contentRef.current, fileName);
-      
-      if (result) {
-        toast({
-          title: "Download Complete",
-          description: `${contentLabel} document has been downloaded successfully.`
-        });
-      } else {
-        throw new Error("Failed to generate PDF");
-      }
-    } catch (error) {
-      console.error("PDF download error:", error);
-      toast({
-        title: "Download Failed",
-        description: "There was a problem creating your PDF. Please try again.",
-        variant: "destructive"
+      const response = await generateContent({
+        type: 'all',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments
       });
-    }
-  };
-
-  const handlePushToJira = async (contentType: 'lld' | 'code' | 'tests' | 'all') => {
-    if (!selectedTicket) {
-      toast({
-        title: "Error",
-        description: "No ticket selected to push content to",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    let content = "";
-    let contentTitle = "";
-    
-    if (contentType === 'lld') {
-      content = lldContent;
-      contentTitle = "Low Level Design";
-    } else if (contentType === 'code') {
-      content = codeContent;
-      contentTitle = "Implementation Code";
-    } else if (contentType === 'tests') {
-      content = testContent;
-      contentTitle = "Test Cases";
-    } else if (contentType === 'all') {
-      content = `# Generated Documentation for ${safeStringify(selectedTicket.key)}\n\n## Low Level Design\n\n${lldContent}\n\n## Implementation Code\n\n${codeContent}\n\n## Test Cases\n\n${testContent}`;
-      contentTitle = "All Documentation";
-    }
-    
-    if (!content.trim()) {
-      toast({
-        title: "Error",
-        description: `No ${contentTitle} content to push to Jira`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const success = await pushToJira(selectedTicket.id, content);
       
-      if (success) {
-        toast({
-          title: "Content Pushed to Jira",
-          description: `${contentTitle} has been added to Jira ticket ${selectedTicket.key}`,
-          variant: "success"
-        });
-      } else {
-        throw new Error("Failed to push content to Jira");
-      }
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to push content to Jira",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const saveStoryArtifact = async (
-    contentType: 'lld' | 'code' | 'tests', 
-    content: string, 
-    storyId: string, 
-    projectId: string | null, 
-    sprintId: string | null,
-    contextProjectId: string | null = null
-  ) => {
-    try {
-      const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
-        body: {
-          storyId,
-          projectId,
-          sprintId,
-          contentType,
-          content,
-          contextProjectId
+      if (response) {
+        if (response.lld) {
+          setLldContent(response.lld);
+          setIsLldGenerated(true);
         }
-      });
-      
-      if (error) {
-        throw error;
+        if (response.code) {
+          setCodeContent(response.code);
+          setIsCodeGenerated(true);
+        }
+        if (response.tests) {
+          setTestContent(response.tests);
+          setIsTestsGenerated(true);
+        }
+        // If response.response exists, we'll treat it as LLD content
+        if (response.response) {
+          setLldContent(response.response);
+          setIsLldGenerated(true);
+        }
+        setActiveTab('lld');
       }
-      
-      return { data, error: null };
-    } catch (err) {
-      console.error(`Error saving ${contentType} content:`, err);
-      return { data: null, error: err };
+    } catch (err: any) {
+      console.error('Error generating all content:', err);
+      setError(err.message || 'Failed to generate content');
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!selectedTicket) {
+  const openTicketInJira = () => {
+    if (!ticket || !ticket.domain) return;
+    
+    const url = `${ticket.domain}/browse/${ticket.key}`;
+    window.open(url, '_blank');
+  };
+
+  if (!ticket) {
     return (
-      <Card>
+      <Card className="w-full h-fit">
         <CardHeader>
           <CardTitle>Story Details</CardTitle>
-          <CardDescription>Select a story to view details and generate content</CardDescription>
+          <CardDescription>Select a story to view details</CardDescription>
         </CardHeader>
-        <CardContent className="text-center py-8 text-muted-foreground">
-          <FileText className="h-12 w-12 mx-auto mb-4 opacity-20" />
-          <p>No story selected</p>
-          <p className="text-sm mt-2">Select a story from the list to view details and generate content</p>
+        <CardContent>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>No story selected</AlertTitle>
+            <AlertDescription>
+              Please select a story from the list to view its details
+            </AlertDescription>
+          </Alert>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <div className="flex flex-col space-y-4" ref={contentRef}>
-      <Card>
-        <CardHeader>
+    <div className="space-y-4">
+      <Card className="w-full h-fit">
+        <CardHeader className="pb-2">
           <div className="flex justify-between items-start">
             <div>
-              <CardTitle className="text-xl">{safeStringify(selectedTicket.summary)}</CardTitle>
-              <CardDescription className="mt-1">{safeStringify(selectedTicket.key)} • {safeStringify(selectedTicket.status)}</CardDescription>
+              <div className="flex items-center gap-2">
+                <CardTitle>{ticket.key}: {ticket.summary}</CardTitle>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6" 
+                  onClick={openTicketInJira}
+                  title="Open in Jira"
+                >
+                  <ArrowUpRight className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription className="mt-1 flex flex-wrap gap-1">
+                <Badge variant="outline">{ticket.issuetype?.name || 'Unknown Type'}</Badge>
+                {ticket.priority && <Badge variant="outline">{ticket.priority}</Badge>}
+                {ticket.status && <Badge variant="outline">{ticket.status}</Badge>}
+                {ticket.story_points && <Badge variant="outline">{ticket.story_points} points</Badge>}
+              </CardDescription>
+            </div>
+            <div className="flex gap-1">
+              {isLldGenerated && <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">LLD</Badge>}
+              {isCodeGenerated && <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Code</Badge>}
+              {isTestsGenerated && <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Tests</Badge>}
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="prose prose-sm max-w-none">
-            <h3 className="text-base font-medium mb-2">Description</h3>
-            <div className="bg-muted p-3 rounded-md whitespace-pre-wrap text-sm">
-              {safeStringify(selectedTicket.description) || "No description provided."}
-            </div>
-            
-            {selectedTicket.acceptance_criteria && (
-              <>
-                <h3 className="text-base font-medium mt-4 mb-2">Acceptance Criteria</h3>
-                <div className="bg-muted p-3 rounded-md whitespace-pre-wrap text-sm">
-                  {safeStringify(selectedTicket.acceptance_criteria)}
-                </div>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <CardTitle>Generate Content</CardTitle>
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                onClick={handleGenerateAll}
-                disabled={isGenerating || isGeneratingAll}
-              >
-                {isGeneratingAll ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                    Generating All...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-1" />
-                    Generate All
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-          <CardDescription>
-            Use AI to generate LLD, code, and test cases based on the selected story
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="lld" className="flex items-center gap-1">
-                <FileText className="h-4 w-4" />
-                <span>LLD</span>
-              </TabsTrigger>
-              <TabsTrigger value="code" className="flex items-center gap-1">
-                <Code className="h-4 w-4" />
-                <span>Code</span>
-              </TabsTrigger>
-              <TabsTrigger value="tests" className="flex items-center gap-1">
-                <TestTube className="h-4 w-4" />
-                <span>Tests</span>
-              </TabsTrigger>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="mb-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="lld" disabled={!isLldGenerated && !loading}>LLD</TabsTrigger>
+              <TabsTrigger value="code" disabled={!isCodeGenerated && !loading}>Code</TabsTrigger>
+              <TabsTrigger value="tests" disabled={!isTestsGenerated && !loading}>Tests</TabsTrigger>
             </TabsList>
             
-            {generationError && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{generationError}</AlertDescription>
-              </Alert>
-            )}
-            
-            <TabsContent value="lld" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Low Level Design Document</Label>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleGenerateContent('lld')}
-                    disabled={isGenerating || isGeneratingAll || !!lldContent}
-                  >
-                    {(isGenerating && activeTab === 'lld') || isGeneratingAll ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                        Generating...
-                      </>
-                    ) : !!lldContent ? (
-                      <>
-                        <FileText className="h-4 w-4 mr-1" />
-                        Already Generated
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="h-4 w-4 mr-1" />
-                        Generate LLD
-                      </>
+            <TabsContent value="overview" className="space-y-4">
+              {/* Description Section */}
+              <div>
+                <h3 className="text-md font-semibold mb-2">Description</h3>
+                <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-sm">
+                  {ticket.description || 'No description provided'}
+                </div>
+              </div>
+              
+              {/* Acceptance Criteria Section (if available) */}
+              {ticket.acceptance_criteria && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Acceptance Criteria</h3>
+                  <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-sm">
+                    {ticket.acceptance_criteria}
+                  </div>
+                </div>
+              )}
+              
+              {/* Project Context Section */}
+              {projectContextData && (
+                <div>
+                  <h3 className="text-md font-semibold mb-2">Project Context</h3>
+                  <div className="border rounded-md p-3 bg-muted/30 text-sm">
+                    <p><strong>Project:</strong> {projectContextData.project.name} ({projectContextData.project.type})</p>
+                    {projectContextData.documents.length > 0 && (
+                      <div className="mt-2">
+                        <p><strong>Reference Documents:</strong></p>
+                        <ul className="list-disc list-inside pl-2 mt-1">
+                          {projectContextData.documents.map(doc => (
+                            <li key={doc.id}>{doc.name} ({doc.type})</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Generate Content Buttons */}
+              <div>
+                <h3 className="text-md font-semibold mb-2">Generate Content</h3>
+                <div className="flex flex-wrap gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateLLD}
+                    disabled={loading}
+                    className="flex items-center"
+                  >
+                    {loading && activeTab === 'lld' ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <FileText className="h-4 w-4 mr-2" />
+                    )}
+                    {isLldGenerated ? 'Regenerate LLD' : 'Generate LLD'}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateCode}
+                    disabled={loading}
+                    className="flex items-center"
+                  >
+                    {loading && activeTab === 'code' ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Code className="h-4 w-4 mr-2" />
+                    )}
+                    {isCodeGenerated ? 'Regenerate Code' : 'Generate Code'}
+                  </Button>
+                  
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleGenerateTests}
+                    disabled={loading}
+                    className="flex items-center"
+                  >
+                    {loading && activeTab === 'tests' ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <TestTube className="h-4 w-4 mr-2" />
+                    )}
+                    {isTestsGenerated ? 'Regenerate Tests' : 'Generate Tests'}
+                  </Button>
+                  
+                  <Button 
+                    variant="default" 
+                    size="sm" 
+                    onClick={handleGenerateAll}
+                    disabled={loading}
+                    className="flex items-center"
+                  >
+                    {loading && activeTab === 'all' ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                    )}
+                    Generate All
                   </Button>
                 </div>
               </div>
               
-              {(isGenerating && activeTab === 'lld') || isGeneratingAll ? (
-                <div className="space-y-2">
+              {/* Error Display */}
+              {error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
+            
+            <TabsContent value="lld">
+              {loading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-1/3" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                </div>
-              ) : isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-2/3" />
                 </div>
               ) : (
-                <ContentDisplay 
-                  content={lldContent} 
-                  type="lld" 
-                  title="Low Level Design" 
-                  ticketKey={safeStringify(selectedTicket.key)}
+                <ContentDisplay
+                  title="Low Level Design"
+                  content={lldContent || undefined}
+                  contentType="lld"
+                  storyKey={ticket.key}
+                  storyId={ticket.id}
+                  onPushToJira={pushToJira}
+                  projectContext={projectContext}
+                  selectedDocuments={selectedDocuments}
                 />
               )}
             </TabsContent>
             
-            <TabsContent value="code" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Generated Code</Label>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleGenerateContent('code')}
-                    disabled={isGenerating || isGeneratingAll || !!codeContent}
-                  >
-                    {(isGenerating && activeTab === 'code') || isGeneratingAll ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                        Generating...
-                      </>
-                    ) : !!codeContent ? (
-                      <>
-                        <Code className="h-4 w-4 mr-1" />
-                        Already Generated
-                      </>
-                    ) : (
-                      <>
-                        <Code className="h-4 w-4 mr-1" />
-                        Generate Code
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              
-              {(isGenerating && activeTab === 'code') || isGeneratingAll ? (
-                <div className="space-y-2">
+            <TabsContent value="code">
+              {loading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-1/3" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                </div>
-              ) : isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-2/3" />
                 </div>
               ) : (
-                <ContentDisplay 
-                  content={codeContent} 
-                  type="code" 
-                  title="Implementation Code" 
-                  ticketKey={safeStringify(selectedTicket.key)}
+                <ContentDisplay
+                  title="Implementation Code"
+                  content={codeContent || undefined}
+                  contentType="code"
+                  storyKey={ticket.key}
+                  storyId={ticket.id}
+                  onPushToJira={pushToJira}
+                  projectContext={projectContext}
+                  selectedDocuments={selectedDocuments}
                 />
               )}
             </TabsContent>
             
-            <TabsContent value="tests" className="space-y-4">
-              <div className="flex justify-between items-center">
-                <Label>Test Cases</Label>
-                <div className="flex gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={() => handleGenerateContent('tests')}
-                    disabled={isGenerating || isGeneratingAll || !!testContent}
-                  >
-                    {(isGenerating && activeTab === 'tests') || isGeneratingAll ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                        Generating...
-                      </>
-                    ) : !!testContent ? (
-                      <>
-                        <TestTube className="h-4 w-4 mr-1" />
-                        Already Generated
-                      </>
-                    ) : (
-                      <>
-                        <TestTube className="h-4 w-4 mr-1" />
-                        Generate Tests
-                      </>
-                    )}
-                  </Button>
-                </div>
-              </div>
-              
-              {(isGenerating && activeTab === 'tests') || isGeneratingAll ? (
-                <div className="space-y-2">
+            <TabsContent value="tests">
+              {loading ? (
+                <div className="space-y-3">
+                  <Skeleton className="h-8 w-1/3" />
                   <Skeleton className="h-4 w-full" />
                   <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-5/6" />
-                </div>
-              ) : isLoading ? (
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-2/3" />
                 </div>
               ) : (
-                <ContentDisplay 
-                  content={testContent} 
-                  type="tests" 
-                  title="Test Cases" 
-                  ticketKey={safeStringify(selectedTicket.key)}
+                <ContentDisplay
+                  title="Test Cases"
+                  content={testContent || undefined}
+                  contentType="tests"
+                  storyKey={ticket.key}
+                  storyId={ticket.id}
+                  onPushToJira={pushToJira}
+                  projectContext={projectContext}
+                  selectedDocuments={selectedDocuments}
                 />
               )}
             </TabsContent>
           </Tabs>
         </CardContent>
-        <CardFooter className="flex justify-between">
-          <div></div>
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handleDownloadPDF('all')}
-              disabled={!lldContent && !codeContent && !testContent}
-            >
-              <Download className="h-4 w-4 mr-1" />
-              Download All
-            </Button>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => handlePushToJira('all')}
-              disabled={!lldContent && !codeContent && !testContent}
-            >
-              <Upload className="h-4 w-4 mr-1" />
-              Push All to Jira
-            </Button>
-          </div>
-        </CardFooter>
       </Card>
     </div>
   );

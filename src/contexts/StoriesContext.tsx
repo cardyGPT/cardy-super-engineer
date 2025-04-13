@@ -1,27 +1,27 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '@/lib/supabase';
-import { 
-  JiraCredentials, 
-  JiraProject, 
-  JiraSprint, 
-  JiraTicket, 
-  JiraGenerationRequest, 
-  JiraGenerationResponse,
-  StoriesContextType
-} from '@/types/jira';
-import { useToast } from '@/hooks/use-toast';
+import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, StoriesContextType, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
+import { useToast } from "@/hooks/use-toast";
 
 const StoriesContext = createContext<StoriesContextType | undefined>(undefined);
+
+export const useStories = () => {
+  const context = useContext(StoriesContext);
+  if (!context) {
+    throw new Error('useStories must be used within a StoriesProvider');
+  }
+  return context;
+};
 
 export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [projects, setProjects] = useState<JiraProject[]>([]);
   const [sprints, setSprints] = useState<Record<string, JiraSprint[]>>({});
+  const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [selectedProject, setSelectedProject] = useState<JiraProject | null>(null);
   const [selectedSprint, setSelectedSprint] = useState<JiraSprint | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<JiraTicket | null>(null);
@@ -29,146 +29,86 @@ export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [ticketTypeFilter, setTicketTypeFilter] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialize credentials from local storage
+  // Load credentials from localStorage on mount
   useEffect(() => {
-    const loadCredentials = async () => {
+    const loadCredentials = () => {
       try {
-        // Check for credentials stored in localStorage first (for backward compatibility)
-        const storedCreds = localStorage.getItem('jira_credentials');
-        if (storedCreds) {
-          const parsedCreds = JSON.parse(storedCreds);
-          if (parsedCreds) {
-            const jiraCreds: JiraCredentials = {
-              domain: parsedCreds.url || parsedCreds.domain || '',
-              email: parsedCreds.email || '',
-              apiToken: parsedCreds.token || parsedCreds.apiToken || ''
-            };
-            
-            console.log("Found credentials in localStorage");
-            setCredentials(jiraCreds);
-            setIsAuthenticated(true);
-            return;
-          }
-        }
-
-        // Then try to get from database
-        try {
-          const { data, error } = await supabase
-            .from('api_keys')
-            .select('*')
-            .eq('service', 'jira')
-            .maybeSingle();
-          
-          if (error) {
-            console.error("Error loading Jira credentials:", error);
-            return;
-          }
-          
-          if (data) {
-            const creds: JiraCredentials = {
-              domain: data.domain || '',
-              email: data.username || '',
-              apiToken: data.api_key || ''
-            };
-            
-            setCredentials(creds);
-            setIsAuthenticated(true);
-          }
-        } catch (dbErr) {
-          console.error("Error in database credentials lookup:", dbErr);
+        const savedCreds = localStorage.getItem('jira_credentials');
+        if (savedCreds) {
+          const parsedCreds = JSON.parse(savedCreds) as JiraCredentials;
+          setCredentials(parsedCreds);
+          setIsAuthenticated(true);
         }
       } catch (err) {
-        console.error("Error in loadCredentials:", err);
+        console.error('Error loading Jira credentials:', err);
+        localStorage.removeItem('jira_credentials');
       }
     };
-    
+
     loadCredentials();
   }, []);
 
-  // Effect to save credentials to database when they change
+  // Reset state when credentials change
   useEffect(() => {
-    const saveCredentialsToDb = async () => {
-      if (!credentials) return;
-      
-      try {
-        // Save to Supabase
-        const { error } = await supabase
-          .from('api_keys')
-          .upsert({
-            service: 'jira',
-            domain: credentials.domain,
-            username: credentials.email,
-            api_key: credentials.apiToken
-          }, { onConflict: 'service' });
-          
-        if (error) {
-          console.error("Error saving Jira credentials to database:", error);
-          // Also save to localStorage as fallback
-          localStorage.setItem('jira_credentials', JSON.stringify({
-            url: credentials.domain,
-            email: credentials.email,
-            token: credentials.apiToken
-          }));
-        }
-      } catch (err) {
-        console.error("Error saving credentials:", err);
-        // Save to localStorage as fallback
-        localStorage.setItem('jira_credentials', JSON.stringify({
-          url: credentials.domain,
-          email: credentials.email,
-          token: credentials.apiToken
-        }));
-      }
-    };
-    
     if (credentials) {
-      saveCredentialsToDb();
+      localStorage.setItem('jira_credentials', JSON.stringify(credentials));
+      setIsAuthenticated(true);
+      // Load projects when credentials are set
+      fetchProjects();
+    } else {
+      localStorage.removeItem('jira_credentials');
+      setIsAuthenticated(false);
+      setProjects([]);
+      setSprints({});
+      setTickets([]);
+      setSelectedProject(null);
+      setSelectedSprint(null);
+      setSelectedTicket(null);
     }
   }, [credentials]);
 
   const fetchProjects = async () => {
     if (!credentials) {
-      setError('Authentication required');
-      toast({
-        title: "Authentication Required",
-        description: "Please connect to Jira first",
-        variant: "destructive"
-      });
+      setError('No Jira credentials provided');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
+      const { domain, email, apiToken } = credentials;
+
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'get-projects',
-          credentials
+          domain,
+          email,
+          apiToken,
+          path: 'project'
         }
       });
-      
+
       if (error) {
-        throw new Error(error.message || "Failed to connect to Jira API");
+        console.error('Error fetching Jira projects:', error);
+        throw new Error('Failed to fetch Jira projects');
       }
-      
-      if (data?.error) {
-        throw new Error(data.error || "Jira API returned an error");
-      }
-      
-      if (data?.projects) {
-        setProjects(data.projects);
-        setIsAuthenticated(true);
-      } else {
-        setProjects([]);
-      }
+
+      const projectsData: JiraProject[] = data.map((project: any) => ({
+        id: project.id,
+        key: project.key,
+        name: project.name,
+        avatarUrl: project.avatarUrls['48x48'],
+        domain: domain
+      }));
+
+      setProjects(projectsData);
     } catch (err: any) {
-      console.error('Error fetching projects:', err);
-      setError(err.message || 'Failed to fetch projects');
+      console.error('Error fetching Jira projects:', err);
+      setError(err.message || 'Failed to fetch Jira projects');
       toast({
         title: "Error",
-        description: err.message || 'Failed to fetch projects',
-        variant: "destructive"
+        description: err.message || 'Failed to fetch Jira projects',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -177,54 +117,78 @@ export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const fetchSprints = async (projectId?: string) => {
     if (!credentials) {
-      setError('Authentication required');
+      setError('No Jira credentials provided');
       return;
     }
-    
-    const targetProjectId = projectId || selectedProject?.id;
-    if (!targetProjectId) {
+
+    const projectToUse = projectId || selectedProject?.id;
+
+    if (!projectToUse) {
       setError('No project selected');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      const { data, error } = await supabase.functions.invoke('jira-api', {
+      const { domain, email, apiToken } = credentials;
+
+      // First get agile boards for the project
+      const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'get-sprints',
-          credentials,
-          projectId: targetProjectId
+          domain,
+          email,
+          apiToken,
+          path: `agile/1.0/board?projectKeyOrId=${projectToUse}`
         }
       });
-      
-      if (error) {
-        throw new Error(error.message || "Failed to connect to Jira API");
+
+      if (boardError) {
+        console.error('Error fetching Jira boards:', boardError);
+        throw new Error('Failed to fetch Jira boards');
       }
-      
-      if (data?.error) {
-        throw new Error(data.error || "Jira API returned an error");
+
+      if (!boardData.values || boardData.values.length === 0) {
+        setSprints({ ...sprints, [projectToUse]: [] });
+        setLoading(false);
+        return;
       }
-      
-      if (data?.sprints) {
-        setSprints(prev => ({
-          ...prev,
-          [targetProjectId]: data.sprints
-        }));
-      } else {
-        setSprints(prev => ({
-          ...prev,
-          [targetProjectId]: []
-        }));
+
+      // Use the first board to get sprints
+      const boardId = boardData.values[0].id;
+
+      const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
+        body: {
+          domain,
+          email,
+          apiToken,
+          path: `agile/1.0/board/${boardId}/sprint`
+        }
+      });
+
+      if (sprintError) {
+        console.error('Error fetching Jira sprints:', sprintError);
+        throw new Error('Failed to fetch Jira sprints');
       }
+
+      const sprintsData: JiraSprint[] = sprintData.values.map((sprint: any) => ({
+        id: sprint.id,
+        name: sprint.name,
+        state: sprint.state,
+        startDate: sprint.startDate,
+        endDate: sprint.endDate,
+        boardId: boardId
+      }));
+
+      setSprints({ ...sprints, [projectToUse]: sprintsData });
     } catch (err: any) {
-      console.error('Error fetching sprints:', err);
-      setError(err.message || 'Failed to fetch sprints');
+      console.error('Error fetching Jira sprints:', err);
+      setError(err.message || 'Failed to fetch Jira sprints');
       toast({
         title: "Error",
-        description: err.message || 'Failed to fetch sprints',
-        variant: "destructive"
+        description: err.message || 'Failed to fetch Jira sprints',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -233,53 +197,73 @@ export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   const fetchTickets = async (sprintId?: string) => {
     if (!credentials) {
-      setError('Authentication required');
+      setError('No Jira credentials provided');
       return;
     }
-    
-    const targetSprintId = sprintId || selectedSprint?.id;
-    if (!targetSprintId) {
+
+    const sprintToUse = sprintId || selectedSprint?.id;
+
+    if (!sprintToUse) {
       setError('No sprint selected');
       return;
     }
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
+      const { domain, email, apiToken } = credentials;
+
       const { data, error } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'get-tickets',
-          credentials,
-          sprintId: targetSprintId
+          domain,
+          email,
+          apiToken,
+          path: `agile/1.0/sprint/${sprintToUse}/issue`
         }
       });
-      
+
       if (error) {
-        throw new Error(error.message || "Failed to connect to Jira API");
+        console.error('Error fetching Jira tickets:', error);
+        throw new Error('Failed to fetch Jira tickets');
       }
-      
-      if (data?.error) {
-        throw new Error(data.error || "Jira API returned an error");
-      }
-      
-      if (data?.tickets) {
-        const ticketsWithProjectSprint = data.tickets.map((ticket: JiraTicket) => ({
-          ...ticket,
+
+      const ticketsData: JiraTicket[] = data.issues.map((issue: any) => {
+        // Extract acceptance criteria from custom fields if available
+        const acceptanceCriteria = issue.fields.customfield_10010 || '';
+
+        return {
+          id: issue.id,
+          key: issue.key,
+          summary: issue.fields.summary,
+          description: issue.fields.description || '',
+          acceptance_criteria: acceptanceCriteria,
+          status: issue.fields.status?.name,
+          assignee: issue.fields.assignee?.displayName,
+          priority: issue.fields.priority?.name,
+          story_points: issue.fields.customfield_10008, // Assuming this is the story points field
+          labels: issue.fields.labels,
+          epic: issue.fields.epic?.name,
+          created_at: issue.fields.created,
+          updated_at: issue.fields.updated,
+          issuetype: {
+            id: issue.fields.issuetype.id,
+            name: issue.fields.issuetype.name
+          },
           projectId: selectedProject?.id,
-          sprintId: targetSprintId
-        }));
-        setTickets(ticketsWithProjectSprint);
-      } else {
-        setTickets([]);
-      }
+          sprintId: sprintToUse,
+          domain: domain
+        };
+      });
+
+      setTickets(ticketsData);
     } catch (err: any) {
-      console.error('Error fetching tickets:', err);
-      setError(err.message || 'Failed to fetch tickets');
+      console.error('Error fetching Jira tickets:', err);
+      setError(err.message || 'Failed to fetch Jira tickets');
       toast({
         title: "Error",
-        description: err.message || 'Failed to fetch tickets',
-        variant: "destructive"
+        description: err.message || 'Failed to fetch Jira tickets',
+        variant: "destructive",
       });
     } finally {
       setLoading(false);
@@ -287,117 +271,224 @@ export const StoriesProvider: React.FC<{ children: ReactNode }> = ({ children })
   };
 
   const generateContent = async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
+    if (!selectedTicket) {
+      setError('No ticket selected');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
     try {
+      // First check if the content already exists
+      if (selectedTicket.id) {
+        const { data: existingData, error: fetchError } = await supabase
+          .from('story_artifacts')
+          .select('*')
+          .eq('story_id', selectedTicket.key)
+          .maybeSingle();
+
+        if (!fetchError && existingData) {
+          // If we already have content, return it
+          const existingContent: JiraGenerationResponse = {
+            lld: existingData.lld_content || undefined,
+            code: existingData.code_content || undefined,
+            tests: existingData.test_content || undefined
+          };
+
+          // Only use existing content if it exists for the requested type
+          if ((request.type === 'lld' && existingData.lld_content) ||
+              (request.type === 'code' && existingData.code_content) ||
+              (request.type === 'tests' && existingData.test_content) ||
+              (request.type === 'all' && (existingData.lld_content || existingData.code_content || existingData.test_content))) {
+            setGeneratedContent(existingContent);
+            setLoading(false);
+            
+            toast({
+              title: "Content Retrieved",
+              description: "Retrieved previously generated content",
+              variant: "success",
+            });
+            
+            return existingContent;
+          }
+        }
+      }
+
+      // No existing content or specific content requested not available, generate new content
       const { data, error } = await supabase.functions.invoke('chat-with-jira', {
         body: {
-          jiraTicket: request.jiraTicket,
+          jiraTicket: selectedTicket,
           dataModel: request.dataModel,
           documentsContext: request.documentsContext,
-          request: `Generate ${request.type === 'lld' ? 'Low-Level Design' : request.type === 'code' ? 'Implementation Code' : 'Test Cases'}`
+          request: `Generate ${request.type === 'lld' ? 'Low-Level Design' : 
+                    request.type === 'code' ? 'Implementation Code' : 
+                    request.type === 'tests' ? 'Test Cases' : 
+                    'Low-Level Design, Implementation Code, and Test Cases'} for ${selectedTicket.key}: ${selectedTicket.summary}`,
+          projectContext: request.projectContext,
+          selectedDocuments: request.selectedDocuments
         }
       });
-      
-      if (error) throw new Error(error.message);
-      
-      const response: JiraGenerationResponse = {
-        response: data.response
-      };
-      
-      if (request.type === 'lld') {
-        response.lld = data.response;
-      } else if (request.type === 'code') {
-        response.code = data.response;
-      } else if (request.type === 'tests') {
-        response.tests = data.response;
+
+      if (error) {
+        console.error('Error generating content:', error);
+        throw new Error('Failed to generate content');
       }
+
+      // Prepare response data
+      let responseData: JiraGenerationResponse = {};
+
+      if (request.type === 'lld' || request.type === 'all') {
+        responseData.lld = data.response;
+      } else if (request.type === 'code') {
+        responseData.code = data.response;
+      } else if (request.type === 'tests') {
+        responseData.tests = data.response;
+      } else {
+        responseData.response = data.response;
+      }
+
+      // Save the generated content
+      let contentToSave = '';
+      let contentType = request.type;
       
-      setGeneratedContent(response);
-      return response;
+      if (request.type === 'all') {
+        // If all content was requested, save it under lld for now (we'd need to parse later)
+        contentToSave = data.response;
+        contentType = 'lld';
+      } else {
+        contentToSave = data.response;
+      }
+
+      // Save the content to the database
+      await supabase.functions.invoke('save-story-artifacts', {
+        body: {
+          storyId: selectedTicket.key,
+          projectId: selectedTicket.projectId,
+          sprintId: selectedTicket.sprintId,
+          contentType: contentType,
+          content: contentToSave
+        }
+      });
+
+      setGeneratedContent(responseData);
+      
+      toast({
+        title: "Content Generated",
+        description: "Content has been generated and saved successfully",
+        variant: "success",
+      });
+      
+      return responseData;
     } catch (err: any) {
       console.error('Error generating content:', err);
       setError(err.message || 'Failed to generate content');
       toast({
         title: "Error",
         description: err.message || 'Failed to generate content',
-        variant: "destructive"
+        variant: "destructive",
       });
-      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
   const pushToJira = async (ticketId: string, content: string): Promise<boolean> => {
     if (!credentials) {
-      setError('Authentication required');
+      setError('No Jira credentials provided');
       return false;
     }
-    
+
     try {
-      const { data, error } = await supabase.functions.invoke('jira-api', {
+      const { domain, email, apiToken } = credentials;
+
+      // Add the comment to the Jira ticket
+      const { error } = await supabase.functions.invoke('jira-api', {
         body: {
-          action: 'add-comment',
-          credentials,
-          ticketId,
-          comment: content
+          domain,
+          email,
+          apiToken,
+          path: `issue/${ticketId}/comment`,
+          method: 'POST',
+          data: {
+            body: {
+              version: 1,
+              type: "doc",
+              content: [
+                {
+                  type: "paragraph",
+                  content: [
+                    {
+                      type: "text",
+                      text: content
+                    }
+                  ]
+                }
+              ]
+            }
+          }
         }
       });
-      
-      if (error) throw new Error(error.message);
-      
+
+      if (error) {
+        console.error('Error pushing to Jira:', error);
+        throw new Error('Failed to push to Jira');
+      }
+
+      toast({
+        title: "Success",
+        description: "Content has been pushed to Jira",
+        variant: "success",
+      });
+
       return true;
     } catch (err: any) {
       console.error('Error pushing to Jira:', err);
-      setError(err.message || 'Failed to push content to Jira');
+      setError(err.message || 'Failed to push to Jira');
       toast({
         title: "Error",
-        description: err.message || 'Failed to push content to Jira',
-        variant: "destructive"
+        description: err.message || 'Failed to push to Jira',
+        variant: "destructive",
       });
       return false;
     }
   };
 
-  useEffect(() => {
-    if (isAuthenticated && credentials) {
-      fetchProjects();
-    }
-  }, [isAuthenticated, credentials]);
-
-  const value = {
-    credentials,
-    setCredentials,
-    isAuthenticated,
-    tickets,
-    loading,
-    error,
-    projects,
-    sprints,
-    selectedProject,
-    setSelectedProject,
-    selectedSprint,
-    setSelectedSprint,
-    fetchProjects,
-    fetchSprints,
-    fetchTickets,
-    selectedTicket,
-    setSelectedTicket,
-    generatedContent,
-    generateContent,
-    pushToJira,
-    ticketTypeFilter,
-    setTicketTypeFilter
-  };
+  // Filter tickets based on the selected type
+  const filteredTickets = ticketTypeFilter
+    ? tickets.filter(ticket => ticket.issuetype?.name === ticketTypeFilter)
+    : tickets;
 
   return (
-    <StoriesContext.Provider value={value}>
+    <StoriesContext.Provider
+      value={{
+        credentials,
+        setCredentials,
+        isAuthenticated,
+        tickets: filteredTickets,
+        loading,
+        error,
+        projects,
+        sprints,
+        selectedProject,
+        setSelectedProject,
+        selectedSprint,
+        setSelectedSprint,
+        fetchProjects,
+        fetchSprints,
+        fetchTickets,
+        selectedTicket,
+        setSelectedTicket,
+        generatedContent,
+        generateContent,
+        pushToJira,
+        ticketTypeFilter,
+        setTicketTypeFilter
+      }}
+    >
       {children}
     </StoriesContext.Provider>
   );
 };
 
-export const useStories = () => {
-  const context = useContext(StoriesContext);
-  if (context === undefined) {
-    throw new Error('useStories must be used within a StoriesProvider');
-  }
-  return context;
-};
+export default StoriesContext;

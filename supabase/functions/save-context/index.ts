@@ -44,12 +44,17 @@ serve(async (req) => {
       .eq('id', projectId)
       .maybeSingle();
     
-    if (projectError || !projectExists) {
+    if (projectError) {
       console.error('Project validation error:', projectError);
       return new Response(
-        JSON.stringify({ error: 'Invalid project ID' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+        JSON.stringify({ error: 'Error validating project ID' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
       );
+    }
+    
+    if (!projectExists) {
+      console.error('Project does not exist:', projectId);
+      // We'll continue anyway since the projectId might be from Jira
     }
 
     // Validate document IDs if any are provided
@@ -68,14 +73,14 @@ serve(async (req) => {
       }
       
       // Check if all requested document IDs exist
-      const foundDocIds = docsData.map(d => d.id);
-      const missingDocIds = documentIds.filter(id => !foundDocIds.includes(id));
-      
-      if (missingDocIds.length > 0) {
-        return new Response(
-          JSON.stringify({ error: 'One or more document IDs are invalid' }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-        );
+      if (docsData) {
+        const foundDocIds = docsData.map(d => d.id);
+        const missingDocIds = documentIds.filter(id => !foundDocIds.includes(id));
+        
+        if (missingDocIds.length > 0) {
+          console.warn('Some document IDs were not found:', missingDocIds);
+          // Continue anyway with the documents that were found
+        }
       }
     }
 
