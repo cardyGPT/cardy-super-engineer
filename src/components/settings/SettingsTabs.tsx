@@ -5,7 +5,7 @@ import JiraSettings from "./JiraSettings";
 import OpenAISettings from "./OpenAISettings";
 import GSuiteSettings from "./GSuiteSettings";
 import BitbucketSettings from "./BitbucketSettings";
-import { CheckCircle } from "lucide-react";
+import { CheckCircle, AlertCircle } from "lucide-react";
 
 interface SettingsTabsProps {
   activeTab: string;
@@ -37,32 +37,40 @@ const SettingsTabs: React.FC<SettingsTabsProps> = ({
       <TabsList className="grid grid-cols-4 w-full max-w-md mb-4">
         <TabsTrigger value="jira" className="flex items-center gap-1">
           Jira
-          {jiraConnected && (
+          {jiraConnected ? (
             <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
+          ) : (
+            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
           )}
         </TabsTrigger>
         <TabsTrigger value="openai" className="flex items-center gap-1">
           OpenAI
-          {openAIConnected && (
+          {openAIConnected ? (
             <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
+          ) : (
+            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
           )}
         </TabsTrigger>
         <TabsTrigger value="gsuite" className="flex items-center gap-1">
           GSuite
-          {gsuiteConnected && (
+          {gsuiteConnected ? (
             <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
+          ) : (
+            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
           )}
         </TabsTrigger>
         <TabsTrigger value="bitbucket" className="flex items-center gap-1">
           Bitbucket
-          {bitbucketConnected && (
+          {bitbucketConnected ? (
             <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
+          ) : (
+            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
           )}
         </TabsTrigger>
       </TabsList>
       
       <TabsContent value="jira">
-        <JiraSettings />
+        <JiraSettings onConfigChange={setJiraConnected} />
       </TabsContent>
       
       <TabsContent value="openai">

@@ -1,19 +1,16 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle, ExternalLink, Code } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import SettingsCard from './common/SettingsCard';
+import { SettingsProps } from '@/types/settings';
 
-interface BitbucketSettingsProps {
-  onConfigChange?: (connected: boolean) => void;
-}
-
-const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange }) => {
+const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
   const [username, setUsername] = useState('');
   const [appPassword, setAppPassword] = useState('');
   const [workspace, setWorkspace] = useState('');
@@ -26,57 +23,52 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
   
   // Load existing settings
   useEffect(() => {
-    const loadSettings = async () => {
-      setIsLoading(true);
-      try {
-        // Fetch Bitbucket settings from supabase
-        const { data, error } = await supabase
-          .from('api_keys')
-          .select('*')
-          .eq('service', 'bitbucket')
-          .single();
-          
-        if (error) {
+    loadSettings();
+  }, []);
+  
+  const loadSettings = async () => {
+    setIsLoading(true);
+    try {
+      // Fetch Bitbucket settings from supabase
+      const { data, error } = await supabase
+        .from('api_keys')
+        .select('*')
+        .eq('service', 'bitbucket')
+        .single();
+        
+      if (error) {
+        if (error.code !== 'PGRST116') { // Not found error
           console.error('Error loading Bitbucket settings:', error);
-          if (error.code !== 'PGRST116') { // Not found error
-            toast({
-              title: "Error",
-              description: "Failed to load Bitbucket settings",
-              variant: "destructive",
-            });
+        }
+        setIsConnected(false);
+        if (onConfigChange) onConfigChange(false);
+        return;
+      }
+      
+      if (data) {
+        setUsername(data.username || '');
+        // For security, we don't populate the app password field
+        
+        // Parse domain field for workspace and repository
+        if (data.domain) {
+          try {
+            const [ws, repo] = data.domain.split('/');
+            setWorkspace(ws || '');
+            setRepository(repo || '');
+          } catch (e) {
+            console.error('Error parsing workspace/repository:', e);
           }
-          setIsConnected(false);
-          if (onConfigChange) onConfigChange(false);
-          return;
         }
         
-        if (data) {
-          setUsername(data.username || '');
-          setAppPassword(data.api_key || '');
-          
-          // Parse domain field for workspace and repository
-          if (data.domain) {
-            try {
-              const [ws, repo] = data.domain.split('/');
-              setWorkspace(ws || '');
-              setRepository(repo || '');
-            } catch (e) {
-              console.error('Error parsing workspace/repository:', e);
-            }
-          }
-          
-          setIsConnected(true);
-          if (onConfigChange) onConfigChange(true);
-        }
-      } catch (err) {
-        console.error('Error in loadSettings:', err);
-      } finally {
-        setIsLoading(false);
+        setIsConnected(true);
+        if (onConfigChange) onConfigChange(true);
       }
-    };
-    
-    loadSettings();
-  }, [toast, onConfigChange]);
+    } catch (err) {
+      console.error('Error in loadSettings:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const handleSaveSettings = async () => {
     setIsLoading(true);
@@ -90,7 +82,7 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
       // Save Bitbucket settings to supabase
       const { error } = await supabase.functions.invoke('store-api-keys', {
         body: {
-          service: 'bitbucket',
+          provider: 'bitbucket',
           apiKey: appPassword,
           domain: `${workspace}/${repository}`,
           username: username
@@ -98,7 +90,6 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
       });
       
       if (error) {
-        console.error('Error saving Bitbucket settings:', error);
         throw new Error(error.message || 'Failed to save Bitbucket settings');
       }
       
@@ -112,13 +103,9 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
       if (onConfigChange) onConfigChange(true);
       
     } catch (err: any) {
-      console.error('Error in handleSaveSettings:', err);
       setError(err.message || 'Failed to save settings');
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save Bitbucket settings",
-        variant: "destructive",
-      });
+      setIsConnected(false);
+      if (onConfigChange) onConfigChange(false);
     } finally {
       setIsLoading(false);
     }
@@ -159,13 +146,7 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
         throw new Error('Invalid response from Bitbucket');
       }
     } catch (err: any) {
-      console.error('Error in handleValidateConnection:', err);
       setError(err.message || 'Failed to validate connection');
-      toast({
-        title: "Validation Error",
-        description: err.message || "Failed to validate Bitbucket connection",
-        variant: "destructive",
-      });
       setIsConnected(false);
       if (onConfigChange) onConfigChange(false);
     } finally {
@@ -173,105 +154,156 @@ const BitbucketSettings: React.FC<BitbucketSettingsProps> = ({ onConfigChange })
     }
   };
   
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Bitbucket Settings</span>
-          {isConnected ? <CheckCircle className="h-5 w-5 text-green-500" /> : null}
-        </CardTitle>
-        <CardDescription>
-          Configure your Bitbucket integration for code syncing
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {error && (
-          <Alert variant="destructive">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+  const handleDisconnect = async () => {
+    try {
+      const { error } = await supabase
+        .from('api_keys')
+        .delete()
+        .eq('service', 'bitbucket');
         
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">Username</Label>
-            <Input
-              id="username"
-              placeholder="Your Bitbucket username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      setIsConnected(false);
+      setUsername('');
+      setAppPassword('');
+      setWorkspace('');
+      setRepository('');
+      if (onConfigChange) onConfigChange(false);
+      
+      toast({
+        title: "Disconnected",
+        description: "Bitbucket connection has been removed",
+        variant: "default",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to disconnect Bitbucket",
+        variant: "destructive",
+      });
+    }
+  };
+  
+  return (
+    <SettingsCard
+      title="Bitbucket Integration"
+      description="Configure your Bitbucket integration for code syncing"
+      isConnected={isConnected}
+      isError={!!error}
+      statusMessage={error || undefined}
+      icon={<Code className="h-5 w-5" />}
+      footerContent={
+        <div className="flex justify-between w-full">
+          {isConnected && (
+            <Button 
+              variant="destructive" 
+              onClick={handleDisconnect}
+              disabled={isLoading || isValidating}
+            >
+              Disconnect
+            </Button>
+          )}
           
-          <div className="space-y-2">
-            <Label htmlFor="app-password">App Password</Label>
-            <Input
-              id="app-password"
-              type="password"
-              placeholder="Your Bitbucket app password"
-              value={appPassword}
-              onChange={(e) => setAppPassword(e.target.value)}
-              disabled={isLoading}
-            />
-            <p className="text-xs text-muted-foreground">
-              Create an app password with repository read/write permissions in your Bitbucket account settings
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="workspace">Workspace</Label>
-            <Input
-              id="workspace"
-              placeholder="Your Bitbucket workspace name"
-              value={workspace}
-              onChange={(e) => setWorkspace(e.target.value)}
-              disabled={isLoading}
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="repository">Repository</Label>
-            <Input
-              id="repository"
-              placeholder="Your Bitbucket repository name"
-              value={repository}
-              onChange={(e) => setRepository(e.target.value)}
-              disabled={isLoading}
-            />
+          <div className="flex gap-2 ml-auto">
+            <Button 
+              variant="outline" 
+              onClick={handleValidateConnection}
+              disabled={isValidating || isLoading || !username || (!isConnected && !appPassword) || !workspace || !repository}
+            >
+              {isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
+                </>
+              ) : (
+                'Test Connection'
+              )}
+            </Button>
+            
+            <Button 
+              onClick={handleSaveSettings} 
+              disabled={isLoading || !username || (!isConnected && !appPassword) || !workspace || !repository}
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Save Settings'
+              )}
+            </Button>
           </div>
         </div>
-      </CardContent>
-      <CardFooter className="flex justify-between">
-        <Button 
-          variant="outline" 
-          onClick={handleValidateConnection}
-          disabled={isValidating || isLoading || !username || !appPassword || !workspace || !repository}
-        >
-          {isValidating ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Validating...
-            </>
-          ) : (
-            'Test Connection'
-          )}
-        </Button>
-        <Button 
-          onClick={handleSaveSettings} 
-          disabled={isLoading || !username || !appPassword || !workspace || !repository}
-        >
-          {isLoading ? (
-            <>
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Saving...
-            </>
-          ) : (
-            'Save Settings'
-          )}
-        </Button>
-      </CardFooter>
-    </Card>
+      }
+    >
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+      
+      <div className="space-y-4">
+        <div className="space-y-2">
+          <Label htmlFor="username">Username</Label>
+          <Input
+            id="username"
+            placeholder="Your Bitbucket username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="app-password">App Password</Label>
+          <Input
+            id="app-password"
+            type="password"
+            placeholder="Your Bitbucket app password"
+            value={appPassword}
+            onChange={(e) => setAppPassword(e.target.value)}
+            disabled={isLoading}
+          />
+          <p className="text-xs text-muted-foreground flex items-center">
+            <ExternalLink className="h-3 w-3 mr-1" />
+            <a 
+              href="https://support.atlassian.com/bitbucket-cloud/docs/app-passwords/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-blue-500 hover:underline"
+            >
+              Create an app password with repository read/write permissions
+            </a>
+          </p>
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="workspace">Workspace</Label>
+          <Input
+            id="workspace"
+            placeholder="Your Bitbucket workspace name"
+            value={workspace}
+            onChange={(e) => setWorkspace(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="repository">Repository</Label>
+          <Input
+            id="repository"
+            placeholder="Your Bitbucket repository name"
+            value={repository}
+            onChange={(e) => setRepository(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+      </div>
+    </SettingsCard>
   );
 };
 
