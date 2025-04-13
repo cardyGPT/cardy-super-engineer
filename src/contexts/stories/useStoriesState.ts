@@ -53,6 +53,7 @@ export const useStoriesState = () => {
   
   // Filters
   const [ticketTypeFilter, setTicketTypeFilter] = useState<string | null>(null);
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   
   // Generated content
@@ -87,7 +88,7 @@ export const useStoriesState = () => {
   // Reset selected ticket when filters change
   useEffect(() => {
     setSelectedTicket(null);
-  }, [ticketTypeFilter, searchTerm]);
+  }, [ticketTypeFilter, ticketStatusFilter, searchTerm]);
   
   // API method - Fetch projects
   const fetchProjects = useCallback(async () => {
@@ -477,6 +478,8 @@ export const useStoriesState = () => {
     // Filters
     ticketTypeFilter,
     setTicketTypeFilter,
+    ticketStatusFilter,
+    setTicketStatusFilter,
     searchTerm,
     setSearchTerm,
     

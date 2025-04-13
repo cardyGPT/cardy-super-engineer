@@ -12,7 +12,7 @@ import { ProjectContextData } from "@/types/jira";
 // Components
 import StoryList from "@/components/stories/StoryList";
 import StoryDetails from "@/components/stories/StoryDetails";
-import ProjectSelector from "@/components/stories/ProjectSelector";
+import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
 import ContextBanner from "@/components/stories/ContextBanner";
 import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
@@ -215,7 +215,7 @@ const StoriesPage: React.FC = () => {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <ProjectSelector lastRefreshTime={lastRefreshTime} />
+              <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
               <StoryList />
             </div>
             

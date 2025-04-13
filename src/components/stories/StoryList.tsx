@@ -18,6 +18,7 @@ const StoryList: React.FC = () => {
     ticketsLoading, 
     error,
     ticketTypeFilter,
+    ticketStatusFilter,
     searchTerm,
     setSearchTerm,
     hasMore,
@@ -66,14 +67,25 @@ const StoryList: React.FC = () => {
         return false;
       }
       
-      // Apply search filter
-      if (searchTerm && !ticket.summary.toLowerCase().includes(searchTerm.toLowerCase())) {
+      // Apply status filter
+      if (ticketStatusFilter && ticket.status !== ticketStatusFilter) {
         return false;
+      }
+      
+      // Apply search filter - safely check if summary exists and is a string
+      if (searchTerm && ticket.summary) {
+        // Make sure we're working with strings before calling toLowerCase
+        const summary = String(ticket.summary).toLowerCase();
+        const search = searchTerm.toLowerCase();
+        
+        if (!summary.includes(search)) {
+          return false;
+        }
       }
       
       return true;
     });
-  }, [tickets, ticketTypeFilter, searchTerm]);
+  }, [tickets, ticketTypeFilter, ticketStatusFilter, searchTerm]);
   
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchTerm(e.target.value);
@@ -113,6 +125,21 @@ const StoryList: React.FC = () => {
     }
   };
   
+  const getStatusColor = (status: string | undefined) => {
+    switch(status?.toLowerCase()) {
+      case 'to do':
+        return 'bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-300';
+      case 'in progress':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
+      case 'in review':
+        return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300';
+      case 'done':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300';
+    }
+  };
+  
   return (
     <Card className="overflow-hidden h-full">
       <CardHeader className="pb-3">
@@ -122,6 +149,7 @@ const StoryList: React.FC = () => {
             <Badge variant="outline" className="ml-2">
               {filteredTickets.length} 
               {ticketTypeFilter ? ` ${ticketTypeFilter}` : ' tickets'}
+              {ticketStatusFilter ? ` (${ticketStatusFilter})` : ''}
             </Badge>
           )}
         </CardTitle>
@@ -201,7 +229,10 @@ const StoryList: React.FC = () => {
                     )}
                     
                     {ticket.status && (
-                      <Badge variant="outline" className="text-xs">
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs ${getStatusColor(ticket.status)}`}
+                      >
                         {ticket.status}
                       </Badge>
                     )}

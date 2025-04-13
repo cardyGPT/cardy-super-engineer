@@ -108,4 +108,16 @@ export interface StoriesContextType {
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   ticketTypeFilter: string | null;
   setTicketTypeFilter: (type: string | null) => void;
+  ticketStatusFilter: string | null;
+  setTicketStatusFilter: (status: string | null) => void;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  hasMore: boolean;
+  loadingMore: boolean;
+  fetchMoreTickets: () => Promise<void>;
+  projectsLoading: boolean;
+  sprintsLoading: boolean;
+  ticketsLoading: boolean;
+  contentLoading: boolean;
+  fetchTicketsByProject: (projectId: string) => Promise<void>;
 }

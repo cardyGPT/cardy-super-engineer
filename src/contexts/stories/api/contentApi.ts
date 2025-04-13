@@ -36,12 +36,24 @@ export const generateJiraContent = async (
       throw new Error('No response received from content generation service');
     }
     
-    const contentType = request.type === 'all' ? 'lld' : request.type;
-    
     // Create a response object with the generated content
-    const response: JiraGenerationResponse = {
-      [contentType]: data.response
-    };
+    // For 'all' type, we'll still return it in the correct content field instead of using 'all'
+    let response: JiraGenerationResponse = {};
+    
+    if (request.type === 'lld') {
+      response.lld = data.response;
+    } else if (request.type === 'code') {
+      response.code = data.response;
+    } else if (request.type === 'tests') {
+      response.tests = data.response;
+    } else if (request.type === 'all') {
+      // For 'all' type, put the content in the lld field by default
+      // In a real implementation, you might want to split this into different parts
+      response.lld = data.response;
+    }
+    
+    // Also include the full response for reference
+    response.response = data.response;
     
     return response;
   } catch (err) {

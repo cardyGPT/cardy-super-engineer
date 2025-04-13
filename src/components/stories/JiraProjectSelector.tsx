@@ -21,10 +21,13 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     setSelectedSprint,
     fetchSprints,
     fetchTickets,
+    fetchTicketsByProject,
     projectsLoading,
     sprintsLoading,
     ticketTypeFilter,
-    setTicketTypeFilter
+    setTicketTypeFilter,
+    ticketStatusFilter,
+    setTicketStatusFilter
   } = useStories();
 
   const handleProjectChange = async (projectId: string) => {
@@ -43,6 +46,12 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
   const handleSprintChange = (sprintId: string) => {
     if (!selectedProject) return;
     
+    if (sprintId === "all-project-tickets") {
+      setSelectedSprint(null);
+      fetchTicketsByProject(selectedProject.id);
+      return;
+    }
+    
     const projectSprints = sprints[selectedProject.id] || [];
     const sprint = projectSprints.find(s => s.id === sprintId);
     
@@ -54,6 +63,10 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
 
   const handleTypeFilterChange = (value: string) => {
     setTicketTypeFilter(value === "all" ? null : value);
+  };
+  
+  const handleStatusFilterChange = (value: string) => {
+    setTicketStatusFilter(value === "all" ? null : value);
   };
 
   const isLoadingSprints = sprintsLoading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
@@ -109,14 +122,27 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
               Select a project first
             </div>
           ) : availableSprints.length === 0 ? (
-            <LoadingContent 
-              isWarning={true}
-              message="No sprints found for this project"
-              additionalMessage="The project may not use Scrum methodology or have active sprints."
-            />
+            <div className="space-y-2">
+              <LoadingContent 
+                isWarning={true}
+                message="No sprints found for this project"
+                additionalMessage="The project may not use Scrum methodology or have active sprints."
+              />
+              <Select
+                value="all-project-tickets"
+                onValueChange={handleSprintChange}
+              >
+                <SelectTrigger id="all-sprint-select" className="w-full">
+                  <SelectValue placeholder="View all project tickets" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all-project-tickets">All project tickets</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           ) : (
             <Select 
-              value={selectedSprint?.id || ""} 
+              value={selectedSprint?.id || ""}
               onValueChange={handleSprintChange}
               disabled={!selectedProject || availableSprints.length === 0}
             >
@@ -124,6 +150,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                 <SelectValue placeholder="Select a sprint" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all-project-tickets">All project tickets</SelectItem>
                 {availableSprints.map(sprint => (
                   <SelectItem key={sprint.id} value={sprint.id}>
                     {sprint.name} ({sprint.state || 'active'})
@@ -143,26 +170,50 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
           )}
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="type-filter-select" className="text-sm font-medium flex items-center">
-            <Filter className="h-3 w-3 mr-1" />
-            Filter by Type
-          </label>
-          <Select 
-            value={ticketTypeFilter || "all"} 
-            onValueChange={handleTypeFilterChange}
-          >
-            <SelectTrigger id="type-filter-select" className="w-full">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="Story">Story</SelectItem>
-              <SelectItem value="Bug">Bug</SelectItem>
-              <SelectItem value="Task">Task</SelectItem>
-              <SelectItem value="Sub-task">Sub-task</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <label htmlFor="type-filter-select" className="text-sm font-medium flex items-center">
+              <Filter className="h-3 w-3 mr-1" />
+              Filter by Type
+            </label>
+            <Select 
+              value={ticketTypeFilter || "all"} 
+              onValueChange={handleTypeFilterChange}
+            >
+              <SelectTrigger id="type-filter-select" className="w-full">
+                <SelectValue placeholder="All types" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All types</SelectItem>
+                <SelectItem value="Story">Story</SelectItem>
+                <SelectItem value="Bug">Bug</SelectItem>
+                <SelectItem value="Task">Task</SelectItem>
+                <SelectItem value="Sub-task">Sub-task</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="space-y-2">
+            <label htmlFor="status-filter-select" className="text-sm font-medium flex items-center">
+              <Filter className="h-3 w-3 mr-1" />
+              Filter by Status
+            </label>
+            <Select 
+              value={ticketStatusFilter || "all"} 
+              onValueChange={handleStatusFilterChange}
+            >
+              <SelectTrigger id="status-filter-select" className="w-full">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All statuses</SelectItem>
+                <SelectItem value="To Do">To Do</SelectItem>
+                <SelectItem value="In Progress">In Progress</SelectItem>
+                <SelectItem value="In Review">In Review</SelectItem>
+                <SelectItem value="Done">Done</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         
         {lastRefreshTime && (

@@ -42,6 +42,8 @@ interface StoriesContextProps {
   // Filter states
   ticketTypeFilter: string | null;
   setTicketTypeFilter: (type: string | null) => void;
+  ticketStatusFilter: string | null;
+  setTicketStatusFilter: (status: string | null) => void;
   searchTerm: string;
   setSearchTerm: (term: string) => void;
   
@@ -53,6 +55,9 @@ interface StoriesContextProps {
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   refreshAll: () => Promise<void>;
+  
+  // Generated content
+  generatedContent: JiraGenerationResponse | null;
 }
 
 // Create the context
