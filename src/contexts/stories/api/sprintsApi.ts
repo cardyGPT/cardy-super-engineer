@@ -13,9 +13,13 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     try {
       const allSprintsData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=1`);
       
+      console.log('JQL approach response:', JSON.stringify(allSprintsData).substring(0, 300) + '...');
+      
       if (allSprintsData?.issues && allSprintsData.issues.length > 0) {
         // Extract sprint info from the first issue
         const issue = allSprintsData.issues[0];
+        console.log('First issue fields:', Object.keys(issue.fields || {}).join(', '));
+        
         const sprints = issue.fields?.closedSprints || [];
         const activeSprints = issue.fields?.sprint ? [issue.fields.sprint] : [];
         
@@ -36,20 +40,50 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
         } else {
           console.log('No sprints found in first issue via JQL approach');
         }
+      } else {
+        console.log('No issues found or issues array is empty in JQL response');
       }
     } catch (jqlError) {
       console.error('Error in JQL approach:', jqlError);
       // Continue to next approach
     }
     
-    // APPROACH 2: Fetch all boards for the project and then get sprints for each board
+    // APPROACH 2: Try with Agile endpoint directly
     try {
-      console.log(`APPROACH 2: Fetching boards for project ${projectId}`);
+      console.log(`APPROACH 2: Trying direct Agile sprint endpoint for project ${projectId}`);
       
-      // Fetch boards for the project - handle this API call carefully as it might fail
+      // Use the Agile API to directly query for sprints
+      const agileSprints = await callJiraApi(credentials, `agile/1.0/sprint/search?projectId=${projectId}`);
+      
+      if (agileSprints?.values && agileSprints.values.length > 0) {
+        console.log(`Found ${agileSprints.values.length} sprints via direct Agile API`);
+        
+        return agileSprints.values.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state || 'unknown',
+          startDate: sprint.startDate,
+          endDate: sprint.endDate,
+          boardId: '0', // We don't have board info here
+          projectId
+        }));
+      } else {
+        console.log('No sprints found via direct Agile API approach');
+      }
+    } catch (agileError) {
+      console.error('Error in direct Agile sprint approach:', agileError);
+      // Continue to next approach
+    }
+    
+    // APPROACH 3: Fetch all boards for the project and then get sprints for each board
+    try {
+      console.log(`APPROACH 3: Fetching boards for project ${projectId}`);
+      
+      // Fetch boards for the project
       let boardsData;
       try {
         boardsData = await callJiraApi(credentials, `agile/1.0/board?projectKeyOrId=${projectId}`);
+        console.log('Boards data:', JSON.stringify(boardsData).substring(0, 300) + '...');
       } catch (boardsError) {
         console.error('Error fetching boards:', boardsError);
         // If this fails, we'll try a different approach or use development data
@@ -92,9 +126,9 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       // Continue to fallback approach
     }
     
-    // APPROACH 3: Direct JQL query for sprints
+    // APPROACH 4: Direct JQL query for sprints
     try {
-      console.log(`APPROACH 3: Direct JQL query for sprints for project ${projectId}`);
+      console.log(`APPROACH 4: Direct JQL query for sprints for project ${projectId}`);
       const jqlQueryForSprints = `project = ${projectId} ORDER BY created DESC`;
       
       const sprintQueryData = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQueryForSprints)}&maxResults=50`);
@@ -143,6 +177,31 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     } catch (directJqlError) {
       console.error('Error in direct JQL approach:', directJqlError);
       // Continue to development mode or return empty array
+    }
+    
+    // Try one more approach - directly query sprints with Jira software REST API
+    try {
+      console.log(`APPROACH 5: Trying Jira Software REST API for sprints`);
+      
+      // This is a different REST API endpoint specific to Jira Software
+      const softwareSprintsData = await callJiraApi(credentials, `jira-software-rest/latest/sprints?projectId=${projectId}`);
+      
+      if (softwareSprintsData?.values && softwareSprintsData.values.length > 0) {
+        console.log(`Found ${softwareSprintsData.values.length} sprints via Jira Software API`);
+        
+        return softwareSprintsData.values.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state || 'unknown',
+          startDate: sprint.startDate,
+          endDate: sprint.endDate,
+          boardId: sprint.boardId || '0',
+          projectId
+        }));
+      }
+    } catch (softwareError) {
+      console.error('Error in Jira Software API approach:', softwareError);
+      // Continue to development mode
     }
     
     // If we're in dev mode and no sprints were found, create a test sprint

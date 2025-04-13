@@ -2,8 +2,7 @@
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials } from '@/types/jira';
 
-// Set this to false to disable test data and use real data only
-// In production, this should be set to false
+// Set this to true to enable test data when API calls fail
 export const DEV_MODE = true; 
 
 // Helper function to fetch from Jira API through our edge function
@@ -12,7 +11,7 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
   
   try {
     console.log(`Calling Jira API with path: ${path}`);
-    const { data: responseData, error } = await supabase.functions.invoke('jira-api', {
+    const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
       body: {
         domain,
         email,
@@ -23,13 +22,18 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
       }
     });
 
-    if (error) {
-      console.error('Error calling Jira API:', error);
-      throw new Error(error.message || 'Failed to call Jira API');
+    if (supabaseError) {
+      console.error('Supabase functions invoke error:', supabaseError);
+      throw new Error(supabaseError.message || 'Failed to call Jira API via edge function');
     }
 
+    // Check if the response contains error information
     if (responseData?.error) {
-      console.error('Jira API returned an error:', responseData.error, responseData.details);
+      console.error('Jira API returned an error:', responseData.error);
+      console.error('Error details:', responseData.details);
+      console.error('Requested URL:', responseData.url);
+      
+      // Throw a detailed error
       throw new Error(responseData.error || 'Error from Jira API');
     }
 

@@ -43,6 +43,9 @@ serve(async (req) => {
       // Call Jira API
       const response = await fetch(apiUrl, fetchOptions);
       
+      // For debugging - log response status and headers
+      console.log(`Jira API response status: ${response.status}`);
+      
       if (!response.ok) {
         const errorText = await response.text();
         console.error(`Jira API error: ${response.status} - ${errorText}`);
@@ -60,17 +63,22 @@ serve(async (req) => {
           JSON.stringify({
             error: `Jira API returned status ${response.status}`,
             details: errorJson || { message: errorText },
-            status: response.status
+            status: response.status,
+            url: apiUrl
           }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }, 
-            status: response.status 
+            status: 200 // Return 200 with error details in body so client can handle
           }
         );
       }
       
       // Successfully got a response
       const responseData = await response.json();
+      
+      // Log success for debugging
+      console.log(`Jira API success for ${apiUrl}`);
+      
       return new Response(
         JSON.stringify(responseData),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -80,9 +88,10 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           error: `Failed to fetch from Jira API: ${fetchError.message}`,
-          details: fetchError
+          details: { message: fetchError.toString() },
+          url: apiUrl
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
   } catch (error) {
@@ -92,10 +101,11 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         error: error.message || 'Unknown error occurred',
+        stack: error.stack
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 200 // Return 200 with error details in body so client can handle
       }
     );
   }

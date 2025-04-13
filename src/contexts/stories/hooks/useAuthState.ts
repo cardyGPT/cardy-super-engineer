@@ -16,7 +16,16 @@ export const useAuthState = () => {
           
           // Validate the credentials format
           if (parsedCreds.domain && parsedCreds.email && parsedCreds.apiToken) {
-            setCredentials(parsedCreds);
+            // Clean up domain - ensure it has no trailing slashes and is properly formatted
+            const cleanDomain = parsedCreds.domain.replace(/\/+$/, '');
+            
+            // Save the cleaned credentials
+            const cleanedCreds = {
+              ...parsedCreds,
+              domain: cleanDomain
+            };
+            
+            setCredentials(cleanedCreds);
             setIsAuthenticated(true);
             console.log("Loaded valid Jira credentials from localStorage");
           } else {
@@ -39,7 +48,7 @@ export const useAuthState = () => {
   useEffect(() => {
     if (credentials) {
       try {
-        // Ensure domain doesn't have trailing slashes
+        // Ensure domain doesn't have trailing slashes and is properly formatted
         const cleanCredentials = {
           ...credentials,
           domain: credentials.domain.replace(/\/+$/, '')

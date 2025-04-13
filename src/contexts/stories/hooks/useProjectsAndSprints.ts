@@ -94,7 +94,7 @@ export const useProjectsAndSprints = (
         console.log(`No sprints found for project ID: ${projectToUse}`);
         toast({
           title: "No Sprints Found",
-          description: "This project doesn't have any sprints available",
+          description: "This project doesn't have any sprints available. Is it using the Scrum methodology?",
           variant: "default",
         });
       } else {
@@ -103,6 +103,15 @@ export const useProjectsAndSprints = (
         // If there's only one sprint and it's for the current selected project, select it automatically
         if (selectedProject && selectedProject.id === projectToUse && sprintsData.length === 1) {
           setSelectedSprint(sprintsData[0]);
+        }
+        
+        // If we found test data only, show a message
+        if (sprintsData.length > 0 && sprintsData[0].id.startsWith('test-')) {
+          toast({
+            title: "Using Test Sprints",
+            description: "Could not fetch real sprints from Jira. Using test data instead.",
+            variant: "warning",
+          });
         }
       }
     } catch (err: any) {
