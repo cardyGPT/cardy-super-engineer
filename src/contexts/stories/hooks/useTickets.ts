@@ -57,14 +57,9 @@ export const useTickets = (
     }
   };
 
-  // Get filtered tickets
-  const filteredTickets = ticketTypeFilter
-    ? tickets.filter(ticket => ticket.issuetype?.name === ticketTypeFilter)
-    : tickets;
-
   return {
     loading,
-    tickets: filteredTickets,
+    tickets,
     selectedTicket,
     setSelectedTicket,
     fetchTickets,

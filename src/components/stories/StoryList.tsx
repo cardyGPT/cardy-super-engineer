@@ -60,13 +60,11 @@ const StoryList: React.FC = () => {
     
     let filtered = [...tickets];
     
-    /* Commenting out ticket type filtering
     if (ticketTypeFilter) {
       filtered = filtered.filter(ticket => 
         ticket.issuetype?.name === ticketTypeFilter
       );
     }
-    */
     
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
@@ -82,7 +80,7 @@ const StoryList: React.FC = () => {
     setFilteredTickets(filtered);
     
     setCurrentPage(1);
-  }, [tickets, searchTerm]);
+  }, [tickets, searchTerm, ticketTypeFilter]);
   
   useEffect(() => {
     if (!filteredTickets.length) {
