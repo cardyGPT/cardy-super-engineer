@@ -1,16 +1,15 @@
+
 import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, FileText, Code, TestTube, RefreshCw, ArrowUpRight } from "lucide-react";
 import { useStories } from "@/contexts/StoriesContext";
 import { JiraTicket, ProjectContextData } from "@/types/jira";
-import { Skeleton } from "@/components/ui/skeleton";
-import ContentDisplay from "./ContentDisplay";
 import { supabase } from "@/lib/supabase";
+import ContentDisplay from "./ContentDisplay";
+import StoryDetailEmpty from "./StoryDetailEmpty";
+import StoryHeader from "./StoryHeader";
+import StoryOverview from "./StoryOverview";
+import LoadingContent from "./LoadingContent";
 
 interface StoryDetailProps {
   ticket: JiraTicket | null;
@@ -22,8 +21,8 @@ interface StoryDetailProps {
 const StoryDetail: React.FC<StoryDetailProps> = ({ 
   ticket, 
   projectContext, 
-  selectedDocuments,
-  projectContextData
+  selectedDocuments = [],
+  projectContextData = null
 }) => {
   const { generateContent, pushToJira } = useStories();
   const [activeTab, setActiveTab] = useState("overview");
@@ -224,56 +223,20 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   };
 
   if (!ticket) {
-    return (
-      <Card className="w-full h-fit">
-        <CardHeader>
-          <CardTitle>Story Details</CardTitle>
-          <CardDescription>Select a story to view details</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Alert>
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>No story selected</AlertTitle>
-            <AlertDescription>
-              Please select a story from the list to view its details
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
-    );
+    return <StoryDetailEmpty />;
   }
 
   return (
     <div className="space-y-4">
       <Card className="w-full h-fit">
-        <CardHeader className="pb-2">
-          <div className="flex justify-between items-start">
-            <div>
-              <div className="flex items-center gap-2">
-                <CardTitle>{ticket.key}: {ticket.summary}</CardTitle>
-                <Button 
-                  variant="ghost" 
-                  size="icon" 
-                  className="h-6 w-6" 
-                  onClick={openTicketInJira}
-                  title="Open in Jira"
-                >
-                  <ArrowUpRight className="h-4 w-4" />
-                </Button>
-              </div>
-              <CardDescription className="mt-1 flex flex-wrap gap-1">
-                <Badge variant="outline">{ticket.issuetype?.name || 'Unknown Type'}</Badge>
-                {ticket.priority && <Badge variant="outline">{ticket.priority}</Badge>}
-                {ticket.status && <Badge variant="outline">{ticket.status}</Badge>}
-                {ticket.story_points && <Badge variant="outline">{ticket.story_points} points</Badge>}
-              </CardDescription>
-            </div>
-            <div className="flex gap-1">
-              {isLldGenerated && <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">LLD</Badge>}
-              {isCodeGenerated && <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">Code</Badge>}
-              {isTestsGenerated && <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">Tests</Badge>}
-            </div>
-          </div>
+        <CardHeader>
+          <StoryHeader 
+            ticket={ticket}
+            isLldGenerated={isLldGenerated}
+            isCodeGenerated={isCodeGenerated}
+            isTestsGenerated={isTestsGenerated}
+            onOpenInJira={openTicketInJira}
+          />
         </CardHeader>
         <CardContent>
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -284,129 +247,25 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
               <TabsTrigger value="tests" disabled={!isTestsGenerated && !loading}>Tests</TabsTrigger>
             </TabsList>
             
-            <TabsContent value="overview" className="space-y-4">
-              {/* Description Section */}
-              <div>
-                <h3 className="text-md font-semibold mb-2">Description</h3>
-                <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-sm">
-                  {ticket.description || 'No description provided'}
-                </div>
-              </div>
-              
-              {/* Acceptance Criteria Section (if available) */}
-              {ticket.acceptance_criteria && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Acceptance Criteria</h3>
-                  <div className="border rounded-md p-3 bg-muted/30 whitespace-pre-wrap text-sm">
-                    {ticket.acceptance_criteria}
-                  </div>
-                </div>
-              )}
-              
-              {/* Project Context Section */}
-              {projectContextData && (
-                <div>
-                  <h3 className="text-md font-semibold mb-2">Project Context</h3>
-                  <div className="border rounded-md p-3 bg-muted/30 text-sm">
-                    <p><strong>Project:</strong> {projectContextData.project.name} ({projectContextData.project.type})</p>
-                    {projectContextData.documents.length > 0 && (
-                      <div className="mt-2">
-                        <p><strong>Reference Documents:</strong></p>
-                        <ul className="list-disc list-inside pl-2 mt-1">
-                          {projectContextData.documents.map(doc => (
-                            <li key={doc.id}>{doc.name} ({doc.type})</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              {/* Generate Content Buttons */}
-              <div>
-                <h3 className="text-md font-semibold mb-2">Generate Content</h3>
-                <div className="flex flex-wrap gap-2">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleGenerateLLD}
-                    disabled={loading}
-                    className="flex items-center"
-                  >
-                    {loading && activeTab === 'lld' ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <FileText className="h-4 w-4 mr-2" />
-                    )}
-                    {isLldGenerated ? 'Regenerate LLD' : 'Generate LLD'}
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleGenerateCode}
-                    disabled={loading}
-                    className="flex items-center"
-                  >
-                    {loading && activeTab === 'code' ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Code className="h-4 w-4 mr-2" />
-                    )}
-                    {isCodeGenerated ? 'Regenerate Code' : 'Generate Code'}
-                  </Button>
-                  
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={handleGenerateTests}
-                    disabled={loading}
-                    className="flex items-center"
-                  >
-                    {loading && activeTab === 'tests' ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <TestTube className="h-4 w-4 mr-2" />
-                    )}
-                    {isTestsGenerated ? 'Regenerate Tests' : 'Generate Tests'}
-                  </Button>
-                  
-                  <Button 
-                    variant="default" 
-                    size="sm" 
-                    onClick={handleGenerateAll}
-                    disabled={loading}
-                    className="flex items-center"
-                  >
-                    {loading && activeTab === 'all' ? (
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                    )}
-                    Generate All
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Error Display */}
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+            <TabsContent value="overview">
+              <StoryOverview
+                ticket={ticket}
+                loading={loading}
+                error={error}
+                isLldGenerated={isLldGenerated}
+                isCodeGenerated={isCodeGenerated}
+                isTestsGenerated={isTestsGenerated}
+                projectContextData={projectContextData}
+                onGenerateLLD={handleGenerateLLD}
+                onGenerateCode={handleGenerateCode}
+                onGenerateTests={handleGenerateTests}
+                onGenerateAll={handleGenerateAll}
+              />
             </TabsContent>
             
             <TabsContent value="lld">
               {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                </div>
+                <LoadingContent />
               ) : (
                 <ContentDisplay
                   title="Low Level Design"
@@ -423,12 +282,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
             
             <TabsContent value="code">
               {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                </div>
+                <LoadingContent />
               ) : (
                 <ContentDisplay
                   title="Implementation Code"
@@ -445,12 +299,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
             
             <TabsContent value="tests">
               {loading ? (
-                <div className="space-y-3">
-                  <Skeleton className="h-8 w-1/3" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-2/3" />
-                </div>
+                <LoadingContent />
               ) : (
                 <ContentDisplay
                   title="Test Cases"
