@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -72,7 +71,6 @@ const StoriesPage: React.FC = () => {
         setSelectedProjectContext(data.project_id);
         setSelectedDocuments(data.document_ids || []);
         
-        // Load project and document details for context
         await loadProjectContextData(data.project_id, data.document_ids || []);
       }
     } catch (err: any) {
@@ -82,7 +80,6 @@ const StoriesPage: React.FC = () => {
 
   const loadProjectContextData = async (projectId: string, documentIds: string[]) => {
     try {
-      // Fetch project details
       const { data: projectData, error: projectError } = await supabase
         .from('projects')
         .select('id, name, type')
@@ -94,7 +91,6 @@ const StoriesPage: React.FC = () => {
         return;
       }
       
-      // Fetch document details
       const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
         .select('id, name, type')
@@ -128,12 +124,10 @@ const StoriesPage: React.FC = () => {
         throw new Error("Failed to save context settings");
       }
       
-      // Update local state
       setSelectedProjectContext(projectId);
       setSelectedDocuments(documentIds);
       
       if (projectId) {
-        // Load project and document details for context
         await loadProjectContextData(projectId, documentIds);
         
         toast({
@@ -141,7 +135,6 @@ const StoriesPage: React.FC = () => {
           description: "Project context has been updated successfully"
         });
       } else {
-        // Clear context data
         setProjectContextData(null);
         
         toast({
@@ -186,8 +179,6 @@ const StoriesPage: React.FC = () => {
       setSprintError(null);
       
       try {
-        // Fix: Don't use setLoading as it's not in the component scope
-        // Instead, we're relying on the loading state from the useStories hook
         await fetchSprints(project.id);
       } catch (err: any) {
         console.error("Error fetching sprints:", err);
@@ -352,7 +343,7 @@ const StoriesPage: React.FC = () => {
                     <label htmlFor="sprint-select" className="text-sm font-medium">
                       Sprint
                     </label>
-                    {isLoadingSprints ? (
+                    {loading && selectedProject ? (
                       <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
                         Loading sprints...
                       </div>
@@ -364,15 +355,16 @@ const StoriesPage: React.FC = () => {
                           {sprintError}
                         </AlertDescription>
                       </Alert>
-                    ) : selectedProject && (sprints[selectedProject?.id] || []).length === 0 ? (
+                    ) : selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0) ? (
                       <Alert>
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>No Sprints Found</AlertTitle>
                         <AlertDescription>
-                          No sprints were found for this project. Make sure the project uses Scrum methodology or create a sprint in Jira.
+                          No sprints were found for this project. Make sure the project uses Scrum methodology, has boards configured, and has active sprints.
                         </AlertDescription>
                         <div className="mt-2">
                           <Button variant="outline" size="sm" onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}>
+                            <ExternalLink className="h-4 w-4 mr-2" />
                             View in Jira
                           </Button>
                         </div>
@@ -381,7 +373,7 @@ const StoriesPage: React.FC = () => {
                       <Select 
                         value={selectedSprint?.id || ""} 
                         onValueChange={handleSprintChange}
-                        disabled={!selectedProject || (sprints[selectedProject?.id || ''] || []).length === 0}
+                        disabled={!selectedProject || !sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0}
                       >
                         <SelectTrigger id="sprint-select" className="w-full">
                           <SelectValue placeholder="Select a sprint" />

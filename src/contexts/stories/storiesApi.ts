@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
@@ -88,6 +89,33 @@ export const fetchJiraSprints = async (
     // Check if values array exists and has items
     if (!boardData.values || boardData.values.length === 0) {
       console.log('No boards found for this project');
+      
+      // Try fetching all active and future sprints for the project directly
+      console.log(`Attempting to fetch active sprints directly for project ${projectId}`);
+      const { data: projectSprintData, error: projectSprintError } = await supabase.functions.invoke('jira-api', {
+        body: {
+          domain,
+          email,
+          apiToken,
+          // Try to get active sprints directly from the project
+          path: `agile/1.0/board/sprint?state=active,future&projectKeyOrId=${projectId}`
+        }
+      });
+      
+      if (projectSprintError) {
+        console.error('Error fetching project sprints directly:', projectSprintError);
+      } else if (projectSprintData?.values && projectSprintData.values.length > 0) {
+        console.log(`Found ${projectSprintData.values.length} sprints directly for project`);
+        return projectSprintData.values.map((sprint: any) => ({
+          id: sprint.id,
+          name: sprint.name,
+          state: sprint.state,
+          startDate: sprint.startDate,
+          endDate: sprint.endDate,
+          boardId: sprint.originBoardId || 'unknown'
+        }));
+      }
+      
       return [];
     }
 
@@ -124,6 +152,8 @@ export const fetchJiraSprints = async (
       return [];
     }
 
+    console.log(`Successfully fetched ${sprintData.values.length} sprints for board ${boardId}`);
+    
     return sprintData.values.map((sprint: any) => ({
       id: sprint.id,
       name: sprint.name,

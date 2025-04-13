@@ -76,10 +76,20 @@ serve(async (req) => {
         errorMessage = "You don't have permission to access this Jira resource.";
       } else if (response.status === 404) {
         if (apiPath.includes('agile/1.0/board')) {
+          console.log("Board not found, returning empty values array");
           // Special handling for board-related 404 errors
           return new Response(
             JSON.stringify({ 
               values: [] // Return empty values array instead of error for board not found
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        } else if (apiPath.includes('agile/1.0/sprint')) {
+          console.log("Sprint not found, returning empty values array");
+          // Special handling for sprint-related 404 errors
+          return new Response(
+            JSON.stringify({ 
+              values: [] // Return empty values array instead of error for sprint not found
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
           );
@@ -104,6 +114,13 @@ serve(async (req) => {
 
     // Parse the response
     const responseData = await response.json();
+    
+    // Log success response for debugging
+    if (apiPath.includes('agile/1.0/board')) {
+      console.log(`Board API response: Found ${responseData.values?.length || 0} boards`);
+    } else if (apiPath.includes('agile/1.0/sprint')) {
+      console.log(`Sprint API response: Found ${responseData.values?.length || 0} sprints`);
+    }
 
     return new Response(
       JSON.stringify(responseData),

@@ -8,13 +8,15 @@ interface LoadingContentProps {
   titleWidth?: string;
   showTitle?: boolean;
   message?: string;
+  isError?: boolean;
 }
 
 const LoadingContent: React.FC<LoadingContentProps> = ({ 
   count = 4, 
   titleWidth = "w-1/3",
   showTitle = true,
-  message = "Loading content..."
+  message = "Loading content...",
+  isError = false
 }) => {
   return (
     <Card className="p-4">
@@ -26,7 +28,7 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
             className={`h-4 ${i % 2 === 0 ? 'w-full' : (i % 3 === 0 ? 'w-2/3' : 'w-3/4')}`} 
           />
         ))}
-        <p className="text-center text-sm text-muted-foreground mt-2">{message}</p>
+        <p className={`text-center text-sm ${isError ? 'text-red-500' : 'text-muted-foreground'} mt-2`}>{message}</p>
       </div>
     </Card>
   );
