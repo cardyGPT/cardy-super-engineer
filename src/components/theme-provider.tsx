@@ -19,7 +19,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
 // Inner consumer component that uses the useTheme hook
 function ThemeConsumer({ children }: { children: React.ReactNode }) {
-  const { resolvedTheme, theme, setTheme } = useTheme();
+  const { setTheme } = useTheme();
   
   // Force light theme on component mount
   useEffect(() => {

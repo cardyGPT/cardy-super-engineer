@@ -1,3 +1,4 @@
+
 import { JiraCredentials, JiraProject, JiraTicket } from '@/types/jira';
 import { callJiraApi, DEV_MODE } from './apiUtils';
 
@@ -15,11 +16,12 @@ export const fetchJiraTickets = async (
     
     console.log(`Fetching tickets for sprint ID: ${sprintId} in project ${selectedProject.key} (${selectedProject.id}), startAt: ${startAt}, maxResults: ${maxResults}`);
     
-    // Test if this is a development sprint - ensure sprintId is a string before using startsWith
-    if (typeof sprintId === 'string' && sprintId.startsWith('test-')) {
+    // Safely check if it's a development sprint 
+    const sprintIdString = String(sprintId || '');
+    if (sprintIdString.startsWith && sprintIdString.startsWith('test-')) {
       if (DEV_MODE) {
         console.log('[DEV MODE] Returning test tickets for development sprint');
-        const testData = generateTestTickets(sprintId, selectedProject, credentials, 20);
+        const testData = generateTestTickets(sprintIdString, selectedProject, credentials, 20);
         return { tickets: testData.slice(startAt, startAt + maxResults), total: testData.length };
       }
     }
@@ -36,7 +38,7 @@ export const fetchJiraTickets = async (
     }
     
     // Transform the response into our JiraTicket format
-    const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, sprintId.toString()));
+    const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, String(sprintId)));
     
     return { tickets, total: data.total || tickets.length };
   } catch (error) {

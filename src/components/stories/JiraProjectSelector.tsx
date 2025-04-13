@@ -88,22 +88,24 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
 
   // Get a color and icon based on sprint state
   const getSprintStateProps = (state: string) => {
-    state = state.toLowerCase();
-    if (state === 'active') {
+    // Ensure state is a string
+    const stateStr = String(state || '').toLowerCase();
+    
+    if (stateStr === 'active') {
       return { 
         icon: <CheckCircle2 className="h-4 w-4 text-green-500" />, 
         text: '(active)',
         badge: <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400 ml-2">Active</Badge>
       };
     }
-    if (state === 'future') {
+    if (stateStr === 'future') {
       return { 
         icon: <CalendarCheck className="h-4 w-4 text-blue-500" />, 
         text: '(future)',
         badge: <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 ml-2">Future</Badge>
       };
     }
-    if (state === 'closed') {
+    if (stateStr === 'closed') {
       return { 
         icon: <CalendarX className="h-4 w-4 text-gray-500" />, 
         text: '(closed)',
