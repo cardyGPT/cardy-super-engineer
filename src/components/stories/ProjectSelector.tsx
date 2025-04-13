@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Filter, List } from "lucide-react";
+import { ExternalLink, Filter, List, RefreshCw } from "lucide-react";
 import { useStories } from "@/contexts/StoriesContext";
 import LoadingContent from "./LoadingContent";
 
@@ -24,6 +24,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     fetchTicketsByProject,
     projectsLoading,
     sprintsLoading,
+    ticketsLoading,
     ticketTypeFilter,
     setTicketTypeFilter
   } = useStories();
@@ -57,6 +58,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     if (!selectedProject) return;
     fetchTicketsByProject(selectedProject.id);
   };
+  
+  const handleRefreshSprints = async () => {
+    if (!selectedProject) return;
+    await fetchSprints(selectedProject.id);
+  };
 
   const handleTypeFilterChange = (value: string) => {
     setTicketTypeFilter(value === "all" ? null : value);
@@ -64,6 +70,12 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
 
   const isLoadingSprints = sprintsLoading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
   const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
+  
+  // Sort sprints by state: active sprints first, then future, then closed
+  const sortedSprints = [...availableSprints].sort((a, b) => {
+    const stateOrder: Record<string, number> = { 'active': 0, 'future': 1, 'closed': 2 };
+    return (stateOrder[a.state] || 3) - (stateOrder[b.state] || 3);
+  });
 
   return (
     <Card className="shadow-sm">
@@ -104,9 +116,24 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
         </div>
         
         <div className="space-y-2">
-          <label htmlFor="sprint-select" className="text-sm font-medium">
-            Sprint
-          </label>
+          <div className="flex justify-between">
+            <label htmlFor="sprint-select" className="text-sm font-medium">
+              Sprint
+            </label>
+            {selectedProject && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefreshSprints}
+                disabled={sprintsLoading}
+                className="h-6 px-2 text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${sprintsLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            )}
+          </div>
+          
           {isLoadingSprints ? (
             <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
               Loading sprints...
@@ -128,6 +155,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                 size="sm" 
                 className="w-full"
                 onClick={handleViewAllStories}
+                disabled={ticketsLoading}
               >
                 <List className="h-4 w-4 mr-2" />
                 View All Stories
@@ -144,9 +172,9 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   <SelectValue placeholder="Select a sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSprints.map(sprint => (
+                  {sortedSprints.map(sprint => (
                     <SelectItem key={sprint.id} value={sprint.id}>
-                      {sprint.name} ({sprint.state || 'active'})
+                      {sprint.name} {sprint.state === 'active' ? '(active)' : sprint.state === 'future' ? '(future)' : '(closed)'}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -156,6 +184,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   variant="outline" 
                   size="sm" 
                   onClick={handleViewAllStories}
+                  disabled={ticketsLoading}
                 >
                   <List className="h-4 w-4 mr-2" />
                   All Stories

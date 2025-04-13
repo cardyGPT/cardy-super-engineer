@@ -16,6 +16,14 @@ interface StoriesContextProps {
   sprints: Record<string, JiraSprint[]>;
   tickets: JiraTicket[];
   
+  // Pagination state
+  totalTickets: number;
+  currentPage: number;
+  pageSize: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+  fetchMoreTickets: () => Promise<void>;
+  
   // Loading states
   loading: boolean;
   projectsLoading: boolean;

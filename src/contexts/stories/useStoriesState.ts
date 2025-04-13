@@ -2,7 +2,15 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
-import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, fetchJiraTicketsByProject, generateJiraContent, pushContentToJira } from './api';
+import { 
+  fetchJiraProjects, 
+  fetchJiraSprints, 
+  fetchJiraTickets, 
+  fetchJiraTicketsByProject, 
+  generateJiraContent, 
+  pushContentToJira,
+  saveGeneratedContent 
+} from './api';
 
 export const useStoriesState = () => {
   const { toast } = useToast();
@@ -25,11 +33,18 @@ export const useStoriesState = () => {
   const [sprints, setSprints] = useState<Record<string, JiraSprint[]>>({});
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   
+  // Pagination state
+  const [totalTickets, setTotalTickets] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [hasMore, setHasMore] = useState(false);
+  
   // Loading states
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [sprintsLoading, setSprintsLoading] = useState(false);
   const [ticketsLoading, setTicketsLoading] = useState(false);
   const [contentLoading, setContentLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   
   // Selection states
   const [selectedProject, setSelectedProject] = useState<JiraProject | null>(null);
@@ -65,6 +80,11 @@ export const useStoriesState = () => {
       fetchProjects();
     }
   }, [credentials]);
+  
+  // Reset selected ticket when filters change
+  useEffect(() => {
+    setSelectedTicket(null);
+  }, [ticketTypeFilter, searchTerm]);
   
   // API method - Fetch projects
   const fetchProjects = useCallback(async () => {
@@ -117,7 +137,7 @@ export const useStoriesState = () => {
         console.log(`No sprints found for project ${projectId}`);
         toast({
           title: "No Sprints Found",
-          description: "This project doesn't have any sprints available.",
+          description: "This project doesn't have any sprints available. Try viewing all stories from the project instead.",
           variant: "default",
         });
       } else {
@@ -140,7 +160,7 @@ export const useStoriesState = () => {
     }
   }, [credentials, toast]);
   
-  // API method - Fetch tickets
+  // API method - Fetch initial tickets
   const fetchTickets = useCallback(async (sprintId: string) => {
     if (!credentials || !selectedProject) {
       setError('Missing credentials or project selection');
@@ -149,13 +169,22 @@ export const useStoriesState = () => {
     
     setTicketsLoading(true);
     setError(null);
+    setCurrentPage(0);
     
     try {
       console.log(`Fetching tickets for sprint ${sprintId}...`);
-      const ticketsData = await fetchJiraTickets(credentials, sprintId, selectedProject);
+      const { tickets: ticketsData, total } = await fetchJiraTickets(
+        credentials, 
+        sprintId, 
+        selectedProject,
+        0,
+        pageSize
+      );
       
       setTickets(ticketsData);
-      console.log(`Fetched ${ticketsData.length} tickets for sprint ${sprintId}`);
+      setTotalTickets(total);
+      setHasMore(ticketsData.length < total);
+      console.log(`Fetched ${ticketsData.length} tickets for sprint ${sprintId} (total: ${total})`);
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to fetch Jira tickets';
       console.error('Error fetching tickets:', errorMessage);
@@ -166,11 +195,71 @@ export const useStoriesState = () => {
         variant: "destructive",
       });
       setTickets([]);
+      setTotalTickets(0);
+      setHasMore(false);
     } finally {
       setTicketsLoading(false);
     }
-  }, [credentials, selectedProject, toast]);
+  }, [credentials, selectedProject, pageSize, toast]);
 
+  // API method - Fetch more tickets (lazy loading)
+  const fetchMoreTickets = useCallback(async () => {
+    if (!credentials || !selectedProject || (!selectedSprint && !loadFromProject)) {
+      return;
+    }
+    
+    if (loadingMore || !hasMore) {
+      return;
+    }
+    
+    setLoadingMore(true);
+    const nextPage = currentPage + 1;
+    const startAt = nextPage * pageSize;
+    
+    try {
+      console.log(`Fetching more tickets, startAt: ${startAt}, pageSize: ${pageSize}`);
+      let result;
+      
+      if (selectedSprint) {
+        result = await fetchJiraTickets(
+          credentials,
+          selectedSprint.id,
+          selectedProject,
+          startAt,
+          pageSize
+        );
+      } else {
+        result = await fetchJiraTicketsByProject(
+          credentials,
+          selectedProject,
+          startAt,
+          pageSize
+        );
+      }
+      
+      const { tickets: newTickets, total } = result;
+      
+      setTickets(prev => [...prev, ...newTickets]);
+      setTotalTickets(total);
+      setCurrentPage(nextPage);
+      setHasMore(startAt + newTickets.length < total);
+      
+      console.log(`Loaded ${newTickets.length} more tickets (total: ${total})`);
+    } catch (err) {
+      console.error('Error fetching more tickets:', err);
+      toast({
+        title: "Error",
+        description: "Failed to load more tickets",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [credentials, selectedProject, selectedSprint, currentPage, pageSize, hasMore, loadingMore, loadFromProject, toast]);
+
+  // Track whether we're loading from project directly instead of sprint
+  const [loadFromProject, setLoadFromProject] = useState(false);
+  
   // API method - Fetch tickets directly from a project
   const fetchTicketsByProject = useCallback(async (projectId: string) => {
     if (!credentials || !selectedProject) {
@@ -181,13 +270,23 @@ export const useStoriesState = () => {
     setTicketsLoading(true);
     setError(null);
     setSelectedSprint(null); // Clear sprint selection since we're getting all project tickets
+    setCurrentPage(0);
+    setLoadFromProject(true);
     
     try {
       console.log(`Fetching tickets for project ${projectId}...`);
-      const ticketsData = await fetchJiraTicketsByProject(credentials, selectedProject);
+      const { tickets: ticketsData, total } = await fetchJiraTicketsByProject(
+        credentials,
+        selectedProject,
+        0,
+        pageSize
+      );
       
       setTickets(ticketsData);
-      console.log(`Fetched ${ticketsData.length} tickets for project ${projectId}`);
+      setTotalTickets(total);
+      setHasMore(ticketsData.length < total);
+      
+      console.log(`Fetched ${ticketsData.length} tickets for project ${projectId} (total: ${total})`);
       
       toast({
         title: "Project Stories Loaded",
@@ -204,10 +303,19 @@ export const useStoriesState = () => {
         variant: "destructive",
       });
       setTickets([]);
+      setTotalTickets(0);
+      setHasMore(false);
     } finally {
       setTicketsLoading(false);
     }
-  }, [credentials, selectedProject, toast]);
+  }, [credentials, selectedProject, pageSize, toast]);
+  
+  // When switching back to sprint, clear the loadFromProject flag
+  useEffect(() => {
+    if (selectedSprint) {
+      setLoadFromProject(false);
+    }
+  }, [selectedSprint]);
   
   // API method - Generate content
   const generateContent = useCallback(async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
@@ -225,6 +333,23 @@ export const useStoriesState = () => {
       
       setGeneratedContent(responseData);
       console.log('Content generated successfully');
+      
+      // Save the generated content to the database for persistence
+      if (responseData) {
+        try {
+          await saveGeneratedContent(
+            selectedTicket.id, 
+            selectedTicket.projectId || '', 
+            selectedTicket.sprintId || '', 
+            request.type, 
+            responseData[request.type] || responseData.response || ''
+          );
+          console.log('Content saved to database');
+        } catch (saveError) {
+          console.error('Error saving content to database:', saveError);
+          // Don't fail the overall operation if save fails
+        }
+      }
       
       toast({
         title: "Content Generated",
@@ -294,6 +419,8 @@ export const useStoriesState = () => {
         
         if (selectedSprint) {
           await fetchTickets(selectedSprint.id);
+        } else if (loadFromProject) {
+          await fetchTicketsByProject(selectedProject.id);
         }
       }
       
@@ -310,7 +437,7 @@ export const useStoriesState = () => {
         variant: "destructive",
       });
     }
-  }, [fetchProjects, fetchSprints, fetchTickets, selectedProject, selectedSprint, toast]);
+  }, [fetchProjects, fetchSprints, fetchTickets, fetchTicketsByProject, selectedProject, selectedSprint, loadFromProject, toast]);
   
   return {
     // Authentication
@@ -323,6 +450,14 @@ export const useStoriesState = () => {
     projects,
     sprints,
     tickets,
+    
+    // Pagination
+    totalTickets,
+    currentPage,
+    pageSize,
+    hasMore,
+    loadingMore,
+    fetchMoreTickets,
     
     // Loading states
     loading,

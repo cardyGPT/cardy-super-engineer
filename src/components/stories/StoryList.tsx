@@ -3,7 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Search, AlertCircle, ChevronDown } from "lucide-react";
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket } from '@/types/jira';
 import LoadingContent from './LoadingContent';
@@ -18,7 +19,10 @@ const StoryList: React.FC = () => {
     error,
     ticketTypeFilter,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    hasMore,
+    loadingMore,
+    fetchMoreTickets
   } = useStories();
   
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
@@ -88,6 +92,12 @@ const StoryList: React.FC = () => {
     setSelectedTicketIds(newSelectedIds);
   };
   
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchMoreTickets();
+    }
+  };
+  
   const getTicketTypeColor = (type: string | undefined) => {
     switch(type?.toLowerCase()) {
       case 'story':
@@ -128,7 +138,7 @@ const StoryList: React.FC = () => {
       </CardHeader>
 
       <CardContent className="p-0">
-        {ticketsLoading ? (
+        {ticketsLoading && tickets.length === 0 ? (
           <div className="p-4">
             <LoadingContent message="Loading stories..." />
           </div>
@@ -146,57 +156,97 @@ const StoryList: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="divide-y max-h-[400px] overflow-y-auto">
-            {filteredTickets.map((ticket: JiraTicket) => (
-              <div
-                key={ticket.id}
-                className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${
-                  selectedTicket?.id === ticket.id ? 'bg-muted/50 border-l-4 border-primary' : ''
-                }`}
-                onClick={() => handleTicketClick(ticket)}
-              >
-                <div className="flex justify-between mb-1">
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-muted-foreground mr-2">
-                      {ticket.key}
-                    </span>
-                    <Badge 
-                      variant="secondary" 
-                      className={`text-xs ${getTicketTypeColor(ticket.issuetype?.name)}`}
-                    >
-                      {ticket.issuetype?.name || 'Unknown'}
-                    </Badge>
+          <div className="max-h-[550px] overflow-y-auto">
+            <div className="divide-y">
+              {filteredTickets.map((ticket: JiraTicket) => (
+                <div
+                  key={ticket.id}
+                  className={`p-3 hover:bg-muted/50 cursor-pointer transition-colors ${
+                    selectedTicket?.id === ticket.id ? 'bg-muted/50 border-l-4 border-primary' : ''
+                  }`}
+                  onClick={() => handleTicketClick(ticket)}
+                >
+                  <div className="flex justify-between mb-1">
+                    <div className="flex items-center">
+                      <span className="text-sm font-medium text-muted-foreground mr-2">
+                        {ticket.key}
+                      </span>
+                      <Badge 
+                        variant="secondary" 
+                        className={`text-xs ${getTicketTypeColor(ticket.issuetype?.name)}`}
+                      >
+                        {ticket.issuetype?.name || 'Unknown'}
+                      </Badge>
+                    </div>
+                    
+                    {generatedTicketIds.has(ticket.id) && (
+                      <Badge 
+                        variant="outline" 
+                        className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
+                      >
+                        Generated
+                      </Badge>
+                    )}
                   </div>
                   
-                  {generatedTicketIds.has(ticket.id) && (
-                    <Badge 
-                      variant="outline" 
-                      className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300"
-                    >
-                      Generated
-                    </Badge>
-                  )}
-                </div>
-                
-                <h3 className="text-sm font-medium line-clamp-2">
-                  {ticket.summary}
-                </h3>
-                
-                <div className="flex mt-2 gap-2">
-                  {ticket.priority && (
-                    <Badge variant="outline" className="text-xs">
-                      P: {ticket.priority}
-                    </Badge>
-                  )}
+                  <h3 className="text-sm font-medium line-clamp-2">
+                    {ticket.summary}
+                  </h3>
                   
-                  {ticket.status && (
-                    <Badge variant="outline" className="text-xs">
-                      {ticket.status}
-                    </Badge>
-                  )}
+                  <div className="flex mt-2 gap-2">
+                    {ticket.priority && (
+                      <Badge variant="outline" className="text-xs">
+                        P: {ticket.priority}
+                      </Badge>
+                    )}
+                    
+                    {ticket.status && (
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.status}
+                      </Badge>
+                    )}
+                    
+                    {ticket.story_points > 0 && (
+                      <Badge variant="outline" className="text-xs">
+                        {ticket.story_points} pts
+                      </Badge>
+                    )}
+                  </div>
                 </div>
+              ))}
+            </div>
+            
+            {/* Load more button */}
+            {hasMore && (
+              <div className="p-3 text-center">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleLoadMore} 
+                  disabled={loadingMore}
+                  className="w-full text-muted-foreground"
+                >
+                  {loadingMore ? (
+                    <span className="flex items-center">
+                      <span className="h-4 w-4 border-2 border-b-transparent border-t-current border-l-current border-r-current rounded-full inline-block animate-spin mr-2"></span>
+                      Loading...
+                    </span>
+                  ) : (
+                    <span className="flex items-center justify-center">
+                      Load more
+                      <ChevronDown className="ml-1 h-4 w-4" />
+                    </span>
+                  )}
+                </Button>
               </div>
-            ))}
+            )}
+            
+            {/* Loading spinner when loading more */}
+            {loadingMore && tickets.length > 0 && (
+              <div className="p-2 text-center">
+                <span className="text-xs text-muted-foreground">Loading more tickets...</span>
+              </div>
+            )}
           </div>
         )}
       </CardContent>
