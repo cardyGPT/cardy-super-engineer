@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, AlertTriangle, ExternalLink, Code } from "lucide-react";
+import { Loader2, ShieldCheck, ExternalLink, Code, Trash2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsCard from './common/SettingsCard';
 import { SettingsProps } from '@/types/settings';
@@ -75,15 +75,19 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     setError(null);
     
     try {
-      if (!username || !appPassword || !workspace || !repository) {
-        throw new Error('All fields are required');
+      if (!username || !workspace || !repository) {
+        throw new Error('Username, Workspace and Repository are required');
+      }
+      
+      if (!isConnected && !appPassword) {
+        throw new Error('App Password is required for initial setup');
       }
       
       // Save Bitbucket settings to supabase
       const { error } = await supabase.functions.invoke('store-api-keys', {
         body: {
           provider: 'bitbucket',
-          apiKey: appPassword,
+          apiKey: appPassword || 'unchanged', // Don't update if empty
           domain: `${workspace}/${repository}`,
           username: username
         }
@@ -99,13 +103,21 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         variant: "default",
       });
       
-      setIsConnected(true);
-      if (onConfigChange) onConfigChange(true);
+      // Validate the connection
+      if (appPassword) {
+        await handleValidateConnection();
+      } else {
+        setIsConnected(true);
+        if (onConfigChange) onConfigChange(true);
+      }
       
     } catch (err: any) {
       setError(err.message || 'Failed to save settings');
-      setIsConnected(false);
-      if (onConfigChange) onConfigChange(false);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save Bitbucket settings",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -116,34 +128,43 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     setError(null);
     
     try {
-      if (!username || !appPassword || !workspace || !repository) {
-        throw new Error('All fields are required');
+      if (!username || !workspace || !repository) {
+        throw new Error('Username, Workspace and Repository are required');
+      }
+      
+      if (!isConnected && !appPassword) {
+        throw new Error('App Password is required for validation');
       }
       
       // Simple validation - just check if we can get the repository info
-      const auth = btoa(`${username}:${appPassword}`);
-      const response = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repository}`, {
-        headers: {
-          'Authorization': `Basic ${auth}`
-        }
-      });
+      const auth = btoa(`${username}:${appPassword || 'invalid-password-for-testing'}`);
       
-      if (!response.ok) {
-        throw new Error(`Failed to connect to Bitbucket: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (data && data.name) {
-        toast({
-          title: "Connection Valid",
-          description: `Successfully connected to ${data.name}`,
-          variant: "success",
+      try {
+        const response = await fetch(`https://api.bitbucket.org/2.0/repositories/${workspace}/${repository}`, {
+          headers: {
+            'Authorization': `Basic ${auth}`
+          }
         });
-        setIsConnected(true);
-        if (onConfigChange) onConfigChange(true);
-      } else {
-        throw new Error('Invalid response from Bitbucket');
+        
+        if (!response.ok) {
+          throw new Error(`Failed to connect to Bitbucket: ${response.status} ${response.statusText}. Please check your credentials and repository details.`);
+        }
+        
+        const data = await response.json();
+        
+        if (data && data.name) {
+          toast({
+            title: "Connection Valid",
+            description: `Successfully connected to ${data.name}`,
+            variant: "success",
+          });
+          setIsConnected(true);
+          if (onConfigChange) onConfigChange(true);
+        } else {
+          throw new Error('Invalid response from Bitbucket');
+        }
+      } catch (fetchError: any) {
+        throw new Error(`Connection error: ${fetchError.message}`);
       }
     } catch (err: any) {
       setError(err.message || 'Failed to validate connection');
@@ -202,25 +223,22 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
               onClick={handleDisconnect}
               disabled={isLoading || isValidating}
             >
+              <Trash2 className="h-4 w-4 mr-2" />
               Disconnect
             </Button>
           )}
           
           <div className="flex gap-2 ml-auto">
-            <Button 
-              variant="outline" 
-              onClick={handleValidateConnection}
-              disabled={isValidating || isLoading || !username || (!isConnected && !appPassword) || !workspace || !repository}
-            >
-              {isValidating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                'Test Connection'
-              )}
-            </Button>
+            {!isLoading && !isValidating && (
+              <Button 
+                variant="outline" 
+                onClick={handleValidateConnection}
+                disabled={isValidating || isLoading || !username || (!isConnected && !appPassword) || !workspace || !repository}
+              >
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                Test Connection
+              </Button>
+            )}
             
             <Button 
               onClick={handleSaveSettings} 
@@ -230,6 +248,11 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
+                </>
+              ) : isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
                 </>
               ) : (
                 'Save Settings'
@@ -241,14 +264,25 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     >
       {error && (
         <Alert variant="destructive" className="mb-4">
-          <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
       
+      {isConnected && (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4 mb-4">
+          <p className="text-green-800 dark:text-green-300 font-medium flex items-center">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Connected to Bitbucket
+          </p>
+          <p className="text-green-700 dark:text-green-400 text-sm mt-1">
+            Your Bitbucket connection is active: {workspace}/{repository}
+          </p>
+        </div>
+      )}
+      
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="username">Username</Label>
+          <Label htmlFor="username">Username <span className="text-red-500">*</span></Label>
           <Input
             id="username"
             placeholder="Your Bitbucket username"
@@ -259,11 +293,11 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="app-password">App Password</Label>
+          <Label htmlFor="app-password">App Password {!isConnected && <span className="text-red-500">*</span>}</Label>
           <Input
             id="app-password"
             type="password"
-            placeholder="Your Bitbucket app password"
+            placeholder={isConnected ? "Leave blank to keep current password" : "Your Bitbucket app password"}
             value={appPassword}
             onChange={(e) => setAppPassword(e.target.value)}
             disabled={isLoading}
@@ -282,7 +316,7 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="workspace">Workspace</Label>
+          <Label htmlFor="workspace">Workspace <span className="text-red-500">*</span></Label>
           <Input
             id="workspace"
             placeholder="Your Bitbucket workspace name"
@@ -290,10 +324,13 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
             onChange={(e) => setWorkspace(e.target.value)}
             disabled={isLoading}
           />
+          <p className="text-xs text-muted-foreground">
+            The workspace or organization name in your repository URL
+          </p>
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="repository">Repository</Label>
+          <Label htmlFor="repository">Repository <span className="text-red-500">*</span></Label>
           <Input
             id="repository"
             placeholder="Your Bitbucket repository name"
@@ -301,6 +338,9 @@ const BitbucketSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
             onChange={(e) => setRepository(e.target.value)}
             disabled={isLoading}
           />
+          <p className="text-xs text-muted-foreground">
+            The repository name in your repository URL
+          </p>
         </div>
       </div>
     </SettingsCard>

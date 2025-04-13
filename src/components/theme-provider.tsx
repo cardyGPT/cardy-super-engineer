@@ -11,7 +11,7 @@ export const ThemeContext = createContext<{ theme: string | undefined }>({ theme
 // Wrapper to provide next-themes provider
 export function ThemeProvider({ children }: ThemeProviderProps) {
   return (
-    <NextThemesProvider attribute="class" defaultTheme="system" enableSystem>
+    <NextThemesProvider attribute="class" defaultTheme="light" enableSystem={false}>
       <ThemeConsumer>{children}</ThemeConsumer>
     </NextThemesProvider>
   );
@@ -19,11 +19,17 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
 
 // Inner consumer component that uses the useTheme hook
 function ThemeConsumer({ children }: { children: React.ReactNode }) {
-  const { resolvedTheme, systemTheme } = useTheme();
-  const theme = resolvedTheme || systemTheme || 'light';
+  const { resolvedTheme, theme, setTheme } = useTheme();
+  
+  // Force light theme on component mount
+  useEffect(() => {
+    setTheme('light');
+  }, [setTheme]);
+  
+  const currentTheme = resolvedTheme || theme || 'light';
   
   return (
-    <ThemeContext.Provider value={{ theme }}>
+    <ThemeContext.Provider value={{ theme: currentTheme }}>
       {children}
     </ThemeContext.Provider>
   );

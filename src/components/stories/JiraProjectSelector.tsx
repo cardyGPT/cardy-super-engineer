@@ -1,126 +1,164 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
-import { ExternalLink, Filter, CheckCircle } from "lucide-react";
-import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
+import React, { useState, useEffect } from "react";
 import { useStories } from "@/contexts/StoriesContext";
-import LoadingContent from "./LoadingContent";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { 
+  FolderOpen, 
+  Clock, 
+  CalendarCheck, 
+  CalendarX, 
+  Loader2,
+  CheckCircle2
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface JiraProjectSelectorProps {
-  lastRefreshTime: Date | null;
+  lastRefreshTime?: Date | null;
 }
 
-const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTime }) => {
+const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ 
+  lastRefreshTime 
+}) => {
   const { 
-    projects,
+    projects, 
     sprints,
-    selectedProject,
+    selectedProject, 
     selectedSprint,
-    setSelectedProject,
+    setSelectedProject, 
     setSelectedSprint,
     fetchSprints,
     fetchTickets,
     fetchTicketsByProject,
     projectsLoading,
-    sprintsLoading,
-    ticketTypeFilter,
-    setTicketTypeFilter,
-    ticketStatusFilter,
-    setTicketStatusFilter
+    sprintsLoading
   } = useStories();
+
+  const [isLoadingSprints, setIsLoadingSprints] = useState(false);
+  const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+
+  // Reset selections when projects change (e.g., after refresh)
+  useEffect(() => {
+    if (lastRefreshTime && projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0]);
+    }
+  }, [lastRefreshTime, projects, selectedProject, setSelectedProject]);
 
   const handleProjectChange = async (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
+    if (!project) return;
     
-    if (project && (!selectedProject || selectedProject.id !== project.id)) {
-      setSelectedProject(project);
-      setSelectedSprint(null);
-      
-      if (!sprints[project.id] || sprints[project.id].length === 0) {
-        fetchSprints(project.id);
-      }
+    setSelectedProject(project);
+    setSelectedSprint(null);
+    
+    // Load sprints for the selected project
+    setIsLoadingSprints(true);
+    try {
+      await fetchSprints(projectId);
+    } finally {
+      setIsLoadingSprints(false);
     }
   };
 
-  const handleSprintChange = (sprintId: string) => {
+  const handleSprintChange = async (sprintId: string) => {
     if (!selectedProject) return;
-    
-    if (sprintId === "all-project-tickets") {
-      setSelectedSprint(null);
-      fetchTicketsByProject(selectedProject.id);
-      return;
-    }
     
     const projectSprints = sprints[selectedProject.id] || [];
     const sprint = projectSprints.find(s => s.id === sprintId);
+    if (!sprint) return;
     
-    if (sprint) {
-      setSelectedSprint(sprint);
-      fetchTickets(sprint.id);
+    setSelectedSprint(sprint);
+    
+    // Load tickets for the selected sprint
+    setIsLoadingTickets(true);
+    try {
+      await fetchTickets(sprintId);
+    } finally {
+      setIsLoadingTickets(false);
     }
   };
 
-  const handleTypeFilterChange = (value: string) => {
-    setTicketTypeFilter(value === "all" ? null : value);
-  };
-  
-  const handleStatusFilterChange = (value: string) => {
-    setTicketStatusFilter(value === "all" ? null : value);
+  const handleViewAllTickets = async () => {
+    if (!selectedProject) return;
+    
+    setSelectedSprint(null);
+    
+    // Load all tickets for the project
+    setIsLoadingTickets(true);
+    try {
+      await fetchTicketsByProject(selectedProject.id);
+    } finally {
+      setIsLoadingTickets(false);
+    }
   };
 
-  const isLoadingSprints = sprintsLoading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
-  const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
+  // Get sprints for the selected project
+  const projectSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
 
-  // Function to render sprint state with an icon
-  const renderSprintState = (sprint: { name: string, state: string }) => {
-    const isActive = sprint.state?.toLowerCase() === 'active';
-    return (
-      <div className="flex items-center">
-        {sprint.name}
-        {isActive && (
-          <span className="ml-2" title="Active Sprint">
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </span>
-        )}
-        <span className="ml-1 text-xs text-muted-foreground">
-          ({sprint.state || 'unknown'})
-        </span>
-      </div>
-    );
+  // Get a color and icon based on sprint state
+  const getSprintStateProps = (state: string) => {
+    state = state.toLowerCase();
+    if (state === 'active') {
+      return { 
+        icon: <CheckCircle2 className="h-4 w-4 text-green-500" />, 
+        text: '(active)',
+        badge: <Badge className="bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400 ml-2">Active</Badge>
+      };
+    }
+    if (state === 'future') {
+      return { 
+        icon: <CalendarCheck className="h-4 w-4 text-blue-500" />, 
+        text: '(future)',
+        badge: <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 ml-2">Future</Badge>
+      };
+    }
+    if (state === 'closed') {
+      return { 
+        icon: <CalendarX className="h-4 w-4 text-gray-500" />, 
+        text: '(closed)',
+        badge: <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 ml-2">Closed</Badge>
+      };
+    }
+    return { 
+      icon: <Clock className="h-4 w-4 text-gray-500" />, 
+      text: '',
+      badge: null
+    };
   };
 
   return (
-    <Card className="shadow-sm">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-lg">Select Project & Sprint</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4 bg-white dark:bg-card rounded-lg border border-border p-4 shadow-sm">
+      <h2 className="text-xl font-bold text-foreground mb-4">Select Project & Sprint</h2>
+      
+      <div className="space-y-4">
         <div className="space-y-2">
-          <label htmlFor="project-select" className="text-sm font-medium">
-            Project
-          </label>
-          {projects.length === 0 ? (
-            <LoadingContent 
-              isLoading={projectsLoading}
-              isError={!projectsLoading}
-              message={projectsLoading ? "Loading projects..." : "No Projects Found"}
-              additionalMessage="Make sure your Jira account has access to at least one project."
-            />
+          <label className="block text-sm font-medium text-muted-foreground">Project</label>
+          
+          {projectsLoading ? (
+            <Skeleton className="h-10 w-full" />
           ) : (
-            <Select 
-              value={selectedProject?.id || ""} 
+            <Select
+              value={selectedProject?.id}
               onValueChange={handleProjectChange}
               disabled={projectsLoading}
             >
-              <SelectTrigger id="project-select" className="w-full">
-                <SelectValue placeholder="Select a project" />
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select project" />
               </SelectTrigger>
               <SelectContent>
-                {projects.map(project => (
+                {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
-                    {project.name} ({project.key})
+                    <div className="flex items-center">
+                      <FolderOpen className="h-4 w-4 mr-2 text-primary" />
+                      {project.name} {project.key && `(${project.key})`}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -129,131 +167,56 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
         </div>
         
         <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <label htmlFor="sprint-select" className="text-sm font-medium">
-              Sprint
-            </label>
-            {selectedProject && (
-              <HoverCard>
-                <HoverCardTrigger asChild>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-6 w-6"
-                    onClick={() => window.open(`${selectedProject.domain}/browse/${selectedProject.key}`, '_blank')}
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span className="sr-only">View in Jira</span>
-                  </Button>
-                </HoverCardTrigger>
-                <HoverCardContent className="w-auto p-2">
-                  <p className="text-sm">View in Jira</p>
-                </HoverCardContent>
-              </HoverCard>
-            )}
-          </div>
+          <label className="block text-sm font-medium text-muted-foreground">Sprint</label>
           
-          {isLoadingSprints ? (
-            <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
-              Loading sprints...
-            </div>
-          ) : !selectedProject ? (
-            <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm text-muted-foreground">
-              Select a project first
-            </div>
-          ) : availableSprints.length === 0 ? (
-            <div className="space-y-2">
-              <LoadingContent 
-                isWarning={true}
-                message="No sprints found for this project"
-                additionalMessage="The project may not use Scrum methodology or have active sprints."
-              />
+          {(sprintsLoading || isLoadingSprints) ? (
+            <Skeleton className="h-10 w-full" />
+          ) : (
+            <>
               <Select
-                value="all-project-tickets"
+                value={selectedSprint?.id}
                 onValueChange={handleSprintChange}
+                disabled={!selectedProject || sprintsLoading || isLoadingSprints}
               >
-                <SelectTrigger id="all-sprint-select" className="w-full">
-                  <SelectValue placeholder="View all project tickets" />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all-project-tickets">All project tickets</SelectItem>
+                  {projectSprints.map((sprint) => {
+                    const { icon, badge } = getSprintStateProps(sprint.state);
+                    return (
+                      <SelectItem key={sprint.id} value={sprint.id}>
+                        <div className="flex items-center">
+                          {icon}
+                          <span className="ml-2">{sprint.name}</span>
+                          {badge}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
-            </div>
-          ) : (
-            <Select 
-              value={selectedSprint?.id || ""}
-              onValueChange={handleSprintChange}
-              disabled={!selectedProject || availableSprints.length === 0}
-            >
-              <SelectTrigger id="sprint-select" className="w-full">
-                <SelectValue placeholder="Select a sprint" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all-project-tickets">All project tickets</SelectItem>
-                {availableSprints.map(sprint => (
-                  <SelectItem key={sprint.id} value={sprint.id}>
-                    {renderSprintState(sprint)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              
+              <div className="flex justify-end mt-2">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={handleViewAllTickets}
+                  disabled={!selectedProject || isLoadingTickets}
+                >
+                  {isLoadingTickets ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                  )}
+                  View All Tickets
+                </Button>
+              </div>
+            </>
           )}
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label htmlFor="type-filter-select" className="text-sm font-medium flex items-center">
-              <Filter className="h-3 w-3 mr-1" />
-              Filter by Type
-            </label>
-            <Select 
-              value={ticketTypeFilter || "all"} 
-              onValueChange={handleTypeFilterChange}
-            >
-              <SelectTrigger id="type-filter-select" className="w-full">
-                <SelectValue placeholder="All types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All types</SelectItem>
-                <SelectItem value="Story">Story</SelectItem>
-                <SelectItem value="Bug">Bug</SelectItem>
-                <SelectItem value="Task">Task</SelectItem>
-                <SelectItem value="Sub-task">Sub-task</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="status-filter-select" className="text-sm font-medium flex items-center">
-              <Filter className="h-3 w-3 mr-1" />
-              Filter by Status
-            </label>
-            <Select 
-              value={ticketStatusFilter || "all"} 
-              onValueChange={handleStatusFilterChange}
-            >
-              <SelectTrigger id="status-filter-select" className="w-full">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All statuses</SelectItem>
-                <SelectItem value="To Do">To Do</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="In Review">In Review</SelectItem>
-                <SelectItem value="Done">Done</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        
-        {lastRefreshTime && (
-          <div className="text-xs text-muted-foreground text-right pt-2">
-            Last refreshed: {lastRefreshTime.toLocaleTimeString()}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

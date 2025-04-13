@@ -68,7 +68,27 @@ const JiraSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       });
 
       // Fetch projects after successful connection
-      fetchProjects();
+      await fetchProjects();
+      
+      // Now try to test Agile capabilities
+      const agileTest = await supabase.functions.invoke('jira-api', {
+        body: {
+          domain,
+          email,
+          apiToken,
+          path: 'agile/1.0/board'
+        }
+      });
+      
+      if (agileTest.error || agileTest.data?.error) {
+        // We're connected, but might be using Jira Classic
+        toast({
+          title: "Note about Jira Version",
+          description: "You appear to be using Jira Classic. Some Agile features like sprints may be limited.",
+          variant: "default",
+        });
+      }
+      
       if (onConfigChange) onConfigChange(true);
     } catch (err: any) {
       console.error('Error testing Jira connection:', err);

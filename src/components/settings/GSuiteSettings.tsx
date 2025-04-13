@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileText, ExternalLink, Trash2 } from "lucide-react";
+import { Loader2, FileText, ExternalLink, Trash2, ShieldCheck } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsCard from './common/SettingsCard';
 import { SettingsProps } from '@/types/settings';
@@ -60,6 +60,11 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     setError(null);
     
     try {
+      // Validate required fields if not already connected
+      if (!isConnected && (!apiKey || !clientSecret)) {
+        throw new Error('API Key and Client Secret are required');
+      }
+      
       // First, if we have an API key, save it
       if (apiKey) {
         const { error: keyError } = await supabase.functions.invoke('store-api-keys', {
@@ -195,29 +200,30 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
           )}
           
           <div className="flex gap-2 ml-auto">
-            <Button 
-              variant="outline" 
-              onClick={validateConnection}
-              disabled={isValidating || isLoading}
-            >
-              {isValidating ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
-                </>
-              ) : (
-                'Test Connection'
-              )}
-            </Button>
+            {!isLoading && !isValidating && (
+              <Button 
+                variant="outline" 
+                onClick={validateConnection}
+                disabled={isValidating || isLoading}
+              >
+                <ShieldCheck className="h-4 w-4 mr-2" />
+                Test Connection
+              </Button>
+            )}
             
             <Button 
               onClick={handleSaveSettings} 
-              disabled={isLoading}
+              disabled={isLoading || isValidating}
             >
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Saving...
+                </>
+              ) : isValidating ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Validating...
                 </>
               ) : (
                 'Save Settings'
@@ -233,9 +239,21 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         </Alert>
       )}
       
+      {isConnected ? (
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md p-4 mb-4">
+          <p className="text-green-800 dark:text-green-300 font-medium flex items-center">
+            <ShieldCheck className="h-4 w-4 mr-2" />
+            Connected to Google Workspace
+          </p>
+          <p className="text-green-700 dark:text-green-400 text-sm mt-1">
+            Your Google Workspace account is connected and working properly.
+          </p>
+        </div>
+      ) : null}
+      
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="api-key">Google API Key</Label>
+          <Label htmlFor="api-key">Google API Key {!isConnected && <span className="text-red-500">*</span>}</Label>
           <Input
             id="api-key"
             type="password"
@@ -258,7 +276,7 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="client-secret">Client Secret</Label>
+          <Label htmlFor="client-secret">Client Secret {!isConnected && <span className="text-red-500">*</span>}</Label>
           <Input
             id="client-secret"
             type="password"
@@ -278,6 +296,9 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
             onChange={(e) => setRedirectUri(e.target.value)}
             disabled={isLoading}
           />
+          <p className="text-xs text-muted-foreground">
+            The URI where Google will redirect after authentication
+          </p>
         </div>
         
         <div className="flex items-center justify-between space-x-2 pt-4">

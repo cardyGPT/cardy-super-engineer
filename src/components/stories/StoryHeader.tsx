@@ -65,7 +65,13 @@ const StoryHeader: React.FC<StoryHeaderProps> = ({
           {ticket.isLoadingAdditionalInfo ? (
             <Skeleton className="h-5 w-24" />
           ) : ticket.sprintInfo ? (
-            <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-400">
+            <Badge className={`flex items-center ${ticket.sprintInfo.state?.toLowerCase() === 'active' 
+              ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400' 
+              : 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-400'}`
+            }>
+              {ticket.sprintInfo.state?.toLowerCase() === 'active' && (
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+              )}
               {ticket.sprintInfo.name}
             </Badge>
           ) : null}
