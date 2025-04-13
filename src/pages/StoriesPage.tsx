@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -190,21 +189,16 @@ const StoriesPage: React.FC = () => {
   }, [loading, isRefreshing, fetchProjects, selectedProject, fetchSprints, selectedSprint, fetchTickets, toast]);
 
   const handleProjectChange = async (projectId: string) => {
-    // Find the project in our projects list
     const project = jiraProjects.find(p => p.id === projectId);
     
-    // If project exists and is different from current selection
     if (project && (!selectedProject || selectedProject.id !== project.id)) {
       console.log(`Changing selected project to: ${project.name} (${project.id})`);
       
-      // Clear sprint selection and error first
       setSelectedSprint(null);
       setSprintError(null);
       
-      // Update selected project
       setSelectedProject(project);
       
-      // If we don't have sprints for this project yet, fetch them
       if (!sprints[project.id] || sprints[project.id].length === 0) {
         try {
           console.log(`No cached sprints for project ${project.id}, fetching...`);
@@ -230,7 +224,6 @@ const StoriesPage: React.FC = () => {
       return;
     }
     
-    // Check if we have sprints for this project
     const projectSprints = sprints[selectedProject.id] || [];
     
     if (projectSprints.length === 0) {
@@ -238,16 +231,13 @@ const StoriesPage: React.FC = () => {
       return;
     }
     
-    // Find the sprint in our sprints list for this project
     const sprint = projectSprints.find(s => s.id === sprintId);
     
     if (sprint) {
       console.log(`Changing selected sprint to: ${sprint.name} (${sprint.id})`);
       
-      // Update selected sprint
       setSelectedSprint(sprint);
       
-      // Fetch tickets for this sprint
       fetchTickets(sprint.id);
     } else {
       console.error(`Sprint ${sprintId} not found in project ${selectedProject.id}`);
@@ -271,7 +261,6 @@ const StoriesPage: React.FC = () => {
 
   const isLoadingSprints = loading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
   
-  // Check if we have sprints for the selected project
   const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
   
   return (
@@ -281,7 +270,6 @@ const StoriesPage: React.FC = () => {
           <h1 className="text-3xl font-bold">Jira Stories</h1>
           
           <div className="flex gap-2">
-            {/* Commenting out context button
             <Button 
               variant="outline" 
               size="sm" 
@@ -290,7 +278,6 @@ const StoriesPage: React.FC = () => {
               <Database className="h-4 w-4 mr-2" />
               Context
             </Button>
-            */}
             
             {isAuthenticated && (
               <Button 
@@ -313,7 +300,6 @@ const StoriesPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Commenting out project context display
         {projectContextData && (
           <div className="mb-4">
             <Card className="bg-muted/50 border-dashed">
@@ -342,7 +328,6 @@ const StoriesPage: React.FC = () => {
             </Card>
           </div>
         )}
-        */}
 
         {!isAuthenticated ? (
           <Card>
@@ -452,7 +437,6 @@ const StoriesPage: React.FC = () => {
                     )}
                   </div>
 
-                  {/* Commenting out filter by type
                   <div className="space-y-2">
                     <label htmlFor="type-filter-select" className="text-sm font-medium flex items-center">
                       <Filter className="h-3 w-3 mr-1" />
@@ -474,7 +458,6 @@ const StoriesPage: React.FC = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  */}
                   
                   {lastSuccessfulRefresh && (
                     <div className="text-xs text-muted-foreground text-right pt-2">
