@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -40,6 +41,7 @@ const StoriesPage: React.FC = () => {
   } = useStories();
   
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [sprintError, setSprintError] = useState<string | null>(null);
   const { toast } = useToast();
   const [pageLoaded, setPageLoaded] = useState(false);
   const [selectedProjectContext, setSelectedProjectContext] = useState<string | null>(null);
@@ -162,6 +164,7 @@ const StoriesPage: React.FC = () => {
     if (loading || isRefreshing) return;
     
     setIsRefreshing(true);
+    setSprintError(null);
     try {
       await fetchProjects();
       setIsRefreshing(false);
@@ -175,12 +178,24 @@ const StoriesPage: React.FC = () => {
     }
   };
 
-  const handleProjectChange = (projectId: string) => {
+  const handleProjectChange = async (projectId: string) => {
     const project = jiraProjects.find(p => p.id === projectId);
     if (project && (!selectedProject || selectedProject.id !== project.id)) {
       setSelectedProject(project);
       setSelectedSprint(null);
-      fetchSprints(project.id);
+      setSprintError(null);
+      
+      try {
+        await fetchSprints(project.id);
+      } catch (err: any) {
+        console.error("Error fetching sprints:", err);
+        setSprintError(err.message || "Failed to fetch sprints");
+        toast({
+          title: "Error",
+          description: err.message || "Failed to fetch sprints",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -339,6 +354,14 @@ const StoriesPage: React.FC = () => {
                       <div className="h-10 w-full rounded-md border bg-background px-3 py-2 text-sm animate-pulse">
                         Loading sprints...
                       </div>
+                    ) : sprintError ? (
+                      <Alert variant="destructive">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Sprint Fetch Error</AlertTitle>
+                        <AlertDescription>
+                          {sprintError}
+                        </AlertDescription>
+                      </Alert>
                     ) : selectedProject && (sprints[selectedProject?.id] || []).length === 0 ? (
                       <Alert>
                         <AlertTriangle className="h-4 w-4" />

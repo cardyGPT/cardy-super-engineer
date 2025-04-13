@@ -29,6 +29,7 @@ serve(async (req) => {
     const baseUrl = domain.endsWith('/') ? domain : `${domain}/`;
     const apiPath = path.startsWith('/') ? path.substring(1) : path;
     const url = `${baseUrl}rest/api/3/${apiPath}`;
+    console.log(`Making Jira API request to: ${url}`);
 
     // Create auth header with base64 encoding
     const auth = btoa(`${email}:${apiToken}`);
@@ -49,11 +50,28 @@ serve(async (req) => {
 
     // Check if the response is successful
     if (!response.ok) {
-      const errorData = await response.text();
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch (e) {
+        errorData = { error: errorText };
+      }
+      
       console.error(`Jira API error (${response.status}):`, errorData);
+      
+      // Provide more specific error messages for common failure scenarios
+      let errorMessage = `Jira API error: ${response.status} ${response.statusText}`;
+      
+      if (apiPath.includes('agile/1.0/board')) {
+        errorMessage = "Failed to fetch Jira boards. Please verify your Jira account has access to Agile boards.";
+      } else if (apiPath.includes('agile/1.0/sprint')) {
+        errorMessage = "Failed to fetch Jira sprints. Please verify your project is using Scrum methodology.";
+      }
+      
       return new Response(
         JSON.stringify({ 
-          error: `Jira API error: ${response.status} ${response.statusText}`,
+          error: errorMessage,
           details: errorData
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }

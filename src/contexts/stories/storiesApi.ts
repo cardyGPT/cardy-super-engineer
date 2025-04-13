@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
@@ -19,11 +18,16 @@ export const fetchJiraProjects = async (credentials: JiraCredentials): Promise<J
     throw new Error('Failed to fetch Jira projects');
   }
 
+  if (!data || !Array.isArray(data)) {
+    console.error('Invalid response format when fetching Jira projects:', data);
+    throw new Error('Invalid response format from Jira API');
+  }
+
   return data.map((project: any) => ({
     id: project.id,
     key: project.key,
     name: project.name,
-    avatarUrl: project.avatarUrls['48x48'],
+    avatarUrl: project.avatarUrls ? project.avatarUrls['48x48'] : undefined,
     domain: domain
   }));
 };
@@ -34,50 +38,68 @@ export const fetchJiraSprints = async (
 ): Promise<JiraSprint[]> => {
   const { domain, email, apiToken } = credentials;
 
-  // First get agile boards for the project
-  const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
-    body: {
-      domain,
-      email,
-      apiToken,
-      path: `agile/1.0/board?projectKeyOrId=${projectId}`
+  try {
+    // First get agile boards for the project
+    console.log(`Fetching boards for project ${projectId}`);
+    const { data: boardData, error: boardError } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        path: `agile/1.0/board?projectKeyOrId=${projectId}`
+      }
+    });
+
+    if (boardError) {
+      console.error('Error fetching Jira boards:', boardError);
+      throw new Error(`Failed to fetch Jira boards: ${boardError.message}`);
     }
-  });
 
-  if (boardError) {
-    console.error('Error fetching Jira boards:', boardError);
-    throw new Error('Failed to fetch Jira boards');
-  }
-
-  if (!boardData.values || boardData.values.length === 0) {
-    return [];
-  }
-
-  // Use the first board to get sprints
-  const boardId = boardData.values[0].id;
-
-  const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
-    body: {
-      domain,
-      email,
-      apiToken,
-      path: `agile/1.0/board/${boardId}/sprint`
+    if (!boardData || !boardData.values) {
+      console.error('Invalid board data format:', boardData);
+      throw new Error('No boards found for this project');
     }
-  });
 
-  if (sprintError) {
-    console.error('Error fetching Jira sprints:', sprintError);
-    throw new Error('Failed to fetch Jira sprints');
+    if (boardData.values.length === 0) {
+      console.log('No boards found for this project');
+      return [];
+    }
+
+    // Use the first board to get sprints
+    const boardId = boardData.values[0].id;
+    console.log(`Using board ID ${boardId} to fetch sprints`);
+
+    const { data: sprintData, error: sprintError } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain,
+        email,
+        apiToken,
+        path: `agile/1.0/board/${boardId}/sprint`
+      }
+    });
+
+    if (sprintError) {
+      console.error('Error fetching Jira sprints:', sprintError);
+      throw new Error(`Failed to fetch Jira sprints: ${sprintError.message}`);
+    }
+
+    if (!sprintData || !sprintData.values) {
+      console.error('Invalid sprint data format:', sprintData);
+      throw new Error('No sprints found for this board');
+    }
+
+    return sprintData.values.map((sprint: any) => ({
+      id: sprint.id,
+      name: sprint.name,
+      state: sprint.state,
+      startDate: sprint.startDate,
+      endDate: sprint.endDate,
+      boardId: boardId
+    }));
+  } catch (error: any) {
+    console.error('Error in fetchJiraSprints:', error);
+    throw new Error(error.message || 'Failed to fetch Jira sprints');
   }
-
-  return sprintData.values.map((sprint: any) => ({
-    id: sprint.id,
-    name: sprint.name,
-    state: sprint.state,
-    startDate: sprint.startDate,
-    endDate: sprint.endDate,
-    boardId: boardId
-  }));
 };
 
 export const fetchJiraTickets = async (
