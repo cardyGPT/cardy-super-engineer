@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Button } from "@/components/ui/button";
@@ -22,6 +21,8 @@ interface StoryGenerateContentProps {
   isGenerating: boolean;
 }
 
+type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
+
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
@@ -32,7 +33,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   generatedContent,
   isGenerating
 }) => {
-  const [activeTab, setActiveTab] = useState<'lld' | 'code' | 'tests' | 'testcases'>('lld');
+  const [activeTab, setActiveTab] = useState<ContentType>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -40,7 +41,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const contentRef = React.useRef<HTMLDivElement>(null);
   
-  const handleGenerate = async (type: 'lld' | 'code' | 'tests' | 'testcases') => {
+  const handleGenerate = async (type: ContentType) => {
     try {
       const request: JiraGenerationRequest = {
         type,
@@ -190,7 +191,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   };
   
-  const getContentByType = (type: 'lld' | 'code' | 'tests' | 'testcases') => {
+  const getContentByType = (type: ContentType) => {
     if (!generatedContent) return '';
     
     switch (type) {
@@ -288,7 +289,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       {generatedContent && (
         <Card className="overflow-hidden">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'lld' | 'code' | 'tests' | 'testcases')}>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ContentType)}>
             <div className="flex justify-between items-center border-b px-4 py-2">
               <TabsList>
                 <TabsTrigger value="lld" disabled={!getContentByType('lld')}>

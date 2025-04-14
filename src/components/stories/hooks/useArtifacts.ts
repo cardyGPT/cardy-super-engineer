@@ -1,92 +1,70 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { supabase } from '@/lib/supabase';
 
-export const useArtifacts = (ticket: JiraTicket | null) => {
-  const [lldContent, setLldContent] = useState<string | null>(null);
-  const [codeContent, setCodeContent] = useState<string | null>(null);
-  const [testContent, setTestContent] = useState<string | null>(null);
-  const [isLldGenerated, setIsLldGenerated] = useState(false);
-  const [isCodeGenerated, setIsCodeGenerated] = useState(false);
-  const [isTestsGenerated, setIsTestsGenerated] = useState(false);
+export interface StoryArtifacts {
+  lldContent: string | null;
+  codeContent: string | null;
+  testContent: string | null;
+  testCasesContent: string | null;
+  lldGsuiteId?: string | null;
+  codeGsuiteId?: string | null;
+  testGsuiteId?: string | null;
+  testCasesGsuiteId?: string | null;
+}
+
+export const useArtifacts = (storyId: string | null) => {
+  const [artifacts, setArtifacts] = useState<StoryArtifacts>({
+    lldContent: null,
+    codeContent: null,
+    testContent: null,
+    testCasesContent: null
+  });
+  
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const checkExistingArtifacts = useCallback(async () => {
-    if (!ticket?.key) {
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      console.log(`Checking existing artifacts for ticket ${ticket.key}`);
-      const { data, error } = await supabase
-        .from('story_artifacts')
-        .select('*')
-        .eq('story_id', ticket.key)
-        .maybeSingle();
-
-      if (error) {
-        console.error('Error fetching artifacts:', error);
-        setError(error.message);
-        return;
+  const [error, setError] = useState<Error | null>(null);
+  
+  useEffect(() => {
+    if (!storyId) return;
+    
+    const fetchArtifacts = async () => {
+      setLoading(true);
+      
+      try {
+        const { data, error } = await supabase
+          .from('story_artifacts')
+          .select('*')
+          .eq('story_id', storyId)
+          .maybeSingle();
+        
+        if (error) throw new Error(error.message);
+        
+        if (data) {
+          setArtifacts({
+            lldContent: data.lld_content,
+            codeContent: data.code_content,
+            testContent: data.test_content,
+            testCasesContent: data.testcases_content,
+            lldGsuiteId: data.lld_gsuite_id,
+            codeGsuiteId: data.code_gsuite_id,
+            testGsuiteId: data.test_gsuite_id,
+            testCasesGsuiteId: data.testcases_gsuite_id
+          });
+        }
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err);
+        } else {
+          setError(new Error('An unknown error occurred'));
+        }
+      } finally {
+        setLoading(false);
       }
-
-      if (data) {
-        console.log('Found artifacts:', data);
-        
-        // Helper to ensure content is a string
-        const ensureStringContent = (content: any) => {
-          if (content === null || content === undefined) return null;
-          return typeof content === 'string' ? content : JSON.stringify(content, null, 2);
-        };
-        
-        // Set content and flags
-        const lld = ensureStringContent(data.lld_content);
-        const code = ensureStringContent(data.code_content);
-        const tests = ensureStringContent(data.test_content);
-        
-        setLldContent(lld);
-        setCodeContent(code);
-        setTestContent(tests);
-        
-        setIsLldGenerated(!!lld);
-        setIsCodeGenerated(!!code);
-        setIsTestsGenerated(!!tests);
-      } else {
-        console.log('No artifacts found, resetting state');
-        // Reset if no data found
-        setLldContent(null);
-        setCodeContent(null);
-        setTestContent(null);
-        setIsLldGenerated(false);
-        setIsCodeGenerated(false);
-        setIsTestsGenerated(false);
-      }
-    } catch (err) {
-      console.error('Error fetching artifacts:', err);
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError('Unknown error occurred while fetching artifacts');
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [ticket]);
-
-  return {
-    lldContent,
-    codeContent,
-    testContent,
-    isLldGenerated,
-    isCodeGenerated,
-    isTestsGenerated,
-    loading,
-    error,
-    checkExistingArtifacts
-  };
+    };
+    
+    fetchArtifacts();
+  }, [storyId]);
+  
+  return { ...artifacts, loading, error };
 };

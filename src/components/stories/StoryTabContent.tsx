@@ -21,6 +21,9 @@ interface StoryTabContentProps {
   onPushToJira: (content: string) => Promise<boolean>;
 }
 
+// Define the content type for better type safety
+type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
+
 const StoryTabContent: React.FC<StoryTabContentProps> = ({
   ticket,
   projectContext,
@@ -28,14 +31,14 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   onGenerate,
   onPushToJira
 }) => {
-  const [activeContent, setActiveContent] = useState<'lld' | 'code' | 'tests' | 'testcases'>('lld');
+  const [activeContent, setActiveContent] = useState<ContentType>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { generatedContent, contentLoading } = useStories();
   const { toast } = useToast();
   const contentRef = React.useRef<HTMLDivElement>(null);
   
-  const getContentByType = (type: 'lld' | 'code' | 'tests' | 'testcases') => {
+  const getContentByType = (type: ContentType) => {
     if (!generatedContent) return '';
     
     switch (type) {
@@ -153,7 +156,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as 'lld' | 'code' | 'tests' | 'testcases')} className="w-full">
+        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as ContentType)} className="w-full">
           <TabsList className="inline-flex space-x-1 rounded-lg bg-muted p-1">
             <TabsTrigger
               value="lld"
