@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ContentDisplay from './ContentDisplay';
 import LoadingContent from './LoadingContent';
-import { FileDown, Send, Github, FileText, Code, TestTube } from "lucide-react";
+import { FileDown, Send, Github, FileText, Code, TestTube, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -138,7 +138,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
       <LoadingContent
         message="No content generated yet"
         isInfo={true}
-        additionalMessage="Click on one of the generate buttons to create content for this ticket"
+        additionalMessage="Select one of the generation options from the sidebar to create content for this ticket"
       />
     );
   }
@@ -150,40 +150,44 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
           <TabsList className="inline-flex space-x-1 rounded-lg bg-muted p-1">
             <TabsTrigger
               value="lld"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('lld') ? 'opacity-50' : ''}`}
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('lld') ? 'opacity-50' : ''}`}
               disabled={!getContentByType('lld')}
             >
-              <FileText className="mr-2 h-4 w-4" />
+              <FileText className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
               LLD
             </TabsTrigger>
             <TabsTrigger
               value="code"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('code') ? 'opacity-50' : ''}`}
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('code') ? 'opacity-50' : ''}`}
               disabled={!getContentByType('code')}
             >
-              <Code className="mr-2 h-4 w-4" />
+              <Code className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
               Code
             </TabsTrigger>
             <TabsTrigger
               value="tests"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('tests') ? 'opacity-50' : ''}`}
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('tests') ? 'opacity-50' : ''}`}
               disabled={!getContentByType('tests')}
             >
-              <TestTube className="mr-2 h-4 w-4" />
+              <TestTube className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
               Tests
             </TabsTrigger>
           </TabsList>
         </Tabs>
         
-        <div className="flex space-x-2">
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={exportToPDF}
             disabled={isExporting || !getContentByType(activeContent)}
-            className="text-xs h-8"
+            className="h-9"
           >
-            <FileDown className="h-3.5 w-3.5 mr-1" />
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-1" />
+            )}
             PDF
           </Button>
           
@@ -199,9 +203,13 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             size="sm"
             onClick={handlePushToJira}
             disabled={isPushingToJira || !getContentByType(activeContent)}
-            className="text-xs h-8"
+            className="h-9"
           >
-            <Send className="h-3.5 w-3.5 mr-1" />
+            {isPushingToJira ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-1" />
+            )}
             Jira
           </Button>
           
@@ -209,16 +217,16 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             variant="outline"
             size="sm"
             disabled={true}
-            className="text-xs h-8"
+            className="h-9"
           >
-            <Github className="h-3.5 w-3.5 mr-1" />
+            <Github className="h-4 w-4 mr-1" />
             Bitbucket
           </Button>
         </div>
       </div>
       
-      <Card className="border rounded-md overflow-hidden">
-        <CardContent className="p-4" ref={contentRef}>
+      <Card className="border rounded-md overflow-hidden shadow-sm">
+        <CardContent className="p-6" ref={contentRef}>
           <ContentDisplay 
             content={getContentByType(activeContent)} 
             contentType={activeContent} 
