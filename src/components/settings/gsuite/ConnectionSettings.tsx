@@ -93,6 +93,19 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
           </p>
         </div>
         
+        {/* Only show API key field if needed */}
+        <div className="space-y-2">
+          <Label htmlFor="api-key">API Key (Optional)</Label>
+          <Input 
+            id="api-key" 
+            placeholder="Enter your Google API Key (optional)" 
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            type="password"
+            disabled={initializing}
+          />
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="drive-folder">Default Drive Folder ID (optional)</Label>
           <Input 

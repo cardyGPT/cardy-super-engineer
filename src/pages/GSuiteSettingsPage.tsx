@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,6 @@ import { supabase } from "@/lib/supabase";
 import { useNavigate } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-// Import refactored components
 import ConnectionSettings from "@/components/settings/gsuite/ConnectionSettings";
 import QuickStartGuide from "@/components/settings/gsuite/QuickStartGuide";
 import ExportSettings from "@/components/settings/gsuite/ExportSettings";
@@ -18,6 +16,8 @@ import SecurityAlert from "@/components/settings/gsuite/SecurityAlert";
 
 const GSuiteSettingsPage: React.FC = () => {
   const [apiKey, setApiKey] = useState<string>("");
+  const [clientId, setClientId] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>("");
   const [defaultDriveFolder, setDefaultDriveFolder] = useState<string>("");
   const [driveScope, setDriveScope] = useState<string>("drive.file");
   const [docsScope, setDocsScope] = useState<string>("docs.full");
@@ -41,7 +41,6 @@ const GSuiteSettingsPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Reset the success message after a delay
   useEffect(() => {
     let timeoutId: number;
     if (connectionSuccess) {
@@ -54,12 +53,10 @@ const GSuiteSettingsPage: React.FC = () => {
     };
   }, [connectionSuccess]);
 
-  // Check GSuite settings on load
   useEffect(() => {
     const checkGSuiteSettings = async () => {
       try {
         console.log("Checking GSuite settings...");
-        // Check if GSuite API key is stored
         const { data, error } = await supabase.functions.invoke('validate-gsuite', {});
         
         if (error) {
@@ -73,8 +70,9 @@ const GSuiteSettingsPage: React.FC = () => {
           console.log("GSuite is connected. Settings:", data.settings);
           setIsConnected(true);
           
-          // Load settings
           if (data.settings) {
+            setClientId(data.settings.clientId || "");
+            setClientSecret(data.settings.clientSecret || "");
             setDefaultDriveFolder(data.settings.defaultDriveFolder || "");
             setAutoSyncEnabled(data.settings.autoSync || false);
             setDriveScope(data.settings.driveScope || "drive.file");
@@ -117,13 +115,13 @@ const GSuiteSettingsPage: React.FC = () => {
     try {
       console.log("Saving GSuite settings...");
       
-      // If API key provided, save it securely
-      if (apiKey.trim()) {
-        // Save API key securely
+      if (apiKey.trim() || clientId.trim() || clientSecret.trim()) {
         const { data: storedData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
           body: { 
             provider: 'gsuite',
-            apiKey
+            apiKey,
+            clientId,
+            clientSecret
           }
         });
         
@@ -134,14 +132,12 @@ const GSuiteSettingsPage: React.FC = () => {
         console.log("API key stored successfully:", storedData);
       }
       
-      // Prepare content options
       const contentOptions = {
         includeMetadata,
         formatCode,
         autoToc
       };
       
-      // Save other settings with metadata
       const enhancedSettings = {
         defaultDriveFolder,
         autoSync: autoSyncEnabled,
@@ -168,7 +164,6 @@ const GSuiteSettingsPage: React.FC = () => {
       
       console.log("Settings saved successfully:", settingsData);
       
-      // Verify that the settings were saved correctly
       const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-gsuite', {});
       
       if (validationError) {
@@ -178,7 +173,7 @@ const GSuiteSettingsPage: React.FC = () => {
       console.log("Validation after save:", validationData);
       
       setIsConnected(validationData?.valid || false);
-      setApiKey("");  // Clear API key for security
+      setApiKey("");
       setConnectionSuccess(true);
       
       toast({
@@ -228,12 +223,10 @@ const GSuiteSettingsPage: React.FC = () => {
     }
   };
   
-  // Handle navigation back to settings
   const handleBackToSettings = () => {
     navigate('/settings');
   };
   
-  // Navigate to Jira stories
   const navigateToStories = () => {
     navigate('/stories');
   };
@@ -291,6 +284,10 @@ const GSuiteSettingsPage: React.FC = () => {
               <ConnectionSettings 
                 apiKey={apiKey}
                 setApiKey={setApiKey}
+                clientId={clientId}
+                setClientId={setClientId}
+                clientSecret={clientSecret}
+                setClientSecret={setClientSecret}
                 defaultDriveFolder={defaultDriveFolder}
                 setDefaultDriveFolder={setDefaultDriveFolder}
                 autoSyncEnabled={autoSyncEnabled}

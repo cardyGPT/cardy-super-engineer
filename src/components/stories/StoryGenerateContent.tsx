@@ -42,6 +42,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     try {
       const request: JiraGenerationRequest = {
         type,
+        jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       };
@@ -68,6 +69,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       // First generate LLD
       const lldRequest: JiraGenerationRequest = {
         type: 'lld',
+        jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       };
@@ -76,6 +78,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       // Then generate code
       const codeRequest: JiraGenerationRequest = {
         type: 'code',
+        jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       };
@@ -84,6 +87,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       // Finally generate tests
       const testsRequest: JiraGenerationRequest = {
         type: 'tests',
+        jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       };
@@ -109,7 +113,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const handlePushToJira = async () => {
     const contentType = activeTab;
-    const content = generatedContent?.[contentType === 'lld' ? 'lldContent' : contentType === 'code' ? 'codeContent' : 'testContent'];
+    const content = getContentByType(activeTab);
     
     if (!content) {
       toast({
@@ -185,11 +189,11 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     
     switch (type) {
       case 'lld':
-        return generatedContent.lldContent || '';
+        return generatedContent.lldContent || generatedContent.lld || '';
       case 'code':
-        return generatedContent.codeContent || '';
+        return generatedContent.codeContent || generatedContent.code || '';
       case 'tests':
-        return generatedContent.testContent || '';
+        return generatedContent.testContent || generatedContent.tests || '';
       default:
         return '';
     }
@@ -260,15 +264,15 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'lld' | 'code' | 'tests')}>
             <div className="flex justify-between items-center border-b px-4 py-2">
               <TabsList>
-                <TabsTrigger value="lld" disabled={!generatedContent.lldContent}>
+                <TabsTrigger value="lld" disabled={!getContentByType('lld')}>
                   <FileText className="h-4 w-4 mr-2" />
                   LLD
                 </TabsTrigger>
-                <TabsTrigger value="code" disabled={!generatedContent.codeContent}>
+                <TabsTrigger value="code" disabled={!getContentByType('code')}>
                   <Code className="h-4 w-4 mr-2" />
                   Code
                 </TabsTrigger>
-                <TabsTrigger value="tests" disabled={!generatedContent.testContent}>
+                <TabsTrigger value="tests" disabled={!getContentByType('tests')}>
                   <TestTube className="h-4 w-4 mr-2" />
                   Tests
                 </TabsTrigger>
@@ -290,7 +294,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 </Button>
                 
                 <ExportToGSuite
-                  ticket={ticket}
+                  storyId={ticket.id}
+                  storyKey={ticket.key}
                   content={getContentByType(activeTab)}
                   contentType={activeTab}
                 />
@@ -322,13 +327,13 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             
             <div className="p-4" ref={contentRef}>
               <TabsContent value="lld" className="mt-0">
-                <ContentDisplay content={generatedContent.lldContent || ''} contentType="lld" />
+                <ContentDisplay content={getContentByType('lld')} contentType="lld" />
               </TabsContent>
               <TabsContent value="code" className="mt-0">
-                <ContentDisplay content={generatedContent.codeContent || ''} contentType="code" />
+                <ContentDisplay content={getContentByType('code')} contentType="code" />
               </TabsContent>
               <TabsContent value="tests" className="mt-0">
-                <ContentDisplay content={generatedContent.testContent || ''} contentType="tests" />
+                <ContentDisplay content={getContentByType('tests')} contentType="tests" />
               </TabsContent>
             </div>
           </Tabs>
