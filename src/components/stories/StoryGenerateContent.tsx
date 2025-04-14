@@ -396,7 +396,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             {lldContent && (
               <TabsContent value="lld">
                 <StoryTabContent 
+                  tabId="lld"
+                  title="Low-Level Design"
                   content={lldContent} 
+                  contentType="lld"
+                  loading={false}
+                  ticket={ticket}
                   onPushToJira={handlePushToJira}
                 />
               </TabsContent>
@@ -405,7 +410,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             {codeContent && (
               <TabsContent value="code">
                 <StoryTabContent 
+                  tabId="code"
+                  title="Code Implementation"
                   content={codeContent} 
+                  contentType="code"
+                  loading={false}
+                  ticket={ticket}
                   onPushToJira={handlePushToJira}
                 />
               </TabsContent>
@@ -414,7 +424,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             {testCasesContent && (
               <TabsContent value="test_cases">
                 <StoryTabContent 
+                  tabId="test_cases"
+                  title="Test Cases"
                   content={testCasesContent} 
+                  contentType="tests"
+                  loading={false}
+                  ticket={ticket}
                   onPushToJira={handlePushToJira}
                 />
               </TabsContent>
@@ -423,7 +438,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             {testContent && (
               <TabsContent value="tests">
                 <StoryTabContent 
+                  tabId="tests"
+                  title="Tests (Playwright)"
                   content={testContent} 
+                  contentType="tests"
+                  loading={false}
+                  ticket={ticket}
                   onPushToJira={handlePushToJira}
                 />
               </TabsContent>
