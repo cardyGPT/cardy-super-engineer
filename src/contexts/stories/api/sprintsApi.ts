@@ -1,11 +1,10 @@
-
 import { JiraCredentials, JiraSprint } from '@/types/jira';
 import { callJiraApi, DEV_MODE } from './apiUtils';
 
 export const fetchJiraSprints = async (
   credentials: JiraCredentials, 
   projectId: string,
-  apiType: 'agile' | 'classic' = 'agile'
+  apiType: 'agile' | 'classic' | 'cloud' = 'agile'
 ): Promise<JiraSprint[]> => {
   try {
     console.log(`Fetching Jira sprints for project ID: ${projectId} using ${apiType} API`);
@@ -13,6 +12,11 @@ export const fetchJiraSprints = async (
     // For classic Jira, we'll use a simpler approach with direct project API
     if (apiType === 'classic') {
       return await fetchClassicJiraSprints(credentials, projectId);
+    }
+    
+    // For Cloud Jira, use the same API as Agile but with potential different handling
+    if (apiType === 'cloud') {
+      return await fetchCloudJiraSprints(credentials, projectId);
     }
     
     // For Agile Jira, we'll use the standard Agile API
@@ -36,6 +40,74 @@ export const fetchJiraSprints = async (
       // If both fail, throw the original error
       throw error;
     }
+  }
+};
+
+// Fetch sprints using Cloud API (similar to Agile but with specific cloud features)
+const fetchCloudJiraSprints = async (
+  credentials: JiraCredentials,
+  projectId: string
+): Promise<JiraSprint[]> => {
+  try {
+    // For now, the Cloud API implementation is the same as Agile
+    // In the future, we can customize this for specific Cloud API features
+    console.log(`Fetching boards for project ID: ${projectId} using Cloud API`);
+    const boardsData = await callJiraApi(
+      credentials, 
+      `agile/1.0/board?projectKeyOrId=${projectId}`
+    );
+    
+    if (!boardsData?.values || boardsData.values.length === 0) {
+      console.log(`No boards found for project ${projectId}`);
+      return [];
+    }
+    
+    console.log(`Found ${boardsData.values.length} boards for project ${projectId}`);
+    
+    // Get the first scrum or kanban board (limit to first 3 boards)
+    const boards = boardsData.values.slice(0, 3);
+    let allSprints: JiraSprint[] = [];
+    
+    // For each board, get the sprints
+    for (const board of boards) {
+      try {
+        console.log(`Fetching sprints for board ID: ${board.id}`);
+        const sprintsData = await callJiraApi(
+          credentials, 
+          `agile/1.0/board/${board.id}/sprint?state=active,future,closed`
+        );
+        
+        if (sprintsData?.values && sprintsData.values.length > 0) {
+          console.log(`Found ${sprintsData.values.length} sprints for board ${board.id}`);
+          
+          const boardSprints = sprintsData.values.map((sprint: any) => ({
+            id: sprint.id,
+            name: sprint.name,
+            state: (sprint.state || '').toLowerCase(),
+            startDate: sprint.startDate || null,
+            endDate: sprint.endDate || null,
+            boardId: board.id,
+            projectId
+          }));
+          
+          allSprints = [...allSprints, ...boardSprints];
+        }
+      } catch (err) {
+        console.log(`Error fetching sprints for board ${board.id}:`, err);
+        // Continue to next board
+      }
+    }
+    
+    // Sort sprints: active first, then future, then closed
+    return allSprints.sort((a, b) => {
+      const stateOrder: Record<string, number> = { 'active': 0, 'future': 1, 'closed': 2 };
+      const stateA = (a.state || '').toLowerCase();
+      const stateB = (b.state || '').toLowerCase();
+      return (stateOrder[stateA] || 3) - (stateOrder[stateB] || 3);
+    });
+  } catch (error) {
+    console.error('Error fetching Cloud Jira sprints:', error);
+    throw error;
   }
 };
 
