@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
+import { ProjectContextData } from '@/types/index';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +15,7 @@ interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
+  projectContextData?: ProjectContextData | null;
   onGenerate: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   onPushToJira: (ticketId: string, content: string) => Promise<boolean>;
   generatedContent: JiraGenerationResponse | null;
@@ -25,6 +26,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
   selectedDocuments,
+  projectContextData,
   onGenerate,
   onPushToJira,
   generatedContent,
@@ -66,7 +68,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
     try {
-      // First generate LLD
       const lldRequest: JiraGenerationRequest = {
         type: 'lld',
         jiraTicket: ticket,
@@ -75,7 +76,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       };
       await onGenerate(lldRequest);
       
-      // Then generate code
       const codeRequest: JiraGenerationRequest = {
         type: 'code',
         jiraTicket: ticket,
@@ -84,7 +84,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       };
       await onGenerate(codeRequest);
       
-      // Finally generate tests
       const testsRequest: JiraGenerationRequest = {
         type: 'tests',
         jiraTicket: ticket,
@@ -93,7 +92,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       };
       await onGenerate(testsRequest);
       
-      // Set active tab to LLD
       setActiveTab('lld');
       
       toast({
@@ -317,7 +315,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={true} // Placeholder for now
+                  disabled={true}
                 >
                   <Github className="h-4 w-4 mr-2" />
                   Bitbucket
