@@ -161,3 +161,46 @@ export const sanitizeHtml = (html: string): string => {
     .replace(/javascript:/gi, '')
     .replace(/on\w+=/gi, 'data-disabled-event=');
 };
+
+// Save generated content to database (used in contentApi.ts)
+export const saveGeneratedContent = async (
+  storyId: string,
+  projectId: string,
+  sprintId: string,
+  contentType: string,
+  content: string
+): Promise<void> => {
+  try {
+    const { error } = await supabase.functions.invoke('save-story-artifacts', {
+      body: {
+        storyId,
+        projectId,
+        sprintId,
+        contentType,
+        content: ensureString(content)
+      }
+    });
+    
+    if (error) {
+      console.error('Error saving generated content:', error);
+      throw new Error(error.message || 'Failed to save generated content');
+    }
+  } catch (err) {
+    console.error('Error in saveGeneratedContent:', err);
+    throw err;
+  }
+};
+
+// Sanitize content for rendering in React components
+export const sanitizeContentForReact = (content: string): string => {
+  if (!content) return '';
+  
+  // Replace HTML entities and other problematic characters
+  return content
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\r\n/g, '\n'); // Normalize line endings
+};

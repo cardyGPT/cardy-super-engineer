@@ -6,7 +6,8 @@ export {
   saveGeneratedContent, 
   ensureString,
   testJiraConnection,
-  sanitizeContentForReact
+  sanitizeContentForReact,
+  sanitizeHtml
 } from './apiUtils';
 
 export { 
