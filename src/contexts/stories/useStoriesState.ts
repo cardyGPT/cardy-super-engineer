@@ -43,7 +43,7 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
   // Pagination state for tickets
   const [totalTickets, setTotalTickets] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
-  const [pageSize, setPageSize] = useState(20);
+  const [pageSize, setPageSize] = useState(50); // Increased from 20 to 50
   const [hasMore, setHasMore] = useState(false);
   
   // Loading states
@@ -84,13 +84,27 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     }
   }, [credentials]);
 
-  // Auto-fetch projects when credentials are available
+  // When filters change, reload tickets with filters
   useEffect(() => {
-    if (credentials && projects.length === 0 && !projectsLoading) {
-      console.log('Auto-fetching projects on credentials load');
-      fetchProjects();
+    if (credentials && selectedProject && (selectedSprint || loadFromProject) && 
+        !ticketsLoading && !loadingMore && tickets.length > 0) {
+      // Wait a bit to prevent multiple fetches
+      const timer = setTimeout(() => {
+        console.log('Filters changed, reloading tickets:', { 
+          type: ticketTypeFilter, 
+          status: ticketStatusFilter
+        });
+        
+        if (selectedSprint) {
+          fetchTickets(selectedSprint.id);
+        } else if (loadFromProject) {
+          fetchTicketsByProject(selectedProject.id);
+        }
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
-  }, [credentials]);
+  }, [ticketTypeFilter, ticketStatusFilter]);
   
   // Clear data when API type changes
   useEffect(() => {
@@ -250,7 +264,7 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     }
   }, [credentials, apiType, toast]);
   
-  // API method - Fetch initial tickets
+  // API method - Fetch initial tickets with filters
   const fetchTickets = useCallback(async (sprintId: string) => {
     if (!credentials || !selectedProject) {
       setError('Missing credentials or project selection');
@@ -262,13 +276,18 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     setCurrentPage(0);
     
     try {
-      console.log(`Fetching tickets for sprint ${sprintId}...`);
+      console.log(`Fetching tickets for sprint ${sprintId} with filters:`, { 
+        type: ticketTypeFilter, 
+        status: ticketStatusFilter
+      });
+      
       const result = await fetchJiraTickets(
         credentials, 
         sprintId, 
         selectedProject,
         0,
-        pageSize
+        pageSize,
+        { type: ticketTypeFilter, status: ticketStatusFilter }
       );
       
       setTickets(result.tickets);
@@ -290,7 +309,7 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     } finally {
       setTicketsLoading(false);
     }
-  }, [credentials, selectedProject, pageSize, toast]);
+  }, [credentials, selectedProject, pageSize, ticketTypeFilter, ticketStatusFilter, toast]);
 
   // API method - Fetch more tickets (lazy loading)
   const fetchMoreTickets = useCallback(async () => {
@@ -302,12 +321,21 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
       return;
     }
     
+    // Don't load more if we have filters applied
+    if (ticketTypeFilter || ticketStatusFilter || searchTerm) {
+      return;
+    }
+    
     setLoadingMore(true);
     const nextPage = currentPage + 1;
     const startAt = nextPage * pageSize;
     
     try {
-      console.log(`Fetching more tickets, startAt: ${startAt}, pageSize: ${pageSize}`);
+      console.log(`Fetching more tickets, startAt: ${startAt}, pageSize: ${pageSize}, filters:`, {
+        type: ticketTypeFilter, 
+        status: ticketStatusFilter
+      });
+      
       let result;
       
       if (selectedSprint) {
@@ -316,14 +344,16 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
           selectedSprint.id,
           selectedProject,
           startAt,
-          pageSize
+          pageSize,
+          { type: ticketTypeFilter, status: ticketStatusFilter }
         );
       } else {
         result = await fetchJiraTicketsByProject(
           credentials,
           selectedProject,
           startAt,
-          pageSize
+          pageSize,
+          { type: ticketTypeFilter, status: ticketStatusFilter }
         );
       }
       
@@ -345,9 +375,11 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     } finally {
       setLoadingMore(false);
     }
-  }, [credentials, selectedProject, selectedSprint, currentPage, pageSize, hasMore, loadingMore, loadFromProject, toast]);
+  }, [credentials, selectedProject, selectedSprint, currentPage, pageSize, 
+      hasMore, loadingMore, loadFromProject, ticketTypeFilter, ticketStatusFilter, 
+      searchTerm, toast]);
   
-  // API method - Fetch tickets directly from a project
+  // API method - Fetch tickets directly from a project with filters
   const fetchTicketsByProject = useCallback(async (projectId: string) => {
     if (!credentials || !selectedProject) {
       setError('Missing credentials or project selection');
@@ -361,12 +393,17 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     setLoadFromProject(true);
     
     try {
-      console.log(`Fetching tickets for project ${projectId}...`);
+      console.log(`Fetching tickets for project ${projectId} with filters:`, {
+        type: ticketTypeFilter, 
+        status: ticketStatusFilter
+      });
+      
       const result = await fetchJiraTicketsByProject(
         credentials,
         selectedProject,
         0,
-        pageSize
+        pageSize,
+        { type: ticketTypeFilter, status: ticketStatusFilter }
       );
       
       setTickets(result.tickets);
@@ -395,7 +432,7 @@ export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
     } finally {
       setTicketsLoading(false);
     }
-  }, [credentials, selectedProject, pageSize, toast]);
+  }, [credentials, selectedProject, pageSize, ticketTypeFilter, ticketStatusFilter, toast]);
   
   // When switching back to sprint, clear the loadFromProject flag
   useEffect(() => {
