@@ -26,6 +26,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   projectContextData = null
 }) => {
   const [activeTab, setActiveTab] = useState("details");
+  const { generateContent, pushToJira, generatedContent, contentLoading } = useStories();
   
   if (isLoading) {
     return <StoryDetailSkeleton />;
@@ -51,6 +52,10 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
             projectContext={projectContext}
             selectedDocuments={selectedDocuments}
             projectContextData={projectContextData}
+            onGenerate={generateContent}
+            onPushToJira={pushToJira}
+            generatedContent={generatedContent}
+            isGenerating={contentLoading}
           />
         </TabsContent>
       </Tabs>

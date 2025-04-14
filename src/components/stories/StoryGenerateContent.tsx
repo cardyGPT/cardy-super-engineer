@@ -1,6 +1,6 @@
+
 import React, { useState } from 'react';
-import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
-import { ProjectContextData } from '@/types/index';
+import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
