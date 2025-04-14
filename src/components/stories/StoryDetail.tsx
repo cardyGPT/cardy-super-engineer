@@ -82,6 +82,8 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
       
       if (response) {
         setActiveTab(tabToActivate);
+        // Force refresh artifacts after generation
+        await checkExistingArtifacts();
       }
     } catch (err: any) {
       console.error(`Error generating ${type}:`, err);

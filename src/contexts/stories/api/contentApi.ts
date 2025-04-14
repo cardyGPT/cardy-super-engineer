@@ -36,24 +36,45 @@ export const generateJiraContent = async (
       throw new Error('No response received from content generation service');
     }
     
+    // Ensure response is a string
+    const responseContent = typeof data.response === 'string' 
+      ? data.response 
+      : JSON.stringify(data.response, null, 2);
+    
     // Create a response object with the generated content
     // For 'all' type, we'll still return it in the correct content field instead of using 'all'
     let response: JiraGenerationResponse = {};
     
     if (request.type === 'lld') {
-      response.lld = data.response;
+      response.lld = responseContent;
     } else if (request.type === 'code') {
-      response.code = data.response;
+      response.code = responseContent;
     } else if (request.type === 'tests') {
-      response.tests = data.response;
+      response.tests = responseContent;
     } else if (request.type === 'all') {
       // For 'all' type, put the content in the lld field by default
       // In a real implementation, you might want to split this into different parts
-      response.lld = data.response;
+      response.lld = responseContent;
     }
     
     // Also include the full response for reference
-    response.response = data.response;
+    response.response = responseContent;
+    
+    // Save the generated content to the database
+    try {
+      if (ticket.key && ticket.projectId) {
+        await saveGeneratedContent(
+          ticket.key,
+          ticket.projectId,
+          ticket.sprintId || '',
+          request.type,
+          responseContent
+        );
+      }
+    } catch (saveError) {
+      console.error('Error saving generated content:', saveError);
+      // Continue even if saving fails
+    }
     
     return response;
   } catch (err: any) {
@@ -104,8 +125,11 @@ export const pushContentToJira = async (
     
     console.log(`Pushing content to Jira ticket ${ticketId}...`);
     
+    // Ensure content is a string
+    const safeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+    
     // Convert markdown to Jira markup (a basic conversion)
-    const jiraContent = content
+    const jiraContent = safeContent
       .replace(/^# (.*$)/gm, 'h1. $1')
       .replace(/^## (.*$)/gm, 'h2. $1')
       .replace(/^### (.*$)/gm, 'h3. $1')

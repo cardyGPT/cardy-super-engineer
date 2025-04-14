@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,11 @@ import { formatTimestampForFilename } from "@/utils/exportUtils";
 import { downloadAsPDF } from "@/utils/exportUtils";
 import { AlertCircle, Copy, Download, FileCode, FileText, Send, TestTube, File } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { supabase } from "@/lib/supabase";
 import ReactMarkdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
 import rehypeRaw from "rehype-raw";
 import remarkGfm from "remark-gfm";
-import { supabase } from "@/lib/supabase";
 import ExportToGSuite from "./ExportToGSuite";
 
 interface ContentDisplayProps {
@@ -39,7 +38,7 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
 }) => {
   const [timestamp, setTimestamp] = useState<string | null>(null);
   const { toast } = useToast();
-  const contentRef = React.useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // If we have a story key, try to fetch the timestamp for this content
@@ -163,6 +162,11 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
     );
   }
 
+  // Ensure content is a string
+  const safeContent = typeof content === 'string' ? content : 
+                     (content && typeof content === 'object' ? JSON.stringify(content, null, 2) : 
+                     String(content || ''));
+
   return (
     <Card className="w-full h-fit">
       <CardHeader>
@@ -185,7 +189,7 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
             rehypePlugins={[rehypeHighlight, rehypeRaw]}
             remarkPlugins={[remarkGfm]}
           >
-            {content}
+            {safeContent}
           </ReactMarkdown>
         </div>
       </CardContent>
@@ -207,7 +211,7 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({
           )}
         </div>
         <ExportToGSuite
-          content={content}
+          content={safeContent}
           contentType={contentType}
           storyKey={storyKey}
           storyId={storyId}
