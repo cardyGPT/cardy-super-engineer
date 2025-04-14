@@ -1,272 +1,163 @@
-import { supabase } from '@/lib/supabase';
-import { JiraCredentials } from '@/types/jira';
 
-// Set this to true to enable test data when API calls fail
+import { supabase } from '@/lib/supabase';
+import { JiraCredentials, JiraProject } from '@/types/jira';
+
+// Development mode flag for testing
 export const DEV_MODE = false;
 
-// Helper function to fetch from Jira API through our edge function
-export const callJiraApi = async (credentials: JiraCredentials, path: string, method: string = 'GET', data?: any) => {
-  const { domain, email, apiToken } = credentials;
-  
+// Call the Jira API via our Supabase edge function
+export const callJiraApi = async (
+  credentials: JiraCredentials,
+  path: string,
+  method: string = 'GET',
+  data?: any
+) => {
   try {
-    console.log(`Calling Jira API with path: ${path}, method: ${method}`);
-    console.log(`Using credentials for domain: ${domain}, email: ${email}, token type: Classic API Token`);
+    console.log(`Calling Jira API: ${path} (${method})`);
     
-    const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
+    const { data: responseData, error } = await supabase.functions.invoke('jira-api', {
       body: {
-        domain,
-        email,
-        apiToken,
+        domain: credentials.domain,
+        email: credentials.email,
+        apiToken: credentials.apiToken,
         path,
         method,
         data
       }
     });
-
-    if (supabaseError) {
-      console.error('Supabase functions invoke error:', supabaseError);
-      throw new Error(supabaseError.message || 'Failed to call Jira API via edge function');
-    }
-
-    // Check if the response contains error information
-    if (responseData?.error) {
-      console.error('Jira API returned an error:', responseData.error);
-      console.error('Error details:', responseData.details);
-      console.error('Requested URL:', responseData.url);
-      
-      // Handle potential authentication issues
-      if (responseData.status === 401 || (responseData.details && responseData.details.message && responseData.details.message.includes('Unauthorized'))) {
-        throw new Error('Authentication failed. Please check your Jira credentials.');
-      }
-      
-      // Throw a detailed error
-      throw new Error(responseData.error || 'Error from Jira API');
-    }
-
-    return responseData;
-  } catch (error) {
-    console.error('Error in callJiraApi:', error);
-    throw error;
-  }
-};
-
-// Function to evaluate Jira expressions for a specific issue
-export const evaluateJiraExpression = async (credentials: JiraCredentials, issueKey: string, expression: string) => {
-  const { domain, email, apiToken } = credentials;
-  
-  try {
-    console.log(`Evaluating Jira expression for issue ${issueKey}: ${expression}`);
     
-    const { data: responseData, error: supabaseError } = await supabase.functions.invoke('jira-api', {
-      body: {
-        domain,
-        email,
-        apiToken,
-        path: 'expression/eval',
-        method: 'POST',
-        data: {
-          expression,
-          context: {
-            issue: {
-              key: issueKey
-            }
-          }
-        }
-      }
-    });
-
-    if (supabaseError) {
-      console.error('Supabase functions invoke error:', supabaseError);
-      throw new Error(supabaseError.message || 'Failed to evaluate Jira expression');
-    }
-
-    // Check if the response contains error information
-    if (responseData?.error) {
-      console.error('Jira Expression API returned an error:', responseData.error);
-      console.error('Error details:', responseData.details);
-      
-      // Handle Jira Classic case where expression API might not be available
-      if (responseData.status === 404 || (responseData.details && responseData.details.message && responseData.details.message.includes('not found'))) {
-        console.warn('Expression API not available - possibly using Jira Classic');
-        return null;
-      }
-      
-      // Throw a detailed error
-      throw new Error(responseData.error || 'Error from Jira Expression API');
-    }
-
-    return responseData?.value;
-  } catch (error) {
-    console.error('Error in evaluateJiraExpression:', error);
-    throw error;
-  }
-};
-
-// Helper function to save generated content to the database
-export const saveGeneratedContent = async (
-  storyId: string, 
-  projectId: string | undefined, 
-  sprintId: string | undefined, 
-  contentType: string, 
-  content: string
-) => {
-  if (!storyId || !contentType || !content) return;
-
-  try {
-    const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
-      body: {
-        storyId,
-        projectId,
-        sprintId,
-        contentType, 
-        content
-      }
-    });
-
     if (error) {
-      console.error('Error saving generated content:', error);
-      throw new Error(error.message || 'Failed to save generated content');
+      console.error('Error calling Jira API via edge function:', error);
+      throw new Error(`Edge function error: ${error.message}`);
     }
-
-    return data;
-  } catch (error) {
-    console.error('Error in saveGeneratedContent:', error);
-    throw error;
-  }
-};
-
-// Check if a value is a string
-export const isString = (value: any): boolean => {
-  return typeof value === 'string' || value instanceof String;
-};
-
-// Safely convert any value to a string
-export const ensureString = (value: any): string => {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  
-  if (isString(value)) {
-    return value as string;
-  }
-  
-  if (typeof value === 'object') {
-    try {
-      return JSON.stringify(value, null, 2);
-    } catch (e) {
-      console.error('Error stringifying object:', e);
-      return '[Object conversion error]';
+    
+    // If the API itself returned an error, it will be in responseData.error
+    if (responseData && responseData.error) {
+      console.error('Jira API returned error:', responseData);
+      throw new Error(responseData.error);
     }
+    
+    return responseData;
+  } catch (err) {
+    console.error(`Error in callJiraApi (${path}):`, err);
+    throw err;
   }
-  
-  return String(value);
 };
 
-// Function to test Jira connection and determine API version
-export const testJiraConnection = async (credentials: JiraCredentials): Promise<{
-  isConnected: boolean;
-  userName?: string;
-  apiVersion?: 'classic' | 'agile' | 'cloud';
-  errorMessage?: string;
-}> => {
+// Test Jira connection and determine API version
+export const testJiraConnection = async (credentials: JiraCredentials) => {
   try {
-    // First test basic connection by fetching user information
-    const userData = await callJiraApi(credentials, 'myself');
-    
-    if (!userData || !userData.displayName) {
-      return { 
-        isConnected: false,
-        errorMessage: 'Could not retrieve user information' 
-      };
-    }
-    
-    // Next, test if Agile features are available
+    // Try agile API first (most common for newer Jira instances)
     try {
-      const agileData = await callJiraApi(credentials, 'agile/1.0/board');
+      console.log('Testing Jira connection with Agile API...');
+      const data = await callJiraApi(credentials, 'agile/1.0/board');
       
-      return {
-        isConnected: true,
-        userName: userData.displayName,
-        apiVersion: 'agile'
-      };
-    } catch (agileError) {
-      // If agile API fails, check if it's a newer cloud instance
-      try {
-        const cloudTest = await callJiraApi(credentials, 'platform/capabilities');
-        
-        return {
-          isConnected: true,
-          userName: userData.displayName,
-          apiVersion: 'cloud'
-        };
-      } catch (cloudError) {
-        // If both fail, assume it's classic Jira
-        return {
-          isConnected: true,
-          userName: userData.displayName,
-          apiVersion: 'classic'
-        };
+      if (data && !data.error) {
+        console.log('Successfully connected using Agile API');
+        return { isConnected: true, apiVersion: 'agile' as const };
       }
+    } catch (agileError) {
+      console.log('Agile API test failed, trying Cloud API next...');
     }
+    
+    // Try cloud API next
+    try {
+      const data = await callJiraApi(credentials, 'api/2/myself');
+      
+      if (data && !data.error) {
+        console.log('Successfully connected using Cloud API');
+        return { isConnected: true, apiVersion: 'cloud' as const };
+      }
+    } catch (cloudError) {
+      console.log('Cloud API test failed, falling back to Classic API...');
+    }
+    
+    // Finally try classic API
+    const data = await callJiraApi(credentials, 'project');
+    
+    if (data && !data.error) {
+      console.log('Successfully connected using Classic API');
+      return { isConnected: true, apiVersion: 'classic' as const };
+    }
+    
+    return { isConnected: false, apiVersion: null };
   } catch (error) {
     console.error('Error testing Jira connection:', error);
-    return {
-      isConnected: false,
-      errorMessage: error.message || 'Failed to connect to Jira'
-    };
+    return { isConnected: false, apiVersion: null };
   }
 };
 
-// Function to sanitize content for React rendering
-export const sanitizeContentForReact = (content: any): string => {
-  if (content === null || content === undefined) {
-    return '';
-  }
-  
+// Ensure all content is properly converted to string
+export const ensureString = (content: any): string => {
   if (typeof content === 'string') {
     return content;
   }
   
+  if (content === null || content === undefined) {
+    return '';
+  }
+  
   if (typeof content === 'object') {
-    // Check if it's an object with type, version, content structure (Jira custom format)
-    if (content.type && content.version && content.content) {
-      try {
-        // Extract plain text from Jira's Atlassian Document Format
-        let plainText = '';
-        const extractText = (items: any[]) => {
-          if (!Array.isArray(items)) return;
-          items.forEach(item => {
-            if (item.type === 'paragraph' && item.content) {
-              extractText(item.content);
-              plainText += '\n\n';
-            } else if (item.type === 'text' && item.text) {
-              plainText += item.text;
-            } else if (item.type === 'bulletList' && item.content) {
-              extractText(item.content);
-            } else if (item.type === 'listItem' && item.content) {
-              plainText += '- ';
-              extractText(item.content);
-            } else if (item.content && Array.isArray(item.content)) {
-              extractText(item.content);
-            }
-          });
-        };
-        
-        extractText(content.content);
-        return plainText.trim();
-      } catch (e) {
-        console.error('Error extracting text from Atlassian Document Format:', e);
-        return JSON.stringify(content);
-      }
-    }
-    
     try {
-      return JSON.stringify(content, null, 2);
+      return JSON.stringify(content);
     } catch (e) {
-      console.error('Error stringifying object:', e);
-      return '[Complex object]';
+      return String(content);
     }
   }
   
   return String(content);
+};
+
+// Function to extract JQL from a Jira URL
+export const extractJqlFromUrl = (url: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get('jql');
+  } catch (e) {
+    console.error('Error parsing URL:', e);
+    return null;
+  }
+};
+
+// Helper to extract error message from complex error objects
+export const extractErrorMessage = (error: any): string => {
+  if (!error) {
+    return 'Unknown error occurred';
+  }
+  
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  // Check for response error format from Jira
+  if (error.response && error.response.data) {
+    const { data } = error.response;
+    
+    if (data.errorMessages && data.errorMessages.length > 0) {
+      return data.errorMessages[0];
+    }
+    
+    if (data.message) {
+      return data.message;
+    }
+  }
+  
+  // Check for fetch error or axios error
+  if (error.message) {
+    return error.message;
+  }
+  
+  // Fallback
+  return 'An error occurred with the Jira API';
+};
+
+// Sanitize HTML content (for safety when rendering)
+export const sanitizeHtml = (html: string): string => {
+  if (!html) return '';
+  
+  // Replace potentially dangerous tags
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, 'data-disabled-event=');
 };

@@ -26,7 +26,9 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     projectsLoading,
     fetchAllProjectsAtOnce,
     error,
-    apiVersion
+    apiVersion,
+    hasMoreProjects,
+    totalTickets
   } = useStories();
   
   const [loadingAllProjects, setLoadingAllProjects] = useState(false);
@@ -98,6 +100,11 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
           <div className="flex justify-between items-center mb-2">
             <label className="text-sm font-medium">
               Jira Project {apiVersion && <span className="text-xs text-muted-foreground">({apiVersion})</span>}
+              {projects.length > 0 && (
+                <span className="text-xs text-muted-foreground ml-1">
+                  ({projects.length} {hasMoreProjects ? '+ more' : 'loaded'})
+                </span>
+              )}
             </label>
             
             <Button 
@@ -168,6 +175,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                   <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
                   <span className="text-xs text-muted-foreground">
                     {sprints[selectedProject.id]?.length} sprints
+                    {totalTickets > 0 && ` / ${totalTickets} issues`}
                   </span>
                 </div>
               )}

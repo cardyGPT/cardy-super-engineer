@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { DocumentType } from "@/types";
 import { useProject } from "@/contexts/ProjectContext";
@@ -11,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Upload, AlertCircle, Loader2 } from "lucide-react";
+import { Upload, AlertCircle, Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogClose } from "@/components/ui/dialog";
@@ -39,12 +40,24 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValidationError(null);
+    setUploadSuccess(false);
+    
     if (e.target.files && e.target.files[0]) {
       const selectedFile = e.target.files[0];
       setFile(selectedFile);
       
+      // Validate file type based on document type
       if (docType === "data-model" && !selectedFile.name.toLowerCase().endsWith('.json')) {
         setValidationError("Data models must be JSON files");
+        return;
+      }
+      
+      if (docType !== "data-model" && 
+          !selectedFile.name.toLowerCase().endsWith('.pdf') && 
+          !selectedFile.name.toLowerCase().endsWith('.doc') && 
+          !selectedFile.name.toLowerCase().endsWith('.docx')) {
+        setValidationError(`${DOCUMENT_TYPES.find(d => d.value === docType)?.label} must be PDF or Word documents`);
+        return;
       }
     }
   };
@@ -98,6 +111,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       return;
     }
 
+    // Validate file type again
     if (docType === "data-model") {
       if (!file.name.toLowerCase().endsWith('.json')) {
         setValidationError("Data models must be JSON files");
@@ -118,6 +132,11 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         });
         return;
       }
+    } else if (!file.name.toLowerCase().endsWith('.pdf') && 
+              !file.name.toLowerCase().endsWith('.doc') && 
+              !file.name.toLowerCase().endsWith('.docx')) {
+      setValidationError(`${DOCUMENT_TYPES.find(d => d.value === docType)?.label} must be PDF or Word documents`);
+      return;
     }
 
     console.log("Starting upload process with file:", file.name, "for project:", projectId);
@@ -154,7 +173,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
         if (closeButton) {
           closeButton.click();
         }
-      }, 1500);
+      }, 2000);
       
     } catch (error) {
       console.error("Error in upload handler:", error);
@@ -188,6 +207,7 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
           onValueChange={(value) => {
             setDocType(value as DocumentType);
             setValidationError(null);
+            setUploadSuccess(false);
             setFile(null);
           }}
         >
@@ -219,6 +239,11 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
             Upload a JSON file containing your data model. Several formats are supported.
           </p>
         )}
+        {docType !== "data-model" && (
+          <p className="text-xs text-gray-500">
+            Upload a PDF or Word document for {DOCUMENT_TYPES.find(d => d.value === docType)?.label.toLowerCase()}.
+          </p>
+        )}
       </div>
       
       {validationError && (
@@ -230,8 +255,8 @@ const DocumentUpload = ({ projectId, onUploadComplete }: DocumentUploadProps) =>
       )}
       
       {uploadSuccess && (
-        <Alert variant="default">
-          <AlertCircle className="h-4 w-4" />
+        <Alert className="bg-[#F2FCE2] text-green-800 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600" />
           <AlertTitle>Success</AlertTitle>
           <AlertDescription>Document uploaded successfully!</AlertDescription>
         </Alert>

@@ -41,6 +41,17 @@ export const useDocumentOperations = () => {
     }
   };
 
+  const viewDocument = (document: ProjectDocument) => {
+    if (!document.fileUrl) {
+      console.error("No file URL available for document");
+      setError("Document URL is not available");
+      return;
+    }
+    
+    console.log("Opening document in new tab:", document.fileUrl);
+    window.open(document.fileUrl, '_blank');
+  };
+
   const uploadDocument = async (
     document: Partial<ProjectDocument>, 
     file: File,
@@ -197,6 +208,7 @@ export const useDocumentOperations = () => {
     fetchDocuments,
     uploadDocument,
     deleteDocument,
+    viewDocument,
     loading,
     error
   };

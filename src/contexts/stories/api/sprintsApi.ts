@@ -9,13 +9,34 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
     // First, try to get all boards for this project
     let boards = [];
     try {
-      const boardsData = await callJiraApi(credentials, `agile/1.0/board?projectKeyOrId=${projectId}`);
+      let apiPath = `agile/1.0/board?projectKeyOrId=${projectId}`;
+      console.log(`Trying agile API path: ${apiPath}`);
+      const boardsData = await callJiraApi(credentials, apiPath);
       
       if (boardsData?.values?.length > 0) {
         console.log(`Found ${boardsData.values.length} boards for project ${projectId}`);
         boards = boardsData.values.slice(0, 3); // Limit to first 3 boards to avoid too many requests
       } else {
-        console.log(`No boards found for project ${projectId}`);
+        console.log(`No boards found for project ${projectId}, trying classic API...`);
+        // Try classic API approach
+        try {
+          apiPath = `project/${projectId}/components`;
+          console.log(`Trying classic API path: ${apiPath}`);
+          const componentsData = await callJiraApi(credentials, apiPath);
+          
+          if (componentsData && Array.isArray(componentsData)) {
+            console.log(`Found components for project ${projectId}, using this as fallback`);
+            // Create a pseudo-board from the project itself
+            boards = [{
+              id: projectId,
+              name: 'Default Board',
+              type: 'scrum',
+              location: { projectId }
+            }];
+          }
+        } catch (classicError) {
+          console.error('Classic API failed:', classicError);
+        }
       }
     } catch (boardError) {
       console.error('Error fetching boards:', boardError);
@@ -155,50 +176,25 @@ export const fetchJiraSprints = async (credentials: JiraCredentials, projectId: 
       }
     }
     
-    // APPROACH 5: Last resort - try the newer Jira Software REST API
+    // APPROACH 5: Last resort - for classic Jira, create a dummy sprint
     if (sprints.length === 0) {
       try {
-        console.log('Attempting to use Jira Software REST API as last resort...');
+        // Check if this is classic Jira by fetching project directly
+        const projectData = await callJiraApi(credentials, `project/${projectId}`);
         
-        // Try active sprints first
-        const activeSoftwareData = await callJiraApi(credentials, `jira-software-rest/latest/sprints?projectId=${projectId}&state=active`);
-        
-        if (activeSoftwareData?.values?.length > 0) {
-          console.log(`Found ${activeSoftwareData.values.length} active sprints using Jira Software REST API`);
-          
-          const activeSoftwareSprints = activeSoftwareData.values.map((sprint: any) => ({
-            id: sprint.id,
-            name: sprint.name,
-            state: 'active', // Explicitly mark as active
-            startDate: sprint.startDate,
-            endDate: sprint.endDate,
-            boardId: sprint.originBoardId || 'unknown',
+        if (projectData && !projectData.error) {
+          console.log('Creating a dummy sprint for classic Jira project');
+          // Create a dummy "All Issues" sprint for classic Jira
+          sprints = [{
+            id: `classic-${projectId}`,
+            name: 'All Issues',
+            state: 'active',
+            boardId: 'classic',
             projectId
-          }));
-          
-          sprints = [...sprints, ...activeSoftwareSprints];
-        } else {
-          // If no active sprints, try all states
-          const allSoftwareData = await callJiraApi(credentials, `jira-software-rest/latest/sprints?projectId=${projectId}`);
-          
-          if (allSoftwareData?.values?.length > 0) {
-            console.log(`Found ${allSoftwareData.values.length} sprints using Jira Software REST API (all states)`);
-            
-            const allSoftwareSprints = allSoftwareData.values.map((sprint: any) => ({
-              id: sprint.id,
-              name: sprint.name,
-              state: (sprint.state || '').toLowerCase(), // Normalize state to lowercase
-              startDate: sprint.startDate,
-              endDate: sprint.endDate,
-              boardId: sprint.originBoardId || 'unknown',
-              projectId
-            }));
-            
-            sprints = [...sprints, ...allSoftwareSprints];
-          }
+          }];
         }
       } catch (error) {
-        console.error('Jira Software REST API failed:', error);
+        console.error('Classic Jira check failed:', error);
       }
     }
     

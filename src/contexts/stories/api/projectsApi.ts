@@ -17,10 +17,31 @@ export const fetchJiraProjects = async (
       maxResults
     });
     
-    const data = await callJiraApi(
-      credentials, 
-      `project?startAt=${startAt}&maxResults=${maxResults}`
-    );
+    // For agile and cloud API, use the /project endpoint
+    let data;
+    try {
+      // Try the agile API first (most likely to work)
+      data = await callJiraApi(
+        credentials, 
+        `project?startAt=${startAt}&maxResults=${maxResults}`
+      );
+    } catch (error) {
+      console.error('Error with standard API, trying classic API:', error);
+      // If that fails, try the classic API endpoint
+      try {
+        data = await callJiraApi(
+          credentials,
+          `project/search?startAt=${startAt}&maxResults=${maxResults}`
+        );
+        // Extract values array if it exists (classic API response format)
+        if (data && data.values && Array.isArray(data.values)) {
+          data = data.values;
+        }
+      } catch (classicError) {
+        console.error('Error with classic API:', classicError);
+        throw classicError;
+      }
+    }
     
     console.log('Jira projects API response:', data);
     
