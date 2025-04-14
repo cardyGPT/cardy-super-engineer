@@ -31,47 +31,60 @@ const LoadingContent: React.FC<LoadingContentProps> = ({
   additionalMessage
 }) => {
   return (
-    <Card className="p-4">
-      <div className="space-y-3">
-        {showTitle && <Skeleton className={`h-8 ${titleWidth}`} />}
-        {Array.from({ length: count }).map((_, i) => (
-          <Skeleton 
-            key={i} 
-            className={`h-4 ${i % 2 === 0 ? 'w-full' : (i % 3 === 0 ? 'w-2/3' : 'w-3/4')}`} 
-          />
-        ))}
-        <div className={`flex items-center justify-center gap-2 text-center text-sm ${
+    <Card className="p-6 flex flex-col items-center justify-center min-h-[200px]">
+      <div className="space-y-6 text-center">
+        {isLoading && (
+          <div className="space-y-3 w-full max-w-md">
+            {showTitle && <Skeleton className={`h-8 ${titleWidth} mx-auto`} />}
+            {Array.from({ length: count }).map((_, i) => (
+              <Skeleton 
+                key={i} 
+                className={`h-4 ${i % 2 === 0 ? 'w-full' : (i % 3 === 0 ? 'w-2/3' : 'w-3/4')} mx-auto`} 
+              />
+            ))}
+          </div>
+        )}
+        
+        <div className={`flex flex-col items-center justify-center gap-2 text-center ${
           isError ? 'text-red-500' : (isWarning ? 'text-amber-500' : (isInfo ? 'text-blue-500' : 'text-muted-foreground'))
-        } mt-4`}>
-          {isError ? (
-            <AlertCircle className="h-4 w-4" />
-          ) : isWarning ? (
-            <AlertCircle className="h-4 w-4" />
-          ) : isInfo ? (
-            <Info className="h-4 w-4" />
-          ) : (
-            <LoaderCircle className="h-4 w-4 animate-spin" />
+        }`}>
+          <div className={`rounded-full p-3 ${
+            isError ? 'bg-red-100 dark:bg-red-900/20' : 
+            (isWarning ? 'bg-amber-100 dark:bg-amber-900/20' : 
+            (isInfo ? 'bg-blue-100 dark:bg-blue-900/20' : 
+            'bg-gray-100 dark:bg-gray-800/50'))
+          }`}>
+            {isError ? (
+              <AlertCircle className="h-6 w-6" />
+            ) : isWarning ? (
+              <AlertCircle className="h-6 w-6" />
+            ) : isInfo ? (
+              <Info className="h-6 w-6" />
+            ) : (
+              <LoaderCircle className="h-6 w-6 animate-spin" />
+            )}
+          </div>
+          
+          <p className="text-lg font-medium mt-2">{message}</p>
+          
+          {additionalMessage && (
+            <p className="text-sm text-muted-foreground max-w-md">
+              {additionalMessage}
+            </p>
           )}
-          <p>{message}</p>
           
           {onRetry && (
             <Button 
-              variant="ghost" 
+              variant="outline" 
               size="sm" 
-              className="ml-2 h-6 px-2 text-xs"
+              className="mt-4"
               onClick={onRetry}
             >
-              <RefreshCw className="h-3 w-3 mr-1" />
+              <RefreshCw className="h-3.5 w-3.5 mr-2" />
               Retry
             </Button>
           )}
         </div>
-        
-        {additionalMessage && (
-          <div className="mt-2 text-xs text-center text-muted-foreground">
-            <p>{additionalMessage}</p>
-          </div>
-        )}
       </div>
     </Card>
   );

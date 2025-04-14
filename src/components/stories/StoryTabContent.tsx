@@ -1,157 +1,231 @@
 
-import React from 'react';
-import { TabsContent } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+import React, { useState } from 'react';
 import { JiraTicket } from '@/types/jira';
-import { Send, FileCheck, AlertTriangle, Loader2 } from "lucide-react";
+import { useStories } from '@/contexts/StoriesContext';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ContentDisplay from './ContentDisplay';
-import { useToast } from '@/hooks/use-toast';
+import LoadingContent from './LoadingContent';
+import { FileDown, Send, Github, FileText, Code, TestTube } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
+import ExportToGSuite from './ExportToGSuite';
 
 interface StoryTabContentProps {
-  tabId: string;
-  title: string;
-  content: string | null;
-  contentType: 'lld' | 'code' | 'tests';
-  loading: boolean;
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
-  onPushToJira: (content: string) => Promise<boolean>;
   onGenerate: () => Promise<void>;
+  onPushToJira: (content: string) => Promise<boolean>;
 }
 
 const StoryTabContent: React.FC<StoryTabContentProps> = ({
-  tabId,
-  title,
-  content,
-  contentType,
-  loading,
   ticket,
-  onPushToJira,
-  onGenerate
+  projectContext,
+  selectedDocuments,
+  onGenerate,
+  onPushToJira
 }) => {
+  const [activeContent, setActiveContent] = useState<'lld' | 'code' | 'tests'>('lld');
+  const [isPushingToJira, setIsPushingToJira] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const { generatedContent, contentLoading } = useStories();
   const { toast } = useToast();
-  const [pushing, setPushing] = React.useState(false);
-  const [generating, setGenerating] = React.useState(false);
-
-  const handlePushToJira = async () => {
-    if (!content) return;
+  const contentRef = React.useRef<HTMLDivElement>(null);
+  
+  const getContentByType = (type: 'lld' | 'code' | 'tests') => {
+    if (!generatedContent) return '';
     
-    setPushing(true);
+    switch (type) {
+      case 'lld':
+        return generatedContent.lldContent || generatedContent.lld || '';
+      case 'code':
+        return generatedContent.codeContent || generatedContent.code || '';
+      case 'tests':
+        return generatedContent.testContent || generatedContent.tests || '';
+      default:
+        return '';
+    }
+  };
+  
+  const exportToPDF = async () => {
+    if (!contentRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const content = contentRef.current;
+      const canvas = await html2canvas(content);
+      const imgData = canvas.toDataURL('image/png');
+      
+      const contentType = activeContent;
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgWidth = 210;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`${ticket.key}_${contentType}.pdf`);
+      
+      toast({
+        title: "PDF Exported",
+        description: `${contentType.toUpperCase()} content has been exported as PDF.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to export content as PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const handlePushToJira = async () => {
+    const content = getContentByType(activeContent);
+    
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to push to Jira.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsPushingToJira(true);
     try {
       const success = await onPushToJira(content);
       
       if (success) {
         toast({
-          title: "Success",
-          description: `${title} has been pushed to Jira ticket ${ticket.key}`,
-          variant: "default",
+          title: "Content Pushed",
+          description: `${activeContent.toUpperCase()} content has been pushed to Jira ticket ${ticket.key}.`,
         });
       } else {
-        toast({
-          title: "Error",
-          description: "Failed to push content to Jira",
-          variant: "destructive",
-        });
+        throw new Error("Failed to push content to Jira.");
       }
-    } catch (err) {
-      console.error('Error pushing to Jira:', err);
+    } catch (err: any) {
       toast({
         title: "Error",
-        description: "Failed to push content to Jira",
+        description: err.message || "Failed to push content to Jira.",
         variant: "destructive",
       });
     } finally {
-      setPushing(false);
+      setIsPushingToJira(false);
     }
   };
-
-  const handleGenerate = async () => {
-    setGenerating(true);
-    try {
-      await onGenerate();
-      toast({
-        title: "Generated",
-        description: `${title} has been generated successfully`,
-      });
-    } catch (err) {
-      console.error('Error generating content:', err);
-      toast({
-        title: "Error",
-        description: "Failed to generate content",
-        variant: "destructive",
-      });
-    } finally {
-      setGenerating(false);
-    }
-  };
-
+  
+  if (contentLoading) {
+    return (
+      <LoadingContent 
+        message="Generating content, please wait..."
+        isLoading={true}
+      />
+    );
+  }
+  
+  const hasContent = Boolean(getContentByType('lld') || getContentByType('code') || getContentByType('tests'));
+  
+  if (!hasContent) {
+    return (
+      <LoadingContent
+        message="No content generated yet"
+        isInfo={true}
+        additionalMessage="Click on one of the generate buttons to create content for this ticket"
+      />
+    );
+  }
+  
   return (
-    <TabsContent value={tabId} className="min-h-[400px] border rounded-md p-4">
-      {loading ? (
-        <div className="flex flex-col items-center justify-center h-[300px]">
-          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mb-4"></div>
-          <p className="text-muted-foreground">Generating {title}...</p>
-        </div>
-      ) : content ? (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-lg font-medium">{title}</h3>
-            <div className="flex space-x-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handleGenerate}
-                disabled={generating || loading}
-              >
-                {generating ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : (
-                  <FileCheck className="h-3 w-3 mr-1" />
-                )}
-                Regenerate
-              </Button>
-              
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={handlePushToJira}
-                disabled={pushing || !content}
-              >
-                {pushing ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : (
-                  <Send className="h-3 w-3 mr-1" />
-                )}
-                Push to Jira
-              </Button>
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as 'lld' | 'code' | 'tests')} className="w-full">
+          <TabsList className="inline-flex space-x-1 rounded-lg bg-muted p-1">
+            <TabsTrigger
+              value="lld"
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('lld') ? 'opacity-50' : ''}`}
+              disabled={!getContentByType('lld')}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              LLD
+            </TabsTrigger>
+            <TabsTrigger
+              value="code"
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('code') ? 'opacity-50' : ''}`}
+              disabled={!getContentByType('code')}
+            >
+              <Code className="mr-2 h-4 w-4" />
+              Code
+            </TabsTrigger>
+            <TabsTrigger
+              value="tests"
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm ${!getContentByType('tests') ? 'opacity-50' : ''}`}
+              disabled={!getContentByType('tests')}
+            >
+              <TestTube className="mr-2 h-4 w-4" />
+              Tests
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToPDF}
+            disabled={isExporting || !getContentByType(activeContent)}
+            className="text-xs h-8"
+          >
+            <FileDown className="h-3.5 w-3.5 mr-1" />
+            PDF
+          </Button>
           
-          <ContentDisplay 
-            content={content} 
-            contentType={contentType}
+          <ExportToGSuite
+            storyId={ticket.id}
+            storyKey={ticket.key}
+            content={getContentByType(activeContent)}
+            contentType={activeContent}
           />
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-[300px] text-center p-6">
-          <AlertTriangle className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-medium mb-2">No content available</h3>
-          <p className="text-muted-foreground mb-6">
-            Generate content to see the {title.toLowerCase()} for this story
-          </p>
           
-          <Button onClick={handleGenerate} disabled={generating || loading}>
-            {generating ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <FileCheck className="h-4 w-4 mr-2" />
-            )}
-            Generate {title}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePushToJira}
+            disabled={isPushingToJira || !getContentByType(activeContent)}
+            className="text-xs h-8"
+          >
+            <Send className="h-3.5 w-3.5 mr-1" />
+            Jira
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={true}
+            className="text-xs h-8"
+          >
+            <Github className="h-3.5 w-3.5 mr-1" />
+            Bitbucket
           </Button>
         </div>
-      )}
-    </TabsContent>
+      </div>
+      
+      <Card className="border rounded-md overflow-hidden">
+        <CardContent className="p-4" ref={contentRef}>
+          <ContentDisplay 
+            content={getContentByType(activeContent)} 
+            contentType={activeContent} 
+          />
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

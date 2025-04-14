@@ -3,12 +3,14 @@ import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User } from "lucide-react";
+import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User, Tags } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { sanitizeContentForReact, ensureString } from '@/contexts/stories/api';
 import StoryTabContent from './StoryTabContent';
+import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
 
 interface StoryDetailProps {
   ticket: JiraTicket;
@@ -27,6 +29,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("details");
   const { generateContent, pushToJira, generatedContent, contentLoading } = useStories();
+  const { isLldGenerated, isCodeGenerated, isTestsGenerated } = useJiraArtifacts(ticket);
   
   if (isLoading) {
     return <StoryDetailSkeleton />;
@@ -40,7 +43,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       });
-      setActiveTab("lld");
+      setActiveTab("generate");
     } catch (error) {
       console.error("Error generating LLD:", error);
     }
@@ -54,7 +57,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       });
-      setActiveTab("code");
+      setActiveTab("generate");
     } catch (error) {
       console.error("Error generating code:", error);
     }
@@ -68,7 +71,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
       });
-      setActiveTab("tests");
+      setActiveTab("generate");
     } catch (error) {
       console.error("Error generating tests:", error);
     }
@@ -79,142 +82,179 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
     return await pushToJira(ticket.id, content);
   };
 
-  return (
-    <div className="space-y-6">
-      <StoryHeader ticket={ticket} />
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full grid grid-cols-4">
-          <TabsTrigger value="details">Story Details</TabsTrigger>
-          <TabsTrigger value="lld">Low-Level Design</TabsTrigger>
-          <TabsTrigger value="code">Implementation</TabsTrigger>
-          <TabsTrigger value="tests">Test Cases</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="details" className="py-4">
-          <StoryContent ticket={ticket} />
-        </TabsContent>
-        
-        <StoryTabContent
-          tabId="lld"
-          title="Low-Level Design"
-          content={generatedContent?.lld || generatedContent?.lldContent || null}
-          contentType="lld"
-          loading={contentLoading && activeTab === "lld"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateLLD}
-        />
-        
-        <StoryTabContent
-          tabId="code"
-          title="Implementation Code"
-          content={generatedContent?.code || generatedContent?.codeContent || null}
-          contentType="code"
-          loading={contentLoading && activeTab === "code"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateCode}
-        />
-        
-        <StoryTabContent
-          tabId="tests"
-          title="Test Cases"
-          content={generatedContent?.tests || generatedContent?.testContent || null}
-          contentType="tests"
-          loading={contentLoading && activeTab === "tests"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateTests}
-        />
-      </Tabs>
-    </div>
-  );
-};
-
-const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
   const getJiraTicketUrl = () => {
     if (!ticket.domain || !ticket.key) return '#';
     return `${ticket.domain}/browse/${ticket.key}`;
   };
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <h3 className="text-lg font-semibold text-primary">
-            {ticket.key}
-          </h3>
-          {ticket.issuetype?.name && (
-            <Badge variant="outline">
-              {ticket.issuetype.name}
+    <div className="space-y-6">
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold text-primary">
+              {ticket.key}
+            </h3>
+            {ticket.issuetype?.name && (
+              <Badge variant="outline" className="capitalize">
+                {ticket.issuetype.name}
+              </Badge>
+            )}
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => window.open(getJiraTicketUrl(), '_blank')}
+            className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+          >
+            <ExternalLink className="h-4 w-4 mr-1" />
+            View in Jira
+          </Button>
+        </div>
+        
+        <h2 className="text-2xl font-bold">
+          {ticket.summary}
+        </h2>
+        
+        <div className="flex flex-wrap gap-2 pt-1">
+          {ticket.status && (
+            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+              {ticket.status}
+            </Badge>
+          )}
+          
+          {ticket.priority && (
+            <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+              Priority: {ticket.priority}
+            </Badge>
+          )}
+          
+          {ticket.story_points > 0 && (
+            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300">
+              {ticket.story_points} points
             </Badge>
           )}
         </div>
         
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => window.open(getJiraTicketUrl(), '_blank')}
-          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          <ExternalLink className="h-4 w-4 mr-1" />
-          View in Jira
-        </Button>
+        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+          {ticket.assignee && (
+            <div className="flex items-center">
+              <User className="h-4 w-4 mr-1" />
+              {ticket.assignee}
+            </div>
+          )}
+          
+          {ticket.created_at && (
+            <div className="flex items-center">
+              <CalendarClock className="h-4 w-4 mr-1" />
+              Created: {new Date(ticket.created_at).toLocaleDateString()}
+            </div>
+          )}
+          
+          {ticket.updated_at && (
+            <div className="flex items-center">
+              <Clock className="h-4 w-4 mr-1" />
+              Updated: {new Date(ticket.updated_at).toLocaleDateString()}
+            </div>
+          )}
+        </div>
       </div>
       
-      <h2 className="text-2xl font-bold">
-        {ticket.summary}
-      </h2>
-      
-      <div className="flex flex-wrap gap-2 pt-1">
-        {ticket.status && (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-            {ticket.status}
-          </Badge>
-        )}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="details">Story Details</TabsTrigger>
+          <TabsTrigger value="generate">Generate Content</TabsTrigger>
+        </TabsList>
         
-        {ticket.priority && (
-          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-            Priority: {ticket.priority}
-          </Badge>
-        )}
+        <TabsContent value="details" className="py-4">
+          <StoryContent ticket={ticket} />
+        </TabsContent>
         
-        {ticket.story_points > 0 && (
-          <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            {ticket.story_points} points
-          </Badge>
-        )}
-      </div>
-      
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-        {ticket.assignee && (
-          <div className="flex items-center">
-            <User className="h-4 w-4 mr-1" />
-            {ticket.assignee}
-          </div>
-        )}
-        
-        {ticket.created_at && (
-          <div className="flex items-center">
-            <CalendarClock className="h-4 w-4 mr-1" />
-            Created: {new Date(ticket.created_at).toLocaleDateString()}
-          </div>
-        )}
-        
-        {ticket.updated_at && (
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-1" />
-            Updated: {new Date(ticket.updated_at).toLocaleDateString()}
-          </div>
-        )}
-      </div>
+        <TabsContent value="generate" className="py-4">
+          <Card className="overflow-hidden">
+            <CardContent className="p-0">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-0 md:gap-4">
+                <div className="col-span-1 border-r border-border p-4 bg-muted/30">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-medium">Generate Content</h3>
+                    <div className="grid grid-cols-1 gap-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start h-10 font-normal"
+                        onClick={handleGenerateLLD}
+                        disabled={contentLoading}
+                      >
+                        <div className="bg-blue-100 dark:bg-blue-900/40 p-1.5 rounded-md mr-2">
+                          <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        Generate LLD
+                        {isLldGenerated && <Check className="ml-auto h-4 w-4 text-green-500" />}
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start h-10 font-normal"
+                        onClick={handleGenerateCode}
+                        disabled={contentLoading}
+                      >
+                        <div className="bg-green-100 dark:bg-green-900/40 p-1.5 rounded-md mr-2">
+                          <Code className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        </div>
+                        Generate Code
+                        {isCodeGenerated && <Check className="ml-auto h-4 w-4 text-green-500" />}
+                      </Button>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start h-10 font-normal"
+                        onClick={handleGenerateTests}
+                        disabled={contentLoading}
+                      >
+                        <div className="bg-purple-100 dark:bg-purple-900/40 p-1.5 rounded-md mr-2">
+                          <TestTube className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        </div>
+                        Generate Tests
+                        {isTestsGenerated && <Check className="ml-auto h-4 w-4 text-green-500" />}
+                      </Button>
+                      
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="justify-start h-10 w-full bg-primary/90 hover:bg-primary"
+                        disabled={contentLoading}
+                        onClick={async () => {
+                          await handleGenerateLLD();
+                          await handleGenerateCode();
+                          await handleGenerateTests();
+                        }}
+                      >
+                        <div className="bg-white/20 p-1.5 rounded-md mr-2">
+                          <Check className="h-4 w-4 text-white" />
+                        </div>
+                        Generate All
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="col-span-4 p-4">
+                  <StoryTabContent 
+                    onGenerate={handleGenerateLLD}
+                    onPushToJira={handlePushToJira}
+                    projectContext={projectContext}
+                    selectedDocuments={selectedDocuments}
+                    ticket={ticket}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
@@ -265,7 +305,10 @@ const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
       
       {ticket.labels && ticket.labels.length > 0 && (
         <div className="space-y-2">
-          <h3 className="text-md font-semibold">Labels</h3>
+          <h3 className="text-md font-semibold flex items-center">
+            <Tags className="h-4 w-4 mr-2 text-blue-500" />
+            Labels
+          </h3>
           <div className="flex flex-wrap gap-2">
             {ticket.labels.map((label, index) => (
               <Badge key={index} variant="outline">{label}</Badge>
