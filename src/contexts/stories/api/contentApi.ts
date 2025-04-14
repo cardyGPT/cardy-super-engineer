@@ -1,7 +1,30 @@
 
 import { supabase } from '@/lib/supabase';
-import { JiraGenerationRequest, JiraGenerationResponse, JiraTicket, JiraCredentials } from '@/types/jira';
+import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
 import { DEV_MODE, callJiraApi } from './apiUtils';
+
+// Helper function to ensure content is a string
+const ensureStringContent = (content: any): string => {
+  if (content === null || content === undefined) {
+    return "";
+  }
+  
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  // Handle Jira document format or any object
+  if (typeof content === 'object') {
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch (e) {
+      console.error("Error stringifying content:", e);
+      return "[Content conversion error]";
+    }
+  }
+  
+  return String(content);
+};
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -37,9 +60,7 @@ export const generateJiraContent = async (
     }
     
     // Ensure response is a string
-    const responseContent = typeof data.response === 'string' 
-      ? data.response 
-      : JSON.stringify(data.response, null, 2);
+    const responseContent = ensureStringContent(data.response);
     
     // Create a response object with the generated content
     // For 'all' type, we'll still return it in the correct content field instead of using 'all'
@@ -126,7 +147,7 @@ export const pushContentToJira = async (
     console.log(`Pushing content to Jira ticket ${ticketId}...`);
     
     // Ensure content is a string
-    const safeContent = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+    const safeContent = ensureStringContent(content);
     
     // Convert markdown to Jira markup (a basic conversion)
     const jiraContent = safeContent

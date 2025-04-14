@@ -28,6 +28,11 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   selectedDocuments = [],
   onPushToJira
 }) => {
+  // Ensure content is string
+  const safeContent = typeof content === 'string' ? content : 
+                      (content && typeof content === 'object' ? JSON.stringify(content, null, 2) : 
+                      String(content || ''));
+
   return (
     <TabsContent value={tabId}>
       {loading ? (
@@ -35,7 +40,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
       ) : (
         <ContentDisplay
           title={title}
-          content={content || undefined}
+          content={safeContent || undefined}
           contentType={contentType}
           storyKey={ticket.key}
           storyId={ticket.id}

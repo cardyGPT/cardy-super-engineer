@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useStories } from "@/contexts/StoriesContext";
 import { ProjectContextData } from "@/types/jira";
 import StoryDetailWrapper from "./StoryDetailWrapper";

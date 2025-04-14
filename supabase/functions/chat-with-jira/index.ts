@@ -28,11 +28,34 @@ serve(async (req) => {
       );
     }
 
+    // Helper function to safely convert any content to string
+    const safeStringify = (content: any): string => {
+      if (content === null || content === undefined) {
+        return "";
+      }
+      
+      if (typeof content === 'string') {
+        return content;
+      }
+      
+      // Handle Jira document format or any object
+      if (typeof content === 'object') {
+        try {
+          return JSON.stringify(content, null, 2);
+        } catch (e) {
+          console.error("Error stringifying content:", e);
+          return "[Content conversion error]";
+        }
+      }
+      
+      return String(content);
+    };
+
     // Prepare context for the model
     let ticketContext = `
 Jira Ticket: ${jiraTicket.key || 'Unknown'}
 Summary: ${jiraTicket.summary || 'No summary provided'}
-Description: ${jiraTicket.description || 'No description provided'}
+Description: ${safeStringify(jiraTicket.description) || 'No description provided'}
 Status: ${jiraTicket.status || 'Unknown'}
 Priority: ${jiraTicket.priority || 'Unknown'}
 Type: ${jiraTicket.issuetype?.name || 'Unknown'}
@@ -40,20 +63,20 @@ Type: ${jiraTicket.issuetype?.name || 'Unknown'}
 
     // Add any additional contexts
     if (dataModel) {
-      ticketContext += `\nData Model Context:\n${typeof dataModel === 'string' ? dataModel : JSON.stringify(dataModel, null, 2)}`;
+      ticketContext += `\nData Model Context:\n${safeStringify(dataModel)}`;
     }
 
     if (documentsContext) {
-      ticketContext += `\nDocuments Context:\n${typeof documentsContext === 'string' ? documentsContext : JSON.stringify(documentsContext, null, 2)}`;
+      ticketContext += `\nDocuments Context:\n${safeStringify(documentsContext)}`;
     }
 
     // Include sprint and epic information if available
     if (additionalContext?.sprint) {
-      ticketContext += `\nSprint Information:\n${JSON.stringify(additionalContext.sprint, null, 2)}`;
+      ticketContext += `\nSprint Information:\n${safeStringify(additionalContext.sprint)}`;
     }
     
     if (additionalContext?.epic) {
-      ticketContext += `\nEpic Information:\n${JSON.stringify(additionalContext.epic, null, 2)}`;
+      ticketContext += `\nEpic Information:\n${safeStringify(additionalContext.epic)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info
