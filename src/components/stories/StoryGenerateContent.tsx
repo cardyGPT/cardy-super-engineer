@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
+import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,7 @@ interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
+  projectContextData?: ProjectContextData | null;
 }
 
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
