@@ -1,3 +1,4 @@
+
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject } from '@/types/jira';
 
@@ -199,6 +200,16 @@ export const sanitizeContentForReact = (content: any): string => {
   
   // Ensure content is a string before calling string methods
   const contentStr = ensureString(content);
+  
+  // Format JSON if the content appears to be JSON
+  if (contentStr.trim().startsWith('{') || contentStr.trim().startsWith('[')) {
+    try {
+      const parsedJson = JSON.parse(contentStr);
+      return JSON.stringify(parsedJson, null, 2);
+    } catch (e) {
+      // Not valid JSON, continue with regular formatting
+    }
+  }
   
   // Replace HTML entities and other problematic characters
   return contentStr

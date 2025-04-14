@@ -12,8 +12,8 @@ interface StoriesContextProps {
   error: string | null;
   
   // API type
-  apiType: 'agile' | 'classic';
-  setApiType: (type: 'agile' | 'classic') => void;
+  apiType: 'agile' | 'classic' | 'cloud';
+  setApiType: (type: 'agile' | 'classic' | 'cloud') => void;
   
   // Data state
   projects: JiraProject[];
@@ -71,10 +71,14 @@ const StoriesContext = createContext<StoriesContextProps | undefined>(undefined)
 
 // Provider component
 export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [apiType, setApiType] = useState<'agile' | 'classic'>(() => {
+  const [apiType, setApiType] = useState<'agile' | 'classic' | 'cloud'>(() => {
     // Try to load from localStorage on initialization
     try {
-      return localStorage.getItem('jira_api_type') as 'agile' | 'classic' || 'agile';
+      const savedType = localStorage.getItem('jira_api_type');
+      if (savedType === 'agile' || savedType === 'classic' || savedType === 'cloud') {
+        return savedType;
+      }
+      return 'agile'; // Default
     } catch (err) {
       return 'agile';
     }
@@ -82,14 +86,25 @@ export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ child
   
   // Save API type to localStorage when it changes
   useEffect(() => {
-    localStorage.setItem('jira_api_type', apiType);
+    try {
+      localStorage.setItem('jira_api_type', apiType);
+    } catch (e) {
+      console.error('Failed to save API type to localStorage:', e);
+    }
   }, [apiType]);
   
   // Create the stories state with the API type
   const storiesState = useStoriesState(apiType);
   
+  // Provide combined context
+  const contextValue = {
+    ...storiesState,
+    apiType,
+    setApiType
+  };
+  
   return (
-    <StoriesContext.Provider value={{ ...storiesState, apiType, setApiType }}>
+    <StoriesContext.Provider value={contextValue}>
       {children}
     </StoriesContext.Provider>
   );

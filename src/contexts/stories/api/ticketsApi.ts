@@ -1,3 +1,4 @@
+
 import { JiraCredentials, JiraProject, JiraTicket } from '@/types/jira';
 import { callJiraApi, DEV_MODE } from './apiUtils';
 
@@ -66,28 +67,73 @@ export const fetchJiraTickets = async (
     // Add sorting
     jqlQuery += ` ORDER BY updated DESC`;
     
-    // Regular API call for all sprints
+    // Log the query for debugging
     console.log(`Fetching tickets with JQL: ${jqlQuery}`);
-    const data = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=${maxResults}&startAt=${startAt}`);
     
-    // Ensure data.issues is always an array to prevent the map error
-    if (!data.issues || !Array.isArray(data.issues) || data.issues.length === 0) {
-      console.log('No issues found in sprint, returning empty issues array');
+    try {
+      // Regular API call for all sprints
+      const data = await callJiraApi(credentials, `api/2/search?jql=${encodeURIComponent(jqlQuery)}&maxResults=${maxResults}&startAt=${startAt}`);
       
-      // When sprint has no tickets in production, return test data in DEV_MODE
-      if (DEV_MODE && selectedProject) {
-        console.log('[DEV MODE] Returning test tickets for empty sprint');
-        const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 20);
-        return { tickets: testData, total: testData.length };
+      // Ensure data.issues is always an array to prevent the map error
+      if (!data || !data.issues || !Array.isArray(data.issues) || data.issues.length === 0) {
+        console.log('No issues found in sprint, returning empty issues array');
+        
+        // When sprint has no tickets in production, return test data in DEV_MODE
+        if (DEV_MODE && selectedProject) {
+          console.log('[DEV MODE] Returning test tickets for empty sprint');
+          const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 20);
+          return { tickets: testData, total: testData.length };
+        }
+        
+        return { tickets: [], total: 0 };
       }
       
-      return { tickets: [], total: 0 };
+      // Transform the response into our JiraTicket format
+      const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, String(sprintId)));
+      
+      return { tickets, total: data.total || tickets.length };
+    } catch (apiError) {
+      console.error('Error in API call for sprint tickets, trying alternate endpoint:', apiError);
+      
+      // Try an alternate endpoint for Jira Cloud
+      try {
+        const cloudData = await callJiraApi(credentials, `agile/1.0/sprint/${sprintId}/issue?maxResults=${maxResults}&startAt=${startAt}`);
+        
+        if (!cloudData || !cloudData.issues || !Array.isArray(cloudData.issues) || cloudData.issues.length === 0) {
+          console.log('No issues found in sprint using agile API, returning empty issues array');
+          return { tickets: [], total: 0 };
+        }
+        
+        // Transform the response into our JiraTicket format
+        const tickets = cloudData.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, String(sprintId)));
+        
+        // Apply filters manually since we couldn't use JQL
+        let filteredTickets = [...tickets];
+        if (filters.type) {
+          filteredTickets = filteredTickets.filter(ticket => 
+            ticket.issuetype?.name?.toLowerCase() === filters.type?.toLowerCase()
+          );
+        }
+        if (filters.status) {
+          filteredTickets = filteredTickets.filter(ticket => 
+            ticket.status?.toLowerCase() === filters.status?.toLowerCase()
+          );
+        }
+        
+        return { tickets: filteredTickets, total: filteredTickets.length };
+      } catch (altError) {
+        console.error('Both API methods failed for fetching sprint tickets:', altError);
+        
+        // Fallback to fetching all project tickets as a last resort
+        console.log('Falling back to fetching all project tickets with sprint filtering');
+        const { tickets: allTickets } = await fetchJiraTicketsByProject(credentials, selectedProject, 0, 100, filters);
+        
+        // Filter by sprint manually
+        const sprintTickets = allTickets.filter(ticket => ticket.sprintId === String(sprintId));
+        
+        return { tickets: sprintTickets, total: sprintTickets.length };
+      }
     }
-    
-    // Transform the response into our JiraTicket format
-    const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, String(sprintId)));
-    
-    return { tickets, total: data.total || tickets.length };
   } catch (error) {
     console.error('Error fetching Jira tickets:', error);
     
@@ -133,9 +179,9 @@ export const fetchJiraTicketsByProject = async (
     jqlQuery += ` ORDER BY created DESC`;
     
     console.log(`Fetching tickets with project JQL: ${jqlQuery}`);
-    const data = await callJiraApi(credentials, `search?jql=${encodeURIComponent(jqlQuery)}&maxResults=${maxResults}&startAt=${startAt}`);
+    const data = await callJiraApi(credentials, `api/2/search?jql=${encodeURIComponent(jqlQuery)}&maxResults=${maxResults}&startAt=${startAt}`);
     
-    if (!data.issues || !Array.isArray(data.issues) || data.issues.length === 0) {
+    if (!data || !data.issues || !Array.isArray(data.issues) || data.issues.length === 0) {
       console.log('No issues found in project, returning empty issues array');
       
       // For dev mode, return test data

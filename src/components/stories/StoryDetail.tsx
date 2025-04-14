@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
@@ -142,6 +143,10 @@ const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
   const fixedDescription = ticket.description ? sanitizeContentForReact(ticket.description) : '';
   const fixedAcceptanceCriteria = ticket.acceptance_criteria ? sanitizeContentForReact(ticket.acceptance_criteria) : '';
   
+  // Detect if the content looks like JSON for rendering purposes
+  const isDescriptionJson = fixedDescription.trim().startsWith('{') || fixedDescription.trim().startsWith('[');
+  const isAcceptanceCriteriaJson = fixedAcceptanceCriteria.trim().startsWith('{') || fixedAcceptanceCriteria.trim().startsWith('[');
+  
   return (
     <div className="space-y-6">
       {fixedDescription ? (
@@ -150,7 +155,7 @@ const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
             <Check className="h-4 w-4 mr-2 text-green-500" />
             Description
           </h3>
-          <div className="text-sm bg-muted/50 p-4 rounded-md whitespace-pre-wrap">
+          <div className={`text-sm bg-muted/50 p-4 rounded-md ${isDescriptionJson ? 'font-mono overflow-x-auto' : 'whitespace-pre-wrap'}`}>
             {fixedDescription}
           </div>
         </div>
@@ -172,7 +177,7 @@ const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
             <Check className="h-4 w-4 mr-2 text-green-500" />
             Acceptance Criteria
           </h3>
-          <div className="text-sm bg-muted/50 p-4 rounded-md whitespace-pre-wrap">
+          <div className={`text-sm bg-muted/50 p-4 rounded-md ${isAcceptanceCriteriaJson ? 'font-mono overflow-x-auto' : 'whitespace-pre-wrap'}`}>
             {fixedAcceptanceCriteria}
           </div>
         </div>
@@ -193,9 +198,9 @@ const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
         <div className="space-y-2">
           <h3 className="text-md font-semibold">Epic</h3>
           <div className="text-sm bg-muted/50 p-4 rounded-md">
-            {typeof ticket.epicInfo === 'string' 
-              ? ticket.epicInfo 
-              : JSON.stringify(ticket.epicInfo)}
+            {typeof ticket.epicInfo === 'object' 
+              ? JSON.stringify(ticket.epicInfo, null, 2)
+              : ticket.epicInfo}
           </div>
         </div>
       )}
