@@ -1,7 +1,6 @@
-
 import React from 'react';
 import { useStories } from '@/contexts/StoriesContext';
-import { JiraTicket } from '@/types/jira';
+import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,9 +10,18 @@ import { sanitizeContentForReact } from '@/contexts/stories/api';
 interface StoryDetailProps {
   ticket: JiraTicket;
   isLoading?: boolean;
+  projectContext?: string | null;
+  selectedDocuments?: string[];
+  projectContextData?: ProjectContextData | null;
 }
 
-const StoryDetail: React.FC<StoryDetailProps> = ({ ticket, isLoading = false }) => {
+const StoryDetail: React.FC<StoryDetailProps> = ({ 
+  ticket, 
+  isLoading = false,
+  projectContext = null,
+  selectedDocuments = [],
+  projectContextData = null
+}) => {
   if (isLoading) {
     return <StoryDetailSkeleton />;
   }
