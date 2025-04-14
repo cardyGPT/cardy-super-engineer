@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 
 export interface JiraArtifacts {
   lldContent: string | null;
@@ -24,6 +25,7 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const fetchArtifacts = useCallback(async () => {
     if (!ticket?.key) {
@@ -34,6 +36,8 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
     setError(null);
 
     try {
+      console.log(`Fetching artifacts for ticket: ${ticket.key}`);
+      
       const { data, error } = await supabase
         .from('story_artifacts')
         .select('*')
@@ -47,15 +51,18 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
       }
 
       if (data) {
+        console.log('Artifacts found:', data);
+        
         setArtifacts({
           lldContent: data.lld_content || null,
           codeContent: data.code_content || null,
           testContent: data.test_content || null,
-          isLldGenerated: !!data.lld_content,
-          isCodeGenerated: !!data.code_content,
-          isTestsGenerated: !!data.test_content
+          isLldGenerated: Boolean(data.lld_content),
+          isCodeGenerated: Boolean(data.code_content),
+          isTestsGenerated: Boolean(data.test_content)
         });
       } else {
+        console.log('No artifacts found for this ticket');
         // Reset if no data found
         setArtifacts({
           lldContent: null,
@@ -70,18 +77,30 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
       console.error('Error fetching artifacts:', err);
       if (err instanceof Error) {
         setError(err.message);
+        toast({
+          title: 'Error',
+          description: `Failed to load content: ${err.message}`,
+          variant: 'destructive'
+        });
       } else {
         setError('Unknown error occurred while fetching artifacts');
+        toast({
+          title: 'Error',
+          description: 'Unknown error occurred while loading content',
+          variant: 'destructive'
+        });
       }
     } finally {
       setLoading(false);
     }
-  }, [ticket]);
+  }, [ticket, toast]);
 
   // Fetch artifacts whenever ticket changes
   useEffect(() => {
-    fetchArtifacts();
-  }, [fetchArtifacts]);
+    if (ticket?.key) {
+      fetchArtifacts();
+    }
+  }, [fetchArtifacts, ticket]);
 
   return {
     ...artifacts,

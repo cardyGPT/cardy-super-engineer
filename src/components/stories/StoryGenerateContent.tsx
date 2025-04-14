@@ -1,14 +1,29 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2 } from "lucide-react";
+import { 
+  AlertCircle, 
+  Code, 
+  FileText, 
+  TestTube, 
+  RefreshCw, 
+  Send, 
+  CheckCircle2, 
+  Download,
+  External,
+  Github,
+  FileSpreadsheet,
+  BookOpenText
+} from "lucide-react";
 import { JiraTicket, ProjectContextData, JiraGenerationRequest } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import StoryTabContent from './StoryTabContent';
 import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
+import { downloadAsPDF } from '@/utils/exportUtils';
+import { useToast } from '@/hooks/use-toast';
 
 interface StoryGenerateContentProps {
   ticket: JiraTicket;
@@ -26,6 +41,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [activeTab, setActiveTab] = useState("lld");
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null); // Type being generated
+  const contentRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
   
   const { generateContent, pushToJira } = useStories();
   const { 
@@ -106,6 +123,59 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
+
+  const handleGenerateAll = async () => {
+    if (!ticket) return;
+    setError(null);
+    setGenerating("all");
+    
+    try {
+      // Generate LLD
+      const lldRequest: JiraGenerationRequest = {
+        type: 'lld',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+        additionalContext: {}
+      };
+      
+      await generateContent(lldRequest);
+      
+      // Generate Code
+      const codeRequest: JiraGenerationRequest = {
+        type: 'code',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+        additionalContext: {}
+      };
+      
+      await generateContent(codeRequest);
+      
+      // Generate Tests
+      const testsRequest: JiraGenerationRequest = {
+        type: 'tests',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+        additionalContext: {}
+      };
+      
+      await generateContent(testsRequest);
+      
+      // Refresh to show new content
+      await refreshArtifacts();
+      
+      toast({
+        title: "Generation Complete",
+        description: "All content has been generated successfully."
+      });
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate all content');
+    } finally {
+      setGenerating(null);
+    }
+  };
   
   const handlePushToJira = async (content: string): Promise<boolean> => {
     if (!ticket || !ticket.id) {
@@ -120,6 +190,53 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       return false;
     }
   };
+
+  const handleDownloadAll = async () => {
+    if (!contentRef.current) {
+      toast({
+        title: "Error",
+        description: "Content container not found",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const result = await downloadAsPDF(
+      contentRef.current, 
+      `${ticket.key}_all_content`
+    );
+    
+    if (result) {
+      toast({
+        title: "Download Complete",
+        description: "Content has been downloaded as PDF"
+      });
+    } else {
+      toast({
+        title: "Download Failed",
+        description: "Failed to generate PDF",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handlePushToGSuite = () => {
+    toast({
+      title: "GSuite Integration",
+      description: "Pushing to GSuite is not fully implemented yet",
+      variant: "default"
+    });
+  };
+
+  const handlePushToBitbucket = () => {
+    toast({
+      title: "Bitbucket Integration",
+      description: "Pushing to Bitbucket is not fully implemented yet",
+      variant: "default"
+    });
+  };
+  
+  const hasAnyContent = lldContent || codeContent || testContent;
   
   return (
     <Card className="w-full">
@@ -171,6 +288,21 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               )}
               {testContent ? 'Regenerate Tests' : 'Generate Tests'}
             </Button>
+
+            <Button 
+              variant={hasAnyContent ? "outline" : "default"} 
+              size="sm" 
+              onClick={handleGenerateAll}
+              disabled={generating !== null}
+              className="flex items-center"
+            >
+              {generating === "all" ? (
+                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <BookOpenText className="h-4 w-4 mr-2" />
+              )}
+              {hasAnyContent ? 'Regenerate All' : 'Generate All'}
+            </Button>
           </div>
         </CardTitle>
       </CardHeader>
@@ -184,61 +316,98 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           </Alert>
         )}
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-3 mb-4">
-            <TabsTrigger value="lld" className="flex items-center">
-              <FileText className="h-4 w-4 mr-2" />
-              <span>LLD</span>
-              {lldContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-            </TabsTrigger>
-            <TabsTrigger value="code" className="flex items-center">
-              <Code className="h-4 w-4 mr-2" />
-              <span>Code</span>
-              {codeContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-            </TabsTrigger>
-            <TabsTrigger value="tests" className="flex items-center">
-              <TestTube className="h-4 w-4 mr-2" />
-              <span>Tests</span>
-              {testContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-            </TabsTrigger>
-          </TabsList>
+        <div className="flex justify-end mb-4 space-x-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleDownloadAll}
+            disabled={!hasAnyContent}
+            className="flex items-center"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download as PDF
+          </Button>
           
-          <StoryTabContent
-            tabId="lld"
-            title="Low-Level Design"
-            content={lldContent}
-            contentType="lld"
-            loading={generating === "lld"}
-            ticket={ticket}
-            projectContext={projectContext}
-            selectedDocuments={selectedDocuments}
-            onPushToJira={handlePushToJira}
-          />
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handlePushToGSuite}
+            disabled={!hasAnyContent}
+            className="flex items-center"
+          >
+            <FileSpreadsheet className="h-4 w-4 mr-2" />
+            Push to GSuite
+          </Button>
           
-          <StoryTabContent
-            tabId="code"
-            title="Implementation Code"
-            content={codeContent}
-            contentType="code"
-            loading={generating === "code"}
-            ticket={ticket}
-            projectContext={projectContext}
-            selectedDocuments={selectedDocuments}
-            onPushToJira={handlePushToJira}
-          />
-          
-          <StoryTabContent
-            tabId="tests"
-            title="Test Cases"
-            content={testContent}
-            contentType="tests"
-            loading={generating === "tests"}
-            ticket={ticket}
-            projectContext={projectContext}
-            selectedDocuments={selectedDocuments}
-            onPushToJira={handlePushToJira}
-          />
-        </Tabs>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handlePushToBitbucket}
+            disabled={!hasAnyContent}
+            className="flex items-center"
+          >
+            <Github className="h-4 w-4 mr-2" />
+            Push to Bitbucket
+          </Button>
+        </div>
+        
+        <div ref={contentRef}>
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-3 mb-4">
+              <TabsTrigger value="lld" className="flex items-center">
+                <FileText className="h-4 w-4 mr-2" />
+                <span>LLD</span>
+                {lldContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+              </TabsTrigger>
+              <TabsTrigger value="code" className="flex items-center">
+                <Code className="h-4 w-4 mr-2" />
+                <span>Code</span>
+                {codeContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+              </TabsTrigger>
+              <TabsTrigger value="tests" className="flex items-center">
+                <TestTube className="h-4 w-4 mr-2" />
+                <span>Tests</span>
+                {testContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
+              </TabsTrigger>
+            </TabsList>
+            
+            <StoryTabContent
+              tabId="lld"
+              title="Low-Level Design"
+              content={lldContent}
+              contentType="lld"
+              loading={generating === "lld"}
+              ticket={ticket}
+              projectContext={projectContext}
+              selectedDocuments={selectedDocuments}
+              onPushToJira={handlePushToJira}
+            />
+            
+            <StoryTabContent
+              tabId="code"
+              title="Implementation Code"
+              content={codeContent}
+              contentType="code"
+              loading={generating === "code"}
+              ticket={ticket}
+              projectContext={projectContext}
+              selectedDocuments={selectedDocuments}
+              onPushToJira={handlePushToJira}
+            />
+            
+            <StoryTabContent
+              tabId="tests"
+              title="Test Cases"
+              content={testContent}
+              contentType="tests"
+              loading={generating === "tests"}
+              ticket={ticket}
+              projectContext={projectContext}
+              selectedDocuments={selectedDocuments}
+              onPushToJira={handlePushToJira}
+            />
+          </Tabs>
+        </div>
       </CardContent>
     </Card>
   );

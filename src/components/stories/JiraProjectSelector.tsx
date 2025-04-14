@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent } from "@/components/ui/card";
@@ -192,13 +193,15 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                   <SelectContent>
                     {sprints[selectedProject.id]?.map((sprint) => (
                       <SelectItem key={sprint.id} value={sprint.id}>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-between w-full">
                           <span>
                             {sprint.name}
                           </span>
-                          <Badge className={getSprintBadgeColor(sprint)}>
-                            {sprint.state || 'Unknown'}
-                          </Badge>
+                          <div className="flex items-center space-x-2">
+                            <Badge className={getSprintBadgeColor(sprint)}>
+                              {sprint.state || 'Unknown'}
+                            </Badge>
+                          </div>
                         </div>
                       </SelectItem>
                     ))}
