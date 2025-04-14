@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { Badge } from "@/components/ui/badge";
-import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User, Tags } from "lucide-react";
+import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User, Tags, FileText, Code, TestTube } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
