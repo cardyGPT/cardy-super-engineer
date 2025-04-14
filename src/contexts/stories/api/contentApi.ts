@@ -16,11 +16,11 @@ export const generateJiraContent = async (
       request.jiraTicket = ticket;
     }
     
-    // Call the Supabase function to generate content
+    // Call the Supabase function to generate content with OpenAI
     const { data, error } = await supabase.functions.invoke('chat-with-jira', {
       body: {
         jiraTicket: ticket,
-        request: `Generate ${request.type} for this ticket`,
+        type: request.type,
         projectContext: request.projectContext,
         selectedDocuments: request.selectedDocuments,
         additionalContext: request.additionalContext
@@ -40,7 +40,6 @@ export const generateJiraContent = async (
     const responseContent = ensureString(data.response);
     
     // Create a response object with the generated content
-    // For 'all' type, we'll still return it in the correct content field instead of using 'all'
     let response: JiraGenerationResponse = {};
     
     if (request.type === 'lld') {
@@ -51,7 +50,6 @@ export const generateJiraContent = async (
       response.tests = responseContent;
     } else if (request.type === 'all') {
       // For 'all' type, put the content in the lld field by default
-      // In a real implementation, you might want to split this into different parts
       response.lld = responseContent;
     }
     
