@@ -1,3 +1,4 @@
+
 export interface JiraTicket {
   id: string;
   key: string;
