@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials } from '@/types/jira';
 
@@ -219,7 +218,6 @@ export const testJiraConnection = async (credentials: JiraCredentials): Promise<
 };
 
 // Function to sanitize content for React rendering
-// This prevents "Objects are not valid as a React child" errors
 export const sanitizeContentForReact = (content: any): string => {
   if (content === null || content === undefined) {
     return '';

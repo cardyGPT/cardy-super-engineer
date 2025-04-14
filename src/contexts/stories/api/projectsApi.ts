@@ -74,4 +74,3 @@ export const fetchAllJiraProjects = async (credentials: JiraCredentials): Promis
     throw error;
   }
 };
-

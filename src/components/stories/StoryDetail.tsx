@@ -1,11 +1,14 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeContentForReact } from '@/contexts/stories/api';
+import StoryGenerateContent from './StoryGenerateContent';
 
 interface StoryDetailProps {
   ticket: JiraTicket;
@@ -22,6 +25,8 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   selectedDocuments = [],
   projectContextData = null
 }) => {
+  const [activeTab, setActiveTab] = useState("details");
+  
   if (isLoading) {
     return <StoryDetailSkeleton />;
   }
@@ -29,7 +34,26 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   return (
     <div className="space-y-6">
       <StoryHeader ticket={ticket} />
-      <StoryContent ticket={ticket} />
+      
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="w-full grid grid-cols-2">
+          <TabsTrigger value="details">Story Details</TabsTrigger>
+          <TabsTrigger value="generate">Generate Content</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="details" className="py-4">
+          <StoryContent ticket={ticket} />
+        </TabsContent>
+        
+        <TabsContent value="generate" className="py-4">
+          <StoryGenerateContent 
+            ticket={ticket}
+            projectContext={projectContext}
+            selectedDocuments={selectedDocuments}
+            projectContextData={projectContextData}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
