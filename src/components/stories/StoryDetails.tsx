@@ -16,7 +16,7 @@ interface StoryDetailsProps {
 const StoryDetails: React.FC<StoryDetailsProps> = ({ 
   projectContext, 
   selectedDocuments,
-  projectContextData // Accepting but not passing to StoryGenerateContent
+  projectContextData // Accepting but not using directly in props
 }) => {
   const { 
     selectedTicket, 
