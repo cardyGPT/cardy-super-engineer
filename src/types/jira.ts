@@ -19,7 +19,6 @@ export interface JiraTicket {
     id: string;
     name: string;
   };
-  // Additional fields from expressions
   sprintInfo?: any;
   epicInfo?: any;
   isLoadingAdditionalInfo?: boolean;
@@ -40,8 +39,8 @@ export interface JiraSprint {
   startDate?: string;
   endDate?: string;
   boardId: string;
-  projectId?: string; // Add this property to support tracking which project a sprint belongs to
-  totalIssues?: number; // Add totalIssues property
+  projectId?: string;
+  totalIssues?: number;
 }
 
 export interface JiraCredentials {
