@@ -3,33 +3,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  AlertCircle, 
-  Code, 
-  FileText, 
-  TestTube, 
-  RefreshCw, 
-  Send, 
-  CheckCircle2, 
-  Download,
-  Github,
-  FileSpreadsheet,
-  BookOpenText
-} from "lucide-react";
+import { AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2, Download, Github, FileSpreadsheet, BookOpenText } from "lucide-react";
 import { JiraTicket, ProjectContextData, JiraGenerationRequest } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import StoryTabContent from './StoryTabContent';
 import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
 import { downloadAsPDF } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
-
 interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: ProjectContextData | null;
 }
-
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
@@ -40,21 +26,23 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
-  
-  const { generateContent, pushToJira } = useStories();
-  const { 
-    lldContent, 
-    codeContent, 
-    testContent, 
-    refreshArtifacts 
+  const {
+    toast
+  } = useToast();
+  const {
+    generateContent,
+    pushToJira
+  } = useStories();
+  const {
+    lldContent,
+    codeContent,
+    testContent,
+    refreshArtifacts
   } = useJiraArtifacts(ticket);
-
   const handleGenerateLLD = async () => {
     if (!ticket) return;
     setError(null);
     setGenerating("lld");
-    
     try {
       const request: JiraGenerationRequest = {
         type: 'lld',
@@ -63,7 +51,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(request);
       await refreshArtifacts();
       setActiveTab("lld");
@@ -73,12 +60,10 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
-
   const handleGenerateCode = async () => {
     if (!ticket) return;
     setError(null);
     setGenerating("code");
-    
     try {
       const request: JiraGenerationRequest = {
         type: 'code',
@@ -87,7 +72,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(request);
       await refreshArtifacts();
       setActiveTab("code");
@@ -97,12 +81,10 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
-
   const handleGenerateTests = async () => {
     if (!ticket) return;
     setError(null);
     setGenerating("tests");
-    
     try {
       const request: JiraGenerationRequest = {
         type: 'tests',
@@ -111,7 +93,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(request);
       await refreshArtifacts();
       setActiveTab("tests");
@@ -121,12 +102,10 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
-
   const handleGenerateAll = async () => {
     if (!ticket) return;
     setError(null);
     setGenerating("all");
-    
     try {
       const lldRequest: JiraGenerationRequest = {
         type: 'lld',
@@ -135,9 +114,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(lldRequest);
-      
       const codeRequest: JiraGenerationRequest = {
         type: 'code',
         jiraTicket: ticket,
@@ -145,9 +122,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(codeRequest);
-      
       const testsRequest: JiraGenerationRequest = {
         type: 'tests',
         jiraTicket: ticket,
@@ -155,11 +130,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         selectedDocuments,
         additionalContext: {}
       };
-      
       await generateContent(testsRequest);
-      
       await refreshArtifacts();
-      
       toast({
         title: "Generation Complete",
         description: "All content has been generated successfully."
@@ -170,13 +142,11 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
-  
   const handlePushToJira = async (content: string): Promise<boolean> => {
     if (!ticket || !ticket.id) {
       setError('Invalid ticket information');
       return false;
     }
-    
     try {
       return await pushToJira(ticket.id, content);
     } catch (err: any) {
@@ -184,7 +154,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       return false;
     }
   };
-
   const handleDownloadAll = async () => {
     if (!contentRef.current) {
       toast({
@@ -194,12 +163,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
       return;
     }
-    
-    const result = await downloadAsPDF(
-      contentRef.current, 
-      `${ticket.key}_all_content`
-    );
-    
+    const result = await downloadAsPDF(contentRef.current, `${ticket.key}_all_content`);
     if (result) {
       toast({
         title: "Download Complete",
@@ -213,7 +177,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
     }
   };
-
   const handlePushToGSuite = () => {
     toast({
       title: "GSuite Integration",
@@ -221,7 +184,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       variant: "default"
     });
   };
-
   const handlePushToBitbucket = () => {
     toast({
       title: "Bitbucket Integration",
@@ -229,72 +191,29 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       variant: "default"
     });
   };
-  
   const hasAnyContent = lldContent || codeContent || testContent;
-  
-  return (
-    <Card className="w-full">
+  return <Card className="w-full">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl flex justify-between items-center">
-          <span>Generate Content</span>
+          
           <div className="flex items-center space-x-2">
-            <Button 
-              variant={lldContent ? "outline" : "default"} 
-              size="sm" 
-              onClick={handleGenerateLLD}
-              disabled={generating !== null}
-              className="flex items-center"
-            >
-              {generating === "lld" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4 mr-2" />
-              )}
+            <Button variant={lldContent ? "outline" : "default"} size="sm" onClick={handleGenerateLLD} disabled={generating !== null} className="flex items-center">
+              {generating === "lld" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
               {lldContent ? 'Regenerate LLD' : 'Generate LLD'}
             </Button>
             
-            <Button 
-              variant={codeContent ? "outline" : "default"} 
-              size="sm" 
-              onClick={handleGenerateCode}
-              disabled={generating !== null}
-              className="flex items-center"
-            >
-              {generating === "code" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Code className="h-4 w-4 mr-2" />
-              )}
+            <Button variant={codeContent ? "outline" : "default"} size="sm" onClick={handleGenerateCode} disabled={generating !== null} className="flex items-center">
+              {generating === "code" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
               {codeContent ? 'Regenerate Code' : 'Generate Code'}
             </Button>
             
-            <Button 
-              variant={testContent ? "outline" : "default"} 
-              size="sm" 
-              onClick={handleGenerateTests}
-              disabled={generating !== null}
-              className="flex items-center"
-            >
-              {generating === "tests" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <TestTube className="h-4 w-4 mr-2" />
-              )}
+            <Button variant={testContent ? "outline" : "default"} size="sm" onClick={handleGenerateTests} disabled={generating !== null} className="flex items-center">
+              {generating === "tests" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
               {testContent ? 'Regenerate Tests' : 'Generate Tests'}
             </Button>
 
-            <Button 
-              variant={hasAnyContent ? "outline" : "default"} 
-              size="sm" 
-              onClick={handleGenerateAll}
-              disabled={generating !== null}
-              className="flex items-center"
-            >
-              {generating === "all" ? (
-                <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <BookOpenText className="h-4 w-4 mr-2" />
-              )}
+            <Button variant={hasAnyContent ? "outline" : "default"} size="sm" onClick={handleGenerateAll} disabled={generating !== null} className="flex items-center">
+              {generating === "all" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <BookOpenText className="h-4 w-4 mr-2" />}
               {hasAnyContent ? 'Regenerate All' : 'Generate All'}
             </Button>
           </div>
@@ -302,44 +221,24 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       </CardHeader>
       
       <CardContent>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
+        {error && <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+          </Alert>}
         
         <div className="flex justify-end mb-4 space-x-2">
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleDownloadAll}
-            disabled={!hasAnyContent}
-            className="flex items-center"
-          >
+          <Button variant="outline" size="sm" onClick={handleDownloadAll} disabled={!hasAnyContent} className="flex items-center">
             <Download className="h-4 w-4 mr-2" />
             Download as PDF
           </Button>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handlePushToGSuite}
-            disabled={!hasAnyContent}
-            className="flex items-center"
-          >
+          <Button variant="outline" size="sm" onClick={handlePushToGSuite} disabled={!hasAnyContent} className="flex items-center">
             <FileSpreadsheet className="h-4 w-4 mr-2" />
             Push to GSuite
           </Button>
           
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handlePushToBitbucket}
-            disabled={!hasAnyContent}
-            className="flex items-center"
-          >
+          <Button variant="outline" size="sm" onClick={handlePushToBitbucket} disabled={!hasAnyContent} className="flex items-center">
             <Github className="h-4 w-4 mr-2" />
             Push to Bitbucket
           </Button>
@@ -365,46 +264,14 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               </TabsTrigger>
             </TabsList>
             
-            <StoryTabContent
-              tabId="lld"
-              title="Low-Level Design"
-              content={lldContent}
-              contentType="lld"
-              loading={generating === "lld"}
-              ticket={ticket}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-              onPushToJira={handlePushToJira}
-            />
+            <StoryTabContent tabId="lld" title="Low-Level Design" content={lldContent} contentType="lld" loading={generating === "lld"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
             
-            <StoryTabContent
-              tabId="code"
-              title="Implementation Code"
-              content={codeContent}
-              contentType="code"
-              loading={generating === "code"}
-              ticket={ticket}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-              onPushToJira={handlePushToJira}
-            />
+            <StoryTabContent tabId="code" title="Implementation Code" content={codeContent} contentType="code" loading={generating === "code"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
             
-            <StoryTabContent
-              tabId="tests"
-              title="Test Cases"
-              content={testContent}
-              contentType="tests"
-              loading={generating === "tests"}
-              ticket={ticket}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-              onPushToJira={handlePushToJira}
-            />
+            <StoryTabContent tabId="tests" title="Test Cases" content={testContent} contentType="tests" loading={generating === "tests"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
           </Tabs>
         </div>
       </CardContent>
-    </Card>
-  );
+    </Card>;
 };
-
 export default StoryGenerateContent;
