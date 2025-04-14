@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,12 +11,15 @@ import StoryTabContent from './StoryTabContent';
 import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
 import { downloadAsPDF } from '@/utils/exportUtils';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
 interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: ProjectContextData | null;
 }
+
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
@@ -26,9 +30,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [generating, setGenerating] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const {
     generateContent,
     pushToJira
@@ -39,6 +41,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     testContent,
     refreshArtifacts
   } = useJiraArtifacts(ticket);
+
   const handleGenerateLLD = async () => {
     if (!ticket) return;
     setError(null);
@@ -60,6 +63,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
+
   const handleGenerateCode = async () => {
     if (!ticket) return;
     setError(null);
@@ -81,6 +85,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
+
   const handleGenerateTests = async () => {
     if (!ticket) return;
     setError(null);
@@ -102,6 +107,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
+
   const handleGenerateAll = async () => {
     if (!ticket) return;
     setError(null);
@@ -142,6 +148,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGenerating(null);
     }
   };
+
   const handlePushToJira = async (content: string): Promise<boolean> => {
     if (!ticket || !ticket.id) {
       setError('Invalid ticket information');
@@ -154,6 +161,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       return false;
     }
   };
+
   const handleDownloadAll = async () => {
     if (!contentRef.current) {
       toast({
@@ -177,6 +185,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
     }
   };
+
   const handlePushToGSuite = () => {
     toast({
       title: "GSuite Integration",
@@ -184,6 +193,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       variant: "default"
     });
   };
+
   const handlePushToBitbucket = () => {
     toast({
       title: "Bitbucket Integration",
@@ -191,31 +201,63 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       variant: "default"
     });
   };
+
   const hasAnyContent = lldContent || codeContent || testContent;
   return <Card className="w-full">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl flex justify-between items-center">
-          
           <div className="flex items-center space-x-2">
-            <Button variant={lldContent ? "outline" : "default"} size="sm" onClick={handleGenerateLLD} disabled={generating !== null} className="flex items-center">
-              {generating === "lld" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <FileText className="h-4 w-4 mr-2" />}
-              {lldContent ? 'Regenerate LLD' : 'Generate LLD'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={lldContent ? "outline" : "default"} size="sm" onClick={handleGenerateLLD} disabled={generating !== null} className="flex items-center">
+                    {generating === "lld" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {lldContent ? 'Regenerate LLD' : 'Generate LLD'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <Button variant={codeContent ? "outline" : "default"} size="sm" onClick={handleGenerateCode} disabled={generating !== null} className="flex items-center">
-              {generating === "code" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <Code className="h-4 w-4 mr-2" />}
-              {codeContent ? 'Regenerate Code' : 'Generate Code'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={codeContent ? "outline" : "default"} size="sm" onClick={handleGenerateCode} disabled={generating !== null} className="flex items-center">
+                    {generating === "code" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Code className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {codeContent ? 'Regenerate Code' : 'Generate Code'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <Button variant={testContent ? "outline" : "default"} size="sm" onClick={handleGenerateTests} disabled={generating !== null} className="flex items-center">
-              {generating === "tests" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <TestTube className="h-4 w-4 mr-2" />}
-              {testContent ? 'Regenerate Tests' : 'Generate Tests'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={testContent ? "outline" : "default"} size="sm" onClick={handleGenerateTests} disabled={generating !== null} className="flex items-center">
+                    {generating === "tests" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <TestTube className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {testContent ? 'Regenerate Tests' : 'Generate Tests'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
-            <Button variant={hasAnyContent ? "outline" : "default"} size="sm" onClick={handleGenerateAll} disabled={generating !== null} className="flex items-center">
-              {generating === "all" ? <RefreshCw className="h-4 w-4 mr-2 animate-spin" /> : <BookOpenText className="h-4 w-4 mr-2" />}
-              {hasAnyContent ? 'Regenerate All' : 'Generate All'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant={hasAnyContent ? "outline" : "default"} size="sm" onClick={handleGenerateAll} disabled={generating !== null} className="flex items-center">
+                    {generating === "all" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <BookOpenText className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {hasAnyContent ? 'Regenerate All' : 'Generate All'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </CardTitle>
       </CardHeader>
@@ -228,20 +270,38 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           </Alert>}
         
         <div className="flex justify-end mb-4 space-x-2">
-          <Button variant="outline" size="sm" onClick={handleDownloadAll} disabled={!hasAnyContent} className="flex items-center">
-            <Download className="h-4 w-4 mr-2" />
-            Download as PDF
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handleDownloadAll} disabled={!hasAnyContent} className="flex items-center">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Download as PDF</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
-          <Button variant="outline" size="sm" onClick={handlePushToGSuite} disabled={!hasAnyContent} className="flex items-center">
-            <FileSpreadsheet className="h-4 w-4 mr-2" />
-            Push to GSuite
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handlePushToGSuite} disabled={!hasAnyContent} className="flex items-center">
+                  <FileSpreadsheet className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Push to GSuite</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           
-          <Button variant="outline" size="sm" onClick={handlePushToBitbucket} disabled={!hasAnyContent} className="flex items-center">
-            <Github className="h-4 w-4 mr-2" />
-            Push to Bitbucket
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="outline" size="sm" onClick={handlePushToBitbucket} disabled={!hasAnyContent} className="flex items-center">
+                  <Github className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Push to Bitbucket</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
         
         <div ref={contentRef}>
@@ -274,4 +334,5 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       </CardContent>
     </Card>;
 };
+
 export default StoryGenerateContent;

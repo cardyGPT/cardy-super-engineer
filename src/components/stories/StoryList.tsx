@@ -398,8 +398,13 @@ const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSel
       onClick={onSelect}
     >
       <div className="flex justify-between items-start mb-1">
-        <div className="font-medium text-sm text-primary">{ticket.key}</div>
-        <div className="flex flex-wrap gap-1 items-center">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm text-primary">{ticket.key}</span>
+          {ticket.issuetype?.name && (
+            <Badge variant="outline" className="text-xs">
+              {ticket.issuetype.name}
+            </Badge>
+          )}
           {ticket.status && (
             <Badge className={`text-xs ${
               ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
@@ -409,11 +414,6 @@ const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSel
               'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
             }`}>
               {ticket.status}
-            </Badge>
-          )}
-          {ticket.issuetype?.name && (
-            <Badge variant="outline" className="text-xs">
-              {ticket.issuetype.name}
             </Badge>
           )}
         </div>
