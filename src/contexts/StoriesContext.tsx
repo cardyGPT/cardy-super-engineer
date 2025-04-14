@@ -24,7 +24,6 @@ interface StoriesContextProps {
   hasMoreProjects: boolean;
   isLoadingMoreProjects: boolean;
   fetchMoreProjects: () => Promise<void>;
-  fetchAllProjectsAtOnce: () => Promise<void>;
   
   // Ticket pagination
   totalTickets: number;

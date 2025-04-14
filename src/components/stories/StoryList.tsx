@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JiraTicket } from '@/types/jira';
-import { Search, Filter, X, Tag, ListFilter } from "lucide-react";
+import { Search, Filter, X, Tag, ListFilter, DownloadCloud } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const StoryList: React.FC = () => {
@@ -29,7 +29,9 @@ const StoryList: React.FC = () => {
     ticketTypeFilter,
     setTicketTypeFilter,
     ticketStatusFilter,
-    setTicketStatusFilter
+    setTicketStatusFilter,
+    fetchTickets,
+    fetchTicketsByProject
   } = useStories();
   
   const [filteredTickets, setFilteredTickets] = useState<JiraTicket[]>([]);
@@ -37,6 +39,7 @@ const StoryList: React.FC = () => {
   const [uniqueTypes, setUniqueTypes] = useState<string[]>([]);
   const [uniqueStatuses, setUniqueStatuses] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver | null>(null);
@@ -149,6 +152,38 @@ const StoryList: React.FC = () => {
     setLocalSearchTerm('');
   };
   
+  const handleLoadAll = async () => {
+    if (!selectedProject) return;
+    
+    setIsLoadingAll(true);
+    try {
+      // Clear any filters first
+      clearFilters();
+      
+      // Load tickets directly from the project instead of sprint
+      await fetchTicketsByProject(selectedProject.id);
+    } catch (error) {
+      console.error("Error loading all tickets:", error);
+    } finally {
+      setIsLoadingAll(false);
+    }
+  };
+  
+  const handleRefreshTickets = async () => {
+    if (!selectedProject) return;
+    
+    try {
+      if (selectedSprint) {
+        await fetchTickets(selectedSprint.id);
+      } else {
+        // If no sprint is selected, try loading from project
+        await fetchTicketsByProject(selectedProject.id);
+      }
+    } catch (error) {
+      console.error("Error refreshing tickets:", error);
+    }
+  };
+  
   const filterCount = [
     ticketTypeFilter,
     ticketStatusFilter,
@@ -168,20 +203,33 @@ const StoryList: React.FC = () => {
             )}
           </CardTitle>
           
-          <Button 
-            variant={showFilters ? "default" : "outline"} 
-            size="sm" 
-            onClick={() => setShowFilters(!showFilters)}
-            className="h-8"
-          >
-            <ListFilter className="h-4 w-4 mr-2" />
-            Filters
-            {filterCount > 0 && (
-              <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
-                {filterCount}
-              </Badge>
-            )}
-          </Button>
+          <div className="flex space-x-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLoadAll}
+              disabled={isLoadingAll || ticketsLoading}
+              className="h-8 text-xs"
+            >
+              <DownloadCloud className="h-4 w-4 mr-1" />
+              {isLoadingAll ? "Loading..." : "Load All"}
+            </Button>
+            
+            <Button 
+              variant={showFilters ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setShowFilters(!showFilters)}
+              className="h-8"
+            >
+              <ListFilter className="h-4 w-4 mr-2" />
+              Filters
+              {filterCount > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 flex items-center justify-center">
+                  {filterCount}
+                </Badge>
+              )}
+            </Button>
+          </div>
         </div>
         
         <div className="flex gap-2 mt-2">
@@ -268,7 +316,7 @@ const StoryList: React.FC = () => {
       </CardHeader>
       
       <CardContent className="p-0">
-        {ticketsLoading && filteredTickets.length === 0 ? (
+        {ticketsLoading ? (
           <div className="p-4 space-y-2">
             <Skeleton className="h-12 w-full" />
             <Skeleton className="h-12 w-full" />
@@ -303,11 +351,39 @@ const StoryList: React.FC = () => {
             </div>
           </ScrollArea>
         ) : (
-          <div className="p-4 text-center text-muted-foreground">
+          <div className="p-8 text-center text-muted-foreground flex flex-col items-center">
             {selectedProject && selectedSprint ? (
-              <>No tickets found for this sprint with the current filters.</>
+              <>
+                <div className="mb-4">No tickets found for this sprint with the current filters.</div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefreshTickets}
+                >
+                  Refresh Tickets
+                </Button>
+                <div className="mt-4 text-sm">
+                  <span>or </span>
+                  <Button 
+                    variant="link" 
+                    className="p-0 h-auto text-sm" 
+                    onClick={handleLoadAll}
+                  >
+                    load all tickets from project
+                  </Button>
+                </div>
+              </>
             ) : selectedProject ? (
-              <>Please select a sprint.</>
+              <>
+                <div className="mb-4">Please select a sprint or load all tickets from the project.</div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleLoadAll}
+                >
+                  Load All Project Tickets
+                </Button>
+              </>
             ) : (
               <>Please select a project.</>
             )}

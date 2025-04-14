@@ -7,7 +7,7 @@ import { StoriesProvider } from '@/contexts/StoriesContext';
 // Pages
 import StoriesPage from '@/pages/StoriesPage';
 import SettingsPage from '@/pages/SettingsPage';
-import NotFound from '@/pages/NotFound'; // Fixed import
+import NotFound from '@/pages/NotFound'; // Correct import path
 
 function App() {
   return (

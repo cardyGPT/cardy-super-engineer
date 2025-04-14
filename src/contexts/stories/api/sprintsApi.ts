@@ -16,10 +16,26 @@ export const fetchJiraSprints = async (
     }
     
     // For Agile Jira, we'll use the standard Agile API
-    return await fetchAgileJiraSprints(credentials, projectId);
+    const agileResult = await fetchAgileJiraSprints(credentials, projectId);
+    
+    // If we get an empty array from the Agile API, try classic as fallback
+    if (agileResult.length === 0) {
+      console.log('No sprints found with Agile API, trying classic API as fallback');
+      return await fetchClassicJiraSprints(credentials, projectId);
+    }
+    
+    return agileResult;
   } catch (error) {
     console.error('Error fetching Jira sprints:', error);
-    throw error;
+    
+    // If agile API fails, try classic as fallback
+    try {
+      console.log('Agile API failed, trying classic API as fallback');
+      return await fetchClassicJiraSprints(credentials, projectId);
+    } catch (fallbackError) {
+      // If both fail, throw the original error
+      throw error;
+    }
   }
 };
 
