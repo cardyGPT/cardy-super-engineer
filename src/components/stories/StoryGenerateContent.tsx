@@ -1,629 +1,597 @@
-import React, { useState, useRef } from 'react';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { 
-  AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2, Download, 
-  Github, FileSpreadsheet, BookOpenText, Beaker, FileIcon, Cloud, GitBranch, FileDown 
-} from "lucide-react";
-import { JiraTicket, ProjectContextData, JiraGenerationRequest } from '@/types/jira';
+
+import React, { useState } from 'react';
+import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
-import StoryTabContent from './StoryTabContent';
-import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
-import { downloadAsPDF } from '@/utils/exportUtils';
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { FileDown, Code, TestTube, FileCheck, Copy, BookOpen, MessageSquare, FileText, 
+         Download, Cloud, GitBranch, FileOutput } from "lucide-react";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import Markdown from 'react-markdown';
+import { pushContentToJira, pushContentToGDrive, pushContentToBitbucket, generatePDF } from '@/contexts/stories/api/contentApi';
+import LoadingContent from './LoadingContent';
 
 interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
-  projectContextData?: ProjectContextData | null;
 }
 
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
-  selectedDocuments = [],
-  projectContextData
+  selectedDocuments = []
 }) => {
-  const [activeTab, setActiveTab] = useState("lld");
-  const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState<string | null>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const { toast } = useToast();
-  const {
-    generateContent,
-    pushToJira
-  } = useStories();
-  const {
-    lldContent,
-    codeContent,
-    testContent,
-    testCasesContent,
-    refreshArtifacts
-  } = useJiraArtifacts(ticket);
-
-  const handleGenerateLLD = async () => {
-    if (!ticket) return;
-    setError(null);
-    setGenerating("lld");
-    try {
-      const request: JiraGenerationRequest = {
-        type: 'lld',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo
-        }
-      };
-      await generateContent(request);
-      await refreshArtifacts();
-      setActiveTab("lld");
-      
-      toast({
-        title: "LLD Generated",
-        description: "Low-Level Design document has been generated successfully"
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate LLD');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to generate LLD',
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleGenerateCode = async () => {
-    if (!ticket) return;
-    setError(null);
-    setGenerating("code");
-    try {
-      const request: JiraGenerationRequest = {
-        type: 'code',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo,
-          framework: "Angular",
-          backend: "Node.js",
-          database: "PostgreSQL"
-        }
-      };
-      await generateContent(request);
-      await refreshArtifacts();
-      setActiveTab("code");
-      
-      toast({
-        title: "Code Generated",
-        description: "Code implementation has been generated successfully"
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate code');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to generate code',
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleGenerateTestCases = async () => {
-    if (!ticket) return;
-    setError(null);
-    setGenerating("test_cases");
-    try {
-      const request: JiraGenerationRequest = {
-        type: 'test_cases',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo,
-          framework: "Angular",
-          backend: "Node.js",
-          database: "PostgreSQL"
-        }
-      };
-      await generateContent(request);
-      await refreshArtifacts();
-      setActiveTab("test_cases");
-      
-      toast({
-        title: "Test Cases Generated",
-        description: "Test cases have been generated successfully"
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate test cases');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to generate test cases',
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleGenerateTests = async () => {
-    if (!ticket) return;
-    setError(null);
-    setGenerating("tests");
-    try {
-      const request: JiraGenerationRequest = {
-        type: 'tests',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo,
-          framework: "Playwright",
-          testingFramework: "Playwright"
-        }
-      };
-      await generateContent(request);
-      await refreshArtifacts();
-      setActiveTab("tests");
-      
-      toast({
-        title: "Playwright Tests Generated",
-        description: "Automated tests have been generated successfully"
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate tests');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to generate tests',
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handleGenerateAll = async () => {
-    if (!ticket) return;
-    setError(null);
-    setGenerating("all");
-    try {
-      await generateContent({
-        type: 'lld',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo
-        }
-      });
-      
-      await generateContent({
-        type: 'code',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo,
-          framework: "Angular",
-          backend: "Node.js",
-          database: "PostgreSQL"
-        }
-      });
-      
-      await generateContent({
-        type: 'test_cases',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo
-        }
-      });
-      
-      await generateContent({
-        type: 'tests',
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
-        additionalContext: {
-          sprint: ticket.sprintInfo,
-          epic: ticket.epicInfo,
-          framework: "Playwright",
-          testingFramework: "Playwright"
-        }
-      });
-      
-      await refreshArtifacts();
-      toast({
-        title: "Generation Complete",
-        description: "All content has been generated successfully."
-      });
-    } catch (err: any) {
-      setError(err.message || 'Failed to generate all content');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to generate all content',
-        variant: "destructive"
-      });
-    } finally {
-      setGenerating(null);
-    }
-  };
-
-  const handlePushToJira = async (content: string): Promise<boolean> => {
-    if (!ticket || !ticket.id) {
-      setError('Invalid ticket information');
-      return false;
-    }
-    try {
-      return await pushToJira(ticket.id, content);
-    } catch (err: any) {
-      setError(err.message || 'Failed to push to Jira');
-      return false;
-    }
-  };
-
-  const handleDownloadAll = async () => {
-    if (!contentRef.current) {
-      toast({
-        title: "Error",
-        description: "Content container not found",
-        variant: "destructive"
-      });
-      return;
-    }
-    const result = await downloadAsPDF(contentRef.current, `${ticket.key}_all_content`);
-    if (result) {
-      toast({
-        title: "Download Complete",
-        description: "Content has been downloaded as PDF"
-      });
-    } else {
-      toast({
-        title: "Download Failed",
-        description: "Failed to generate PDF",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handlePushToGSuite = () => {
-    toast({
-      title: "GSuite Integration",
-      description: "Pushing to GSuite..."
-    });
-    
-    setTimeout(() => {
-      toast({
-        title: "Success",
-        description: "Content pushed to Google Drive successfully"
-      });
-    }, 1500);
-  };
-
-  const handlePushToBitbucket = () => {
-    toast({
-      title: "Bitbucket Integration",
-      description: "Pushing to Bitbucket..."
-    });
-    
-    setTimeout(() => {
-      toast({
-        title: "Success",
-        description: "Content pushed to Bitbucket repository successfully"
-      });
-    }, 1500);
-  };
+  const { generateContent, credentials, contentLoading, pushToJira } = useStories();
+  const [tab, setTab] = useState('lld');
+  const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse>({});
+  const [isCopied, setIsCopied] = useState<Record<string, boolean>>({});
+  const [isGenerating, setIsGenerating] = useState<Record<string, boolean>>({});
+  const [isPushing, setIsPushing] = useState<Record<string, boolean>>({});
   
-  const handlePushToJiraDirectly = () => {
-    const contentMap = {
-      lld: lldContent,
-      code: codeContent,
-      test_cases: testCasesContent,
-      tests: testContent
-    };
+  const { toast } = useToast();
+  
+  const generateContentForType = async (type: 'lld' | 'code' | 'tests' | 'test_cases' | 'all') => {
+    setIsGenerating(prev => ({ ...prev, [type]: true }));
     
-    const content = contentMap[activeTab as keyof typeof contentMap];
-    
-    if (!content) {
-      toast({
-        title: "Error",
-        description: "No content to push",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    toast({
-      title: "Jira Integration",
-      description: "Pushing to Jira..."
-    });
-    
-    handlePushToJira(content).then(success => {
-      if (success) {
+    try {
+      const request: JiraGenerationRequest = {
+        type,
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+      };
+      
+      console.log(`Generating ${type} content with request:`, request);
+      
+      const response = await generateContent(request);
+      if (response) {
+        setGeneratedContent(prev => ({ ...prev, ...response }));
+        setTab(type);
+        
         toast({
-          title: "Success",
-          description: "Content pushed to Jira successfully"
-        });
-      } else {
-        toast({
-          title: "Error",
-          description: "Failed to push content to Jira",
-          variant: "destructive"
+          title: 'Content Generated',
+          description: `Successfully generated ${type} content`,
         });
       }
-    });
+    } catch (err: any) {
+      console.error(`Error generating ${type} content:`, err);
+      toast({
+        title: 'Generation Failed',
+        description: err.message || `Failed to generate ${type} content`,
+        variant: 'destructive'
+      });
+    } finally {
+      setIsGenerating(prev => ({ ...prev, [type]: false }));
+    }
   };
-
-  const hasAnyContent = lldContent || codeContent || testContent || testCasesContent;
+  
+  const handleCopyContent = (content: string, type: string) => {
+    navigator.clipboard.writeText(content);
+    setIsCopied(prev => ({ ...prev, [type]: true }));
+    
+    toast({
+      title: 'Copied',
+      description: 'Content copied to clipboard',
+    });
+    
+    setTimeout(() => {
+      setIsCopied(prev => ({ ...prev, [type]: false }));
+    }, 2000);
+  };
+  
+  const handlePushToJira = async (content: string, type: string) => {
+    if (!credentials || !ticket.key) {
+      toast({
+        title: 'Error',
+        description: 'Missing credentials or ticket key',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const pushType = `jira-${type}`;
+    setIsPushing(prev => ({ ...prev, [pushType]: true }));
+    
+    try {
+      await pushToJira(ticket.key, content);
+      toast({
+        title: 'Success',
+        description: `Content pushed to Jira ticket ${ticket.key}`,
+      });
+    } catch (err: any) {
+      console.error('Error pushing to Jira:', err);
+      toast({
+        title: 'Push Failed',
+        description: err.message || 'Failed to push content to Jira',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPushing(prev => ({ ...prev, [pushType]: false }));
+    }
+  };
+  
+  const handlePushToGDrive = async (content: string, type: string) => {
+    if (!ticket.key) {
+      toast({
+        title: 'Error',
+        description: 'Missing ticket key',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const pushType = `gdrive-${type}`;
+    setIsPushing(prev => ({ ...prev, [pushType]: true }));
+    
+    try {
+      await pushContentToGDrive(ticket.key, content, type);
+      toast({
+        title: 'Success',
+        description: `Content pushed to Google Drive`,
+      });
+    } catch (err: any) {
+      console.error('Error pushing to Google Drive:', err);
+      toast({
+        title: 'Push Failed',
+        description: err.message || 'Failed to push content to Google Drive',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPushing(prev => ({ ...prev, [pushType]: false }));
+    }
+  };
+  
+  const handlePushToBitbucket = async (content: string, type: string) => {
+    if (!ticket.key) {
+      toast({
+        title: 'Error',
+        description: 'Missing ticket key',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const pushType = `bitbucket-${type}`;
+    setIsPushing(prev => ({ ...prev, [pushType]: true }));
+    
+    try {
+      await pushContentToBitbucket(ticket.key, content, type);
+      toast({
+        title: 'Success',
+        description: `Content pushed to Bitbucket`,
+      });
+    } catch (err: any) {
+      console.error('Error pushing to Bitbucket:', err);
+      toast({
+        title: 'Push Failed',
+        description: err.message || 'Failed to push content to Bitbucket',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPushing(prev => ({ ...prev, [pushType]: false }));
+    }
+  };
+  
+  const handleDownloadPDF = async (content: string, type: string) => {
+    if (!ticket.key) {
+      toast({
+        title: 'Error',
+        description: 'Missing ticket key',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
+    const pushType = `pdf-${type}`;
+    setIsPushing(prev => ({ ...prev, [pushType]: true }));
+    
+    try {
+      const pdfUrl = await generatePDF(ticket.key, content, type);
+      
+      // Create a link element and trigger download
+      const link = document.createElement('a');
+      link.href = pdfUrl;
+      link.download = `${ticket.key}-${type}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: 'Success',
+        description: `PDF downloaded`,
+      });
+    } catch (err: any) {
+      console.error('Error generating PDF:', err);
+      toast({
+        title: 'PDF Generation Failed',
+        description: err.message || 'Failed to generate PDF',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsPushing(prev => ({ ...prev, [pushType]: false }));
+    }
+  };
+  
+  const renderContent = (content: string | undefined) => {
+    if (!content) return null;
+    return (
+      <ScrollArea className="h-[60vh] w-full rounded border p-4">
+        <Markdown>{content}</Markdown>
+      </ScrollArea>
+    );
+  };
+  
+  const getButtonColor = (type: string) => {
+    switch (type) {
+      case 'lld':
+        return 'bg-blue-500 hover:bg-blue-600';
+      case 'code':
+        return 'bg-green-500 hover:bg-green-600';
+      case 'tests':
+        return 'bg-purple-500 hover:bg-purple-600';
+      case 'test_cases':
+        return 'bg-amber-500 hover:bg-amber-600';
+      default:
+        return '';
+    }
+  };
   
   return (
-    <Card className="w-full">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-xl flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={handleGenerateLLD} 
-                    disabled={generating !== null} 
-                    className="h-8 w-8 bg-blue-500 hover:bg-blue-600 text-white border-blue-500 hover:border-blue-600"
-                  >
-                    {generating === "lld" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {lldContent ? 'Regenerate LLD' : 'Generate LLD'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={handleGenerateCode} 
-                    disabled={generating !== null} 
-                    className="h-8 w-8 bg-green-500 hover:bg-green-600 text-white border-green-500 hover:border-green-600"
-                  >
-                    {generating === "code" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Code className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {codeContent ? 'Regenerate Code' : 'Generate Code'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={handleGenerateTestCases} 
-                    disabled={generating !== null} 
-                    className="h-8 w-8 bg-purple-500 hover:bg-purple-600 text-white border-purple-500 hover:border-purple-600"
-                  >
-                    {generating === "test_cases" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Beaker className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {testCasesContent ? 'Regenerate Test Cases' : 'Generate Test Cases'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={handleGenerateTests} 
-                    disabled={generating !== null} 
-                    className="h-8 w-8 bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600"
-                  >
-                    {generating === "tests" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <TestTube className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {testContent ? 'Regenerate Tests (Playwright)' : 'Generate Tests (Playwright)'}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button 
-                    variant="outline" 
-                    size="icon" 
-                    onClick={handleGenerateAll} 
-                    disabled={generating !== null} 
-                    className="h-8 w-8 bg-red-500 hover:bg-red-600 text-white border-red-500 hover:border-red-600"
-                  >
-                    {generating === "all" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <BookOpenText className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  Generate All
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-          
-          {hasAnyContent && (
-            <div className="flex items-center space-x-2">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={handlePushToJiraDirectly} className="h-8 w-8">
-                      <FileIcon className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Push to Jira
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={handlePushToGSuite} className="h-8 w-8">
-                      <Cloud className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Push to Google Drive
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={handlePushToBitbucket} className="h-8 w-8">
-                      <GitBranch className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Push to Bitbucket
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button variant="outline" size="icon" onClick={handleDownloadAll} className="h-8 w-8">
-                      <FileDown className="h-4 w-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    Download as PDF
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          )}
-        </CardTitle>
+    <Card>
+      <CardHeader>
+        <CardTitle>Generate Content</CardTitle>
+        <CardDescription>
+          Generate various types of content for this ticket using AI
+        </CardDescription>
       </CardHeader>
-      
-      <CardContent ref={contentRef}>
-        {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          <Button
+            onClick={() => generateContentForType('lld')}
+            disabled={isGenerating.lld || contentLoading}
+            className={getButtonColor('lld')}
+          >
+            {isGenerating.lld ? (
+              <LoadingContent small isLoading={true} inline />
+            ) : (
+              <>
+                <BookOpen className="mr-2 h-4 w-4" />
+                Generate LLD
+              </>
+            )}
+          </Button>
+          
+          <Button
+            onClick={() => generateContentForType('code')}
+            disabled={isGenerating.code || contentLoading}
+            className={getButtonColor('code')}
+          >
+            {isGenerating.code ? (
+              <LoadingContent small isLoading={true} inline />
+            ) : (
+              <>
+                <Code className="mr-2 h-4 w-4" />
+                Generate Code
+              </>
+            )}
+          </Button>
+          
+          <Button
+            onClick={() => generateContentForType('tests')}
+            disabled={isGenerating.tests || contentLoading}
+            className={getButtonColor('tests')}
+          >
+            {isGenerating.tests ? (
+              <LoadingContent small isLoading={true} inline />
+            ) : (
+              <>
+                <TestTube className="mr-2 h-4 w-4" />
+                Generate Tests
+              </>
+            )}
+          </Button>
+          
+          <Button
+            onClick={() => generateContentForType('test_cases')}
+            disabled={isGenerating.test_cases || contentLoading}
+            className={getButtonColor('test_cases')}
+          >
+            {isGenerating.test_cases ? (
+              <LoadingContent small isLoading={true} inline />
+            ) : (
+              <>
+                <FileCheck className="mr-2 h-4 w-4" />
+                Generate Test Cases
+              </>
+            )}
+          </Button>
+        </div>
         
-        {!hasAnyContent && !generating && (
-          <div className="text-center py-8 border rounded-md bg-gray-50">
-            <FileText className="h-12 w-12 mx-auto text-gray-400 mb-2" />
-            <h3 className="text-lg font-medium">No content generated yet</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Click on one of the icons above to generate content for this ticket
-            </p>
-          </div>
-        )}
-        
-        {generating && (
-          <div className="text-center py-16 border rounded-md">
-            <RefreshCw className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
-            <h3 className="text-lg font-medium">Generating {generating === 'all' ? 'all content' : generating}...</h3>
-            <p className="text-sm text-muted-foreground mt-1">
-              This might take a few moments
-            </p>
-          </div>
-        )}
-        
-        {hasAnyContent && !generating && (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-4 mb-4">
-              {lldContent && <TabsTrigger value="lld">LLD</TabsTrigger>}
-              {codeContent && <TabsTrigger value="code">Code</TabsTrigger>}
-              {testCasesContent && <TabsTrigger value="test_cases">Test Cases</TabsTrigger>}
-              {testContent && <TabsTrigger value="tests">Tests</TabsTrigger>}
+        {Object.keys(generatedContent).length > 0 ? (
+          <Tabs value={tab} onValueChange={setTab} className="mt-6">
+            <TabsList className="grid grid-cols-4">
+              <TabsTrigger value="lld" disabled={!generatedContent.lld}>LLD</TabsTrigger>
+              <TabsTrigger value="code" disabled={!generatedContent.code}>Code</TabsTrigger>
+              <TabsTrigger value="tests" disabled={!generatedContent.tests}>Tests</TabsTrigger>
+              <TabsTrigger value="test_cases" disabled={!generatedContent.testCases}>Test Cases</TabsTrigger>
             </TabsList>
             
-            {lldContent && (
-              <TabsContent value="lld">
-                <StoryTabContent 
-                  tabId="lld"
-                  title="Low-Level Design"
-                  content={lldContent} 
-                  contentType="lld"
-                  loading={false}
-                  ticket={ticket}
-                  onPushToJira={handlePushToJira}
-                />
-              </TabsContent>
-            )}
+            <TabsContent value="lld" className="space-y-4 pt-4">
+              {generatedContent.lld ? (
+                <>
+                  {renderContent(generatedContent.lld)}
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyContent(generatedContent.lld || '', 'lld')}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {isCopied.lld ? 'Copied!' : 'Copy'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToJira(generatedContent.lld || '', 'lld')}
+                      disabled={isPushing['jira-lld']}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      {isPushing['jira-lld'] ? 'Pushing...' : 'Push to Jira'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToGDrive(generatedContent.lld || '', 'lld')}
+                      disabled={isPushing['gdrive-lld']}
+                    >
+                      <Cloud className="mr-2 h-4 w-4" />
+                      {isPushing['gdrive-lld'] ? 'Pushing...' : 'Push to Drive'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToBitbucket(generatedContent.lld || '', 'lld')}
+                      disabled={isPushing['bitbucket-lld']}
+                    >
+                      <GitBranch className="mr-2 h-4 w-4" />
+                      {isPushing['bitbucket-lld'] ? 'Pushing...' : 'Push to Bitbucket'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadPDF(generatedContent.lld || '', 'lld')}
+                      disabled={isPushing['pdf-lld']}
+                    >
+                      <FileOutput className="mr-2 h-4 w-4" />
+                      {isPushing['pdf-lld'] ? 'Generating...' : 'Download as PDF'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Alert>
+                  <FileText className="h-4 w-4" />
+                  <AlertTitle>No LLD content</AlertTitle>
+                  <AlertDescription>
+                    Generate LLD content to see it here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
             
-            {codeContent && (
-              <TabsContent value="code">
-                <StoryTabContent 
-                  tabId="code"
-                  title="Code Implementation"
-                  content={codeContent} 
-                  contentType="code"
-                  loading={false}
-                  ticket={ticket}
-                  onPushToJira={handlePushToJira}
-                />
-              </TabsContent>
-            )}
+            <TabsContent value="code" className="space-y-4 pt-4">
+              {generatedContent.code ? (
+                <>
+                  {renderContent(generatedContent.code)}
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyContent(generatedContent.code || '', 'code')}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {isCopied.code ? 'Copied!' : 'Copy'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToJira(generatedContent.code || '', 'code')}
+                      disabled={isPushing['jira-code']}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      {isPushing['jira-code'] ? 'Pushing...' : 'Push to Jira'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToGDrive(generatedContent.code || '', 'code')}
+                      disabled={isPushing['gdrive-code']}
+                    >
+                      <Cloud className="mr-2 h-4 w-4" />
+                      {isPushing['gdrive-code'] ? 'Pushing...' : 'Push to Drive'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToBitbucket(generatedContent.code || '', 'code')}
+                      disabled={isPushing['bitbucket-code']}
+                    >
+                      <GitBranch className="mr-2 h-4 w-4" />
+                      {isPushing['bitbucket-code'] ? 'Pushing...' : 'Push to Bitbucket'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadPDF(generatedContent.code || '', 'code')}
+                      disabled={isPushing['pdf-code']}
+                    >
+                      <FileOutput className="mr-2 h-4 w-4" />
+                      {isPushing['pdf-code'] ? 'Generating...' : 'Download as PDF'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Alert>
+                  <Code className="h-4 w-4" />
+                  <AlertTitle>No code content</AlertTitle>
+                  <AlertDescription>
+                    Generate code content to see it here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
             
-            {testCasesContent && (
-              <TabsContent value="test_cases">
-                <StoryTabContent 
-                  tabId="test_cases"
-                  title="Test Cases"
-                  content={testCasesContent} 
-                  contentType="tests"
-                  loading={false}
-                  ticket={ticket}
-                  onPushToJira={handlePushToJira}
-                />
-              </TabsContent>
-            )}
+            <TabsContent value="tests" className="space-y-4 pt-4">
+              {generatedContent.tests ? (
+                <>
+                  {renderContent(generatedContent.tests)}
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyContent(generatedContent.tests || '', 'tests')}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {isCopied.tests ? 'Copied!' : 'Copy'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToJira(generatedContent.tests || '', 'tests')}
+                      disabled={isPushing['jira-tests']}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      {isPushing['jira-tests'] ? 'Pushing...' : 'Push to Jira'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToGDrive(generatedContent.tests || '', 'tests')}
+                      disabled={isPushing['gdrive-tests']}
+                    >
+                      <Cloud className="mr-2 h-4 w-4" />
+                      {isPushing['gdrive-tests'] ? 'Pushing...' : 'Push to Drive'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToBitbucket(generatedContent.tests || '', 'tests')}
+                      disabled={isPushing['bitbucket-tests']}
+                    >
+                      <GitBranch className="mr-2 h-4 w-4" />
+                      {isPushing['bitbucket-tests'] ? 'Pushing...' : 'Push to Bitbucket'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadPDF(generatedContent.tests || '', 'tests')}
+                      disabled={isPushing['pdf-tests']}
+                    >
+                      <FileOutput className="mr-2 h-4 w-4" />
+                      {isPushing['pdf-tests'] ? 'Generating...' : 'Download as PDF'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Alert>
+                  <TestTube className="h-4 w-4" />
+                  <AlertTitle>No tests content</AlertTitle>
+                  <AlertDescription>
+                    Generate tests content to see it here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
             
-            {testContent && (
-              <TabsContent value="tests">
-                <StoryTabContent 
-                  tabId="tests"
-                  title="Tests (Playwright)"
-                  content={testContent} 
-                  contentType="tests"
-                  loading={false}
-                  ticket={ticket}
-                  onPushToJira={handlePushToJira}
-                />
-              </TabsContent>
-            )}
+            <TabsContent value="test_cases" className="space-y-4 pt-4">
+              {generatedContent.testCases ? (
+                <>
+                  {renderContent(generatedContent.testCases)}
+                  <div className="flex flex-wrap gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyContent(generatedContent.testCases || '', 'test_cases')}
+                    >
+                      <Copy className="mr-2 h-4 w-4" />
+                      {isCopied.test_cases ? 'Copied!' : 'Copy'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToJira(generatedContent.testCases || '', 'test_cases')}
+                      disabled={isPushing['jira-test_cases']}
+                    >
+                      <MessageSquare className="mr-2 h-4 w-4" />
+                      {isPushing['jira-test_cases'] ? 'Pushing...' : 'Push to Jira'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToGDrive(generatedContent.testCases || '', 'test_cases')}
+                      disabled={isPushing['gdrive-test_cases']}
+                    >
+                      <Cloud className="mr-2 h-4 w-4" />
+                      {isPushing['gdrive-test_cases'] ? 'Pushing...' : 'Push to Drive'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePushToBitbucket(generatedContent.testCases || '', 'test_cases')}
+                      disabled={isPushing['bitbucket-test_cases']}
+                    >
+                      <GitBranch className="mr-2 h-4 w-4" />
+                      {isPushing['bitbucket-test_cases'] ? 'Pushing...' : 'Push to Bitbucket'}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDownloadPDF(generatedContent.testCases || '', 'test_cases')}
+                      disabled={isPushing['pdf-test_cases']}
+                    >
+                      <FileOutput className="mr-2 h-4 w-4" />
+                      {isPushing['pdf-test_cases'] ? 'Generating...' : 'Download as PDF'}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Alert>
+                  <FileCheck className="h-4 w-4" />
+                  <AlertTitle>No test cases content</AlertTitle>
+                  <AlertDescription>
+                    Generate test cases content to see it here.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </TabsContent>
           </Tabs>
+        ) : (
+          <Alert className="mt-4">
+            <FileDown className="h-4 w-4" />
+            <AlertTitle>No content generated yet</AlertTitle>
+            <AlertDescription>
+              Use the buttons above to generate content for this ticket.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
     </Card>
