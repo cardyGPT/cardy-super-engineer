@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2, Download, 
-  Github, FileSpreadsheet, BookOpenText, Beaker, Jira, GoogleDrive, Bitbucket, FilePdf 
+  Github, FileSpreadsheet, BookOpenText, Beaker, FileIcon, Cloud, GitBranch, FileDown 
 } from "lucide-react";
 import { JiraTicket, ProjectContextData, JiraGenerationRequest } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
@@ -199,7 +198,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     setError(null);
     setGenerating("all");
     try {
-      // Generate LLD
       await generateContent({
         type: 'lld',
         jiraTicket: ticket,
@@ -211,7 +209,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         }
       });
       
-      // Generate Code
       await generateContent({
         type: 'code',
         jiraTicket: ticket,
@@ -226,7 +223,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         }
       });
       
-      // Generate Test Cases
       await generateContent({
         type: 'test_cases',
         jiraTicket: ticket,
@@ -238,7 +234,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         }
       });
       
-      // Generate Tests
       await generateContent({
         type: 'tests',
         jiraTicket: ticket,
@@ -312,7 +307,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       description: "Pushing to GSuite..."
     });
     
-    // In a production app, this would call the export-to-gsuite edge function
     setTimeout(() => {
       toast({
         title: "Success",
@@ -327,7 +321,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       description: "Pushing to Bitbucket..."
     });
     
-    // In a production app, this would call a Bitbucket integration edge function
     setTimeout(() => {
       toast({
         title: "Success",
@@ -337,7 +330,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   };
   
   const handlePushToJiraDirectly = () => {
-    // This would push the active tab content to Jira
     const contentMap = {
       lld: lldContent,
       code: codeContent,
@@ -486,7 +478,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={handlePushToJiraDirectly} className="h-8 w-8">
-                      <Jira className="h-4 w-4" />
+                      <FileIcon className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -499,7 +491,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={handlePushToGSuite} className="h-8 w-8">
-                      <GoogleDrive className="h-4 w-4" />
+                      <Cloud className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -512,7 +504,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={handlePushToBitbucket} className="h-8 w-8">
-                      <Bitbucket className="h-4 w-4" />
+                      <GitBranch className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -525,7 +517,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button variant="outline" size="icon" onClick={handleDownloadAll} className="h-8 w-8">
-                      <FilePdf className="h-4 w-4" />
+                      <FileDown className="h-4 w-4" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>

@@ -17,6 +17,8 @@ import DocumentOptions from "@/components/settings/gsuite/DocumentOptions";
 import SecurityAlert from "@/components/settings/gsuite/SecurityAlert";
 
 const GSuiteSettingsPage: React.FC = () => {
+  const [clientId, setClientId] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>("");
   const [apiKey, setApiKey] = useState<string>("");
   const [defaultDriveFolder, setDefaultDriveFolder] = useState<string>("");
   const [driveScope, setDriveScope] = useState<string>("drive.file");
@@ -289,6 +291,10 @@ const GSuiteSettingsPage: React.FC = () => {
           <TabsContent value="connection">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <ConnectionSettings 
+                clientId={clientId}
+                setClientId={setClientId}
+                clientSecret={clientSecret}
+                setClientSecret={setClientSecret}
                 apiKey={apiKey}
                 setApiKey={setApiKey}
                 defaultDriveFolder={defaultDriveFolder}
