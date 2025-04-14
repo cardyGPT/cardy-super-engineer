@@ -14,10 +14,12 @@ import {
   FileText, 
   Code, 
   TestTube, 
+  FileCode,
   Send, 
   Github, 
   FileDown,
-  FileText as DocumentIcon
+  FileText as DocumentIcon,
+  CheckSquare
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -92,6 +94,20 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
     }
   };
 
+  const handleGenerateTestCases = async () => {
+    try {
+      await generateContent({
+        type: 'testcases',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      });
+      setActiveTab("generate");
+    } catch (error) {
+      console.error("Error generating test cases:", error);
+    }
+  };
+
   const handlePushToJira = async (content: string) => {
     if (!ticket.id) return false;
     return await pushToJira(ticket.id, content);
@@ -108,7 +124,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-5">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-lg font-semibold text-primary">
                 {ticket.key}
               </h3>
@@ -249,6 +265,20 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                         Generate Tests
                         {isTestsGenerated && <Check className="ml-auto h-4 w-4 text-green-500" />}
                       </Button>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="justify-start h-12 font-normal w-full"
+                        onClick={handleGenerateTestCases}
+                        disabled={contentLoading}
+                      >
+                        <div className="bg-orange-100 dark:bg-orange-900/40 p-1.5 rounded-md mr-2.5">
+                          <FileCode className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                        </div>
+                        Generate Test Cases
+                        {false && <Check className="ml-auto h-4 w-4 text-green-500" />}
+                      </Button>
                       
                       <Button
                         variant="default"
@@ -259,10 +289,11 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                           await handleGenerateLLD();
                           await handleGenerateCode();
                           await handleGenerateTests();
+                          await handleGenerateTestCases();
                         }}
                       >
                         <div className="bg-white/20 p-1.5 rounded-md mr-2.5">
-                          <Check className="h-4 w-4 text-white" />
+                          <CheckSquare className="h-4 w-4 text-white" />
                         </div>
                         Generate All
                       </Button>

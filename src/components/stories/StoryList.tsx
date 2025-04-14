@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JiraTicket } from '@/types/jira';
-import { Search, Filter, X, Tag, ListFilter, DownloadCloud, Clock } from "lucide-react";
+import { Search, Filter, X, Tag, ListFilter, Clock } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const StoryList: React.FC = () => {
@@ -30,8 +30,7 @@ const StoryList: React.FC = () => {
     setTicketTypeFilter,
     ticketStatusFilter,
     setTicketStatusFilter,
-    fetchTickets,
-    fetchTicketsByProject
+    fetchTickets
   } = useStories();
   
   const [filteredTickets, setFilteredTickets] = useState<JiraTicket[]>([]);
@@ -39,7 +38,6 @@ const StoryList: React.FC = () => {
   const [uniqueTypes, setUniqueTypes] = useState<string[]>([]);
   const [uniqueStatuses, setUniqueStatuses] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [isLoadingAll, setIsLoadingAll] = useState(false);
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const observer = useRef<IntersectionObserver | null>(null);
@@ -152,32 +150,12 @@ const StoryList: React.FC = () => {
     setLocalSearchTerm('');
   };
   
-  const handleLoadAll = async () => {
-    if (!selectedProject) return;
-    
-    setIsLoadingAll(true);
-    try {
-      // Clear any filters first
-      clearFilters();
-      
-      // Load tickets directly from the project instead of sprint
-      await fetchTicketsByProject(selectedProject.id);
-    } catch (error) {
-      console.error("Error loading all tickets:", error);
-    } finally {
-      setIsLoadingAll(false);
-    }
-  };
-  
   const handleRefreshTickets = async () => {
     if (!selectedProject) return;
     
     try {
       if (selectedSprint) {
         await fetchTickets(selectedSprint.id);
-      } else {
-        // If no sprint is selected, try loading from project
-        await fetchTicketsByProject(selectedProject.id);
       }
     } catch (error) {
       console.error("Error refreshing tickets:", error);
@@ -196,25 +174,14 @@ const StoryList: React.FC = () => {
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg">
             Jira Tickets 
-            {filteredTickets.length > 0 && (
+            {totalTickets > 0 && (
               <span className="text-sm text-muted-foreground ml-2">
-                ({filteredTickets.length} {totalTickets > filteredTickets.length ? `of ${totalTickets}` : ''})
+                {filteredTickets.length > 0 ? `(${filteredTickets.length} of ${totalTickets})` : `(${totalTickets})`}
               </span>
             )}
           </CardTitle>
           
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleLoadAll}
-              disabled={isLoadingAll || ticketsLoading}
-              className="h-8 text-xs"
-            >
-              <DownloadCloud className="h-4 w-4 mr-1" />
-              {isLoadingAll ? "Loading..." : "Load All"}
-            </Button>
-            
             <Button 
               variant={showFilters ? "default" : "outline"} 
               size="sm" 
@@ -367,27 +334,10 @@ const StoryList: React.FC = () => {
                 >
                   Refresh Tickets
                 </Button>
-                <div className="mt-4 text-sm">
-                  <span>or </span>
-                  <Button 
-                    variant="link" 
-                    className="p-0 h-auto text-sm" 
-                    onClick={handleLoadAll}
-                  >
-                    load all tickets from project
-                  </Button>
-                </div>
               </>
             ) : selectedProject ? (
               <>
-                <div className="mb-4">Please select a sprint or load all tickets from the project.</div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={handleLoadAll}
-                >
-                  Load All Project Tickets
-                </Button>
+                <div className="mb-4">Please select a sprint to view tickets.</div>
               </>
             ) : (
               <>Please select a project.</>
@@ -417,33 +367,39 @@ const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSel
     >
       <div className="flex justify-between items-start">
         <div className="font-medium text-sm text-primary">{ticket.key}</div>
-        {ticket.status && (
-          <Badge className={`text-xs ml-1 ${
-            ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-            ticket.status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-            ticket.status.toLowerCase().includes('review') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
-            ticket.status.toLowerCase().includes('block') ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
-            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-          }`}>
-            {ticket.status}
-          </Badge>
-        )}
+        <div className="flex items-center gap-1">
+          {ticket.issuetype && (
+            <Badge variant="outline" className="text-xs px-1 py-0">
+              {ticket.issuetype.name}
+            </Badge>
+          )}
+          {ticket.status && (
+            <Badge className={`text-xs ml-0.5 ${
+              ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+              ticket.status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+              ticket.status.toLowerCase().includes('review') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
+              ticket.status.toLowerCase().includes('block') ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+            }`}>
+              {ticket.status}
+            </Badge>
+          )}
+        </div>
       </div>
       
       <div className="text-sm truncate mt-1">{ticket.summary}</div>
       
-      <div className="flex items-center justify-between mt-1">
-        {ticket.issuetype?.name && (
-          <Badge variant="outline" className="text-xs px-1 py-0">
-            {ticket.issuetype.name}
-          </Badge>
-        )}
-        {ticket.assignee && (
-          <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+      {ticket.assignee && (
+        <div className="flex justify-end mt-1">
+          <span className="text-xs text-muted-foreground truncate max-w-[150px] flex items-center">
+            <svg className="h-3 w-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="2"/>
+              <path d="M4 20C4 17.3432 6.34325 14 12 14C17.6569 14 20 17.3432 20 20" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
             {ticket.assignee}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

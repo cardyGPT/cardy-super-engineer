@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ContentDisplay from './ContentDisplay';
 import LoadingContent from './LoadingContent';
-import { FileDown, Send, Github, FileText, Code, TestTube, Loader2 } from "lucide-react";
+import { FileDown, Send, Github, FileText, Code, TestTube, Loader2, FileCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -28,14 +28,14 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   onGenerate,
   onPushToJira
 }) => {
-  const [activeContent, setActiveContent] = useState<'lld' | 'code' | 'tests'>('lld');
+  const [activeContent, setActiveContent] = useState<'lld' | 'code' | 'tests' | 'testcases'>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const { generatedContent, contentLoading } = useStories();
   const { toast } = useToast();
   const contentRef = React.useRef<HTMLDivElement>(null);
   
-  const getContentByType = (type: 'lld' | 'code' | 'tests') => {
+  const getContentByType = (type: 'lld' | 'code' | 'tests' | 'testcases') => {
     if (!generatedContent) return '';
     
     switch (type) {
@@ -45,6 +45,8 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
         return generatedContent.codeContent || generatedContent.code || '';
       case 'tests':
         return generatedContent.testContent || generatedContent.tests || '';
+      case 'testcases':
+        return generatedContent.testCasesContent || '';
       default:
         return '';
     }
@@ -131,7 +133,12 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
     );
   }
   
-  const hasContent = Boolean(getContentByType('lld') || getContentByType('code') || getContentByType('tests'));
+  const hasContent = Boolean(
+    getContentByType('lld') || 
+    getContentByType('code') || 
+    getContentByType('tests') ||
+    getContentByType('testcases')
+  );
   
   if (!hasContent) {
     return (
@@ -146,7 +153,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as 'lld' | 'code' | 'tests')} className="w-full">
+        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as 'lld' | 'code' | 'tests' | 'testcases')} className="w-full">
           <TabsList className="inline-flex space-x-1 rounded-lg bg-muted p-1">
             <TabsTrigger
               value="lld"
@@ -171,6 +178,14 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             >
               <TestTube className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
               Tests
+            </TabsTrigger>
+            <TabsTrigger
+              value="testcases"
+              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('testcases') ? 'opacity-50' : ''}`}
+              disabled={!getContentByType('testcases')}
+            >
+              <FileCode className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
+              Test Cases
             </TabsTrigger>
           </TabsList>
         </Tabs>

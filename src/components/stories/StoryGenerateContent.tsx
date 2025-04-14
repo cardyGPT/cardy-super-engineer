@@ -4,7 +4,7 @@ import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectConte
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { FileText, Code, TestTube, Loader2, PlusCircle, FileDown, Send, FileOutput, Github, ArrowRight } from "lucide-react";
+import { FileText, Code, TestTube, Loader2, CheckSquare, FileDown, Send, FileCode, Github } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import ContentDisplay from './ContentDisplay';
 import ExportToGSuite from './ExportToGSuite';
@@ -32,7 +32,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   generatedContent,
   isGenerating
 }) => {
-  const [activeTab, setActiveTab] = useState<'lld' | 'code' | 'tests'>('lld');
+  const [activeTab, setActiveTab] = useState<'lld' | 'code' | 'tests' | 'testcases'>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
@@ -40,7 +40,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const contentRef = React.useRef<HTMLDivElement>(null);
   
-  const handleGenerate = async (type: 'lld' | 'code' | 'tests') => {
+  const handleGenerate = async (type: 'lld' | 'code' | 'tests' | 'testcases') => {
     try {
       const request: JiraGenerationRequest = {
         type,
@@ -92,11 +92,19 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       };
       await onGenerate(testsRequest);
       
+      const testCasesRequest: JiraGenerationRequest = {
+        type: 'testcases',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      };
+      await onGenerate(testCasesRequest);
+      
       setActiveTab('lld');
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, and Tests content has been generated successfully.",
+        description: "LLD, Code, Tests, and Test Cases content has been generated successfully.",
       });
     } catch (err: any) {
       toast({
@@ -182,7 +190,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   };
   
-  const getContentByType = (type: 'lld' | 'code' | 'tests') => {
+  const getContentByType = (type: 'lld' | 'code' | 'tests' | 'testcases') => {
     if (!generatedContent) return '';
     
     switch (type) {
@@ -192,6 +200,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         return generatedContent.codeContent || generatedContent.code || '';
       case 'tests':
         return generatedContent.testContent || generatedContent.tests || '';
+      case 'testcases':
+        return generatedContent.testCasesContent || '';
       default:
         return '';
     }
@@ -205,11 +215,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           size="sm"
           onClick={() => handleGenerate('lld')}
           disabled={isGenerating}
+          className="inline-flex items-center bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
         >
           {isGenerating && activeTab === 'lld' ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
-            <FileText className="h-4 w-4 mr-2" />
+            <FileText className="h-4 w-4 mr-2 text-blue-600" />
           )}
           Generate LLD
         </Button>
@@ -219,11 +230,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           size="sm"
           onClick={() => handleGenerate('code')}
           disabled={isGenerating}
+          className="inline-flex items-center bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
         >
           {isGenerating && activeTab === 'code' ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
-            <Code className="h-4 w-4 mr-2" />
+            <Code className="h-4 w-4 mr-2 text-green-600" />
           )}
           Generate Code
         </Button>
@@ -233,13 +245,29 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           size="sm"
           onClick={() => handleGenerate('tests')}
           disabled={isGenerating}
+          className="inline-flex items-center bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100"
         >
           {isGenerating && activeTab === 'tests' ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
-            <TestTube className="h-4 w-4 mr-2" />
+            <TestTube className="h-4 w-4 mr-2 text-purple-600" />
           )}
           Generate Tests
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleGenerate('testcases')}
+          disabled={isGenerating}
+          className="inline-flex items-center bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100"
+        >
+          {isGenerating && activeTab === 'testcases' ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileCode className="h-4 w-4 mr-2 text-orange-600" />
+          )}
+          Generate Test Cases
         </Button>
         
         <Button
@@ -247,11 +275,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           size="sm"
           onClick={handleGenerateAll}
           disabled={isGeneratingAll || isGenerating}
+          className="inline-flex items-center bg-indigo-600 hover:bg-indigo-700"
         >
           {isGeneratingAll ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
           ) : (
-            <PlusCircle className="h-4 w-4 mr-2" />
+            <CheckSquare className="h-4 w-4 mr-2" />
           )}
           Generate All
         </Button>
@@ -259,20 +288,24 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       {generatedContent && (
         <Card className="overflow-hidden">
-          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'lld' | 'code' | 'tests')}>
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'lld' | 'code' | 'tests' | 'testcases')}>
             <div className="flex justify-between items-center border-b px-4 py-2">
               <TabsList>
                 <TabsTrigger value="lld" disabled={!getContentByType('lld')}>
-                  <FileText className="h-4 w-4 mr-2" />
+                  <FileText className="h-4 w-4 mr-2 text-blue-600" />
                   LLD
                 </TabsTrigger>
                 <TabsTrigger value="code" disabled={!getContentByType('code')}>
-                  <Code className="h-4 w-4 mr-2" />
+                  <Code className="h-4 w-4 mr-2 text-green-600" />
                   Code
                 </TabsTrigger>
                 <TabsTrigger value="tests" disabled={!getContentByType('tests')}>
-                  <TestTube className="h-4 w-4 mr-2" />
+                  <TestTube className="h-4 w-4 mr-2 text-purple-600" />
                   Tests
+                </TabsTrigger>
+                <TabsTrigger value="testcases" disabled={!getContentByType('testcases')}>
+                  <FileCode className="h-4 w-4 mr-2 text-orange-600" />
+                  Test Cases
                 </TabsTrigger>
               </TabsList>
               
@@ -332,6 +365,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               </TabsContent>
               <TabsContent value="tests" className="mt-0">
                 <ContentDisplay content={getContentByType('tests')} contentType="tests" />
+              </TabsContent>
+              <TabsContent value="testcases" className="mt-0">
+                <ContentDisplay content={getContentByType('testcases')} contentType="testcases" />
               </TabsContent>
             </div>
           </Tabs>
