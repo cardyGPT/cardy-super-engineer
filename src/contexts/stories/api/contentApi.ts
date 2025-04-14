@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
-import { DEV_MODE, callJiraApi, ensureString } from './apiUtils';
+import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent } from './apiUtils';
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -77,35 +77,6 @@ export const generateJiraContent = async (
     return response;
   } catch (err: any) {
     console.error('Error in generateJiraContent:', err);
-    throw err;
-  }
-};
-
-// Save generated content to database for persistence
-export const saveGeneratedContent = async (
-  storyId: string,
-  projectId: string,
-  sprintId: string,
-  contentType: string,
-  content: string
-): Promise<void> => {
-  try {
-    const { error } = await supabase.functions.invoke('save-story-artifacts', {
-      body: {
-        storyId,
-        projectId,
-        sprintId,
-        contentType,
-        content: ensureString(content)
-      }
-    });
-    
-    if (error) {
-      console.error('Error saving generated content:', error);
-      throw new Error(error.message || 'Failed to save generated content');
-    }
-  } catch (err) {
-    console.error('Error in saveGeneratedContent:', err);
     throw err;
   }
 };
