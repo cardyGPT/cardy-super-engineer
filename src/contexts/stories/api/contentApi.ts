@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
-import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent } from './apiUtils';
+import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent, sanitizeContentForReact } from './apiUtils';
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -16,14 +16,34 @@ export const generateJiraContent = async (
       request.jiraTicket = ticket;
     }
     
+    // Ensure we have all the necessary ticket information
+    const enhancedTicket = {
+      ...ticket,
+      key: ticket.key || '',
+      summary: ticket.summary || '',
+      description: ticket.description || '',
+      status: ticket.status || '',
+      priority: ticket.priority || '',
+      assignee: ticket.assignee || '',
+      labels: ticket.labels || [],
+      story_points: ticket.story_points || 0,
+      acceptance_criteria: ticket.acceptance_criteria || '',
+      created_at: ticket.created_at || '',
+      updated_at: ticket.updated_at || '',
+      issuetype: ticket.issuetype || { id: '', name: '' }
+    };
+    
     // Call the Supabase function to generate content
+    console.log('Sending request to chat-with-jira with enhancedTicket:', JSON.stringify(enhancedTicket, null, 2));
+    
     const { data, error } = await supabase.functions.invoke('chat-with-jira', {
       body: {
-        jiraTicket: ticket,
+        jiraTicket: enhancedTicket,
         request: `Generate ${request.type} for this ticket`,
         projectContext: request.projectContext,
         selectedDocuments: request.selectedDocuments,
-        additionalContext: request.additionalContext
+        additionalContext: request.additionalContext,
+        contentType: request.type // Pass content type explicitly
       }
     });
 
@@ -33,11 +53,12 @@ export const generateJiraContent = async (
     }
 
     if (!data || !data.response) {
+      console.error('No response received from content generation service:', data);
       throw new Error('No response received from content generation service');
     }
     
-    // Ensure response is a string
-    const responseContent = ensureString(data.response);
+    // Ensure response is a string and sanitize it
+    const responseContent = sanitizeContentForReact(ensureString(data.response));
     
     // Create a response object with the generated content
     let response: JiraGenerationResponse = {};
@@ -68,6 +89,10 @@ export const generateJiraContent = async (
           request.type,
           responseContent
         );
+        
+        console.log(`Content successfully saved for ${ticket.key}, type: ${request.type}`);
+      } else {
+        console.warn('Cannot save content: Missing ticket key or projectId');
       }
     } catch (saveError) {
       console.error('Error saving generated content:', saveError);
