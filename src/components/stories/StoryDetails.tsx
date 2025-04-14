@@ -5,7 +5,7 @@ import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
-import StoryGenerateContent from './StoryGenerateContent';
+import StoryGenerateContent from './generate-content/StoryGenerateContent';
 
 interface StoryDetailsProps {
   projectContext?: string | null;

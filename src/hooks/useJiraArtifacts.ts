@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
+import { ContentType } from '@/components/stories/ContentDisplay';
 
 export interface JiraArtifacts {
   lldContent: string | null;

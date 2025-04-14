@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+
+import React, { useState, useRef } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
 import ContentDisplay, { ContentType } from './ContentDisplay';
 import LoadingContent from './LoadingContent';
-import { FileDown, Send, Github, FileText, Code, TestTube, Loader2, FileCode } from "lucide-react";
+import { FileDown, Send, Github, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import ExportToGSuite from './ExportToGSuite';
+import { Button } from "@/components/ui/button";
+import { getContentByType } from './generate-content/utils';
+import ContentTabs from './generate-content/ContentTabs';
 
 interface StoryTabContentProps {
   ticket: JiraTicket;
@@ -32,24 +35,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   const [isExporting, setIsExporting] = useState(false);
   const { generatedContent, contentLoading } = useStories();
   const { toast } = useToast();
-  const contentRef = React.useRef<HTMLDivElement>(null);
-  
-  const getContentByType = (type: ContentType) => {
-    if (!generatedContent) return '';
-    
-    switch (type) {
-      case 'lld':
-        return generatedContent.lldContent || generatedContent.lld || '';
-      case 'code':
-        return generatedContent.codeContent || generatedContent.code || '';
-      case 'tests':
-        return generatedContent.testContent || generatedContent.tests || '';
-      case 'testcases':
-        return generatedContent.testCasesContent || '';
-      default:
-        return '';
-    }
-  };
+  const contentRef = useRef<HTMLDivElement>(null);
   
   const exportToPDF = async () => {
     if (!contentRef.current) return;
@@ -89,7 +75,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   };
   
   const handlePushToJira = async () => {
-    const content = getContentByType(activeContent);
+    const content = getContentByType(generatedContent, activeContent);
     
     if (!content) {
       toast({
@@ -133,10 +119,10 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   }
   
   const hasContent = Boolean(
-    getContentByType('lld') || 
-    getContentByType('code') || 
-    getContentByType('tests') ||
-    getContentByType('testcases')
+    getContentByType(generatedContent, 'lld') || 
+    getContentByType(generatedContent, 'code') || 
+    getContentByType(generatedContent, 'tests') ||
+    getContentByType(generatedContent, 'testcases')
   );
   
   if (!hasContent) {
@@ -153,40 +139,14 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as ContentType)} className="w-full">
-          <TabsList className="inline-flex space-x-1 rounded-lg bg-muted p-1">
-            <TabsTrigger
-              value="lld"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('lld') ? 'opacity-50' : ''}`}
-              disabled={!getContentByType('lld')}
-            >
-              <FileText className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" />
-              LLD
-            </TabsTrigger>
-            <TabsTrigger
-              value="code"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('code') ? 'opacity-50' : ''}`}
-              disabled={!getContentByType('code')}
-            >
-              <Code className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
-              Code
-            </TabsTrigger>
-            <TabsTrigger
-              value="tests"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('tests') ? 'opacity-50' : ''}`}
-              disabled={!getContentByType('tests')}
-            >
-              <TestTube className="mr-2 h-4 w-4 text-purple-600 dark:text-purple-400" />
-              Tests
-            </TabsTrigger>
-            <TabsTrigger
-              value="testcases"
-              className={`inline-flex items-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all data-[state=active]:bg-white dark:data-[state=active]:bg-gray-800 data-[state=active]:shadow-sm ${!getContentByType('testcases') ? 'opacity-50' : ''}`}
-              disabled={!getContentByType('testcases')}
-            >
-              <FileCode className="mr-2 h-4 w-4 text-orange-600 dark:text-orange-400" />
-              Test Cases
-            </TabsTrigger>
-          </TabsList>
+          <ContentTabs
+            activeTab={activeContent}
+            onChange={(value) => setActiveContent(value)}
+            hasLldContent={!!getContentByType(generatedContent, 'lld')}
+            hasCodeContent={!!getContentByType(generatedContent, 'code')}
+            hasTestsContent={!!getContentByType(generatedContent, 'tests')}
+            hasTestCasesContent={!!getContentByType(generatedContent, 'testcases')}
+          />
         </Tabs>
         
         <div className="flex gap-2">
@@ -194,7 +154,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             variant="outline"
             size="sm"
             onClick={exportToPDF}
-            disabled={isExporting || !getContentByType(activeContent)}
+            disabled={isExporting || !getContentByType(generatedContent, activeContent)}
             className="h-9"
           >
             {isExporting ? (
@@ -208,7 +168,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
           <ExportToGSuite
             storyId={ticket.id}
             storyKey={ticket.key}
-            content={getContentByType(activeContent)}
+            content={getContentByType(generatedContent, activeContent)}
             contentType={activeContent}
           />
           
@@ -216,7 +176,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             variant="outline"
             size="sm"
             onClick={handlePushToJira}
-            disabled={isPushingToJira || !getContentByType(activeContent)}
+            disabled={isPushingToJira || !getContentByType(generatedContent, activeContent)}
             className="h-9"
           >
             {isPushingToJira ? (
@@ -242,7 +202,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
       <Card className="border rounded-md overflow-hidden shadow-sm">
         <CardContent className="p-6" ref={contentRef}>
           <ContentDisplay 
-            content={getContentByType(activeContent)} 
+            content={getContentByType(generatedContent, activeContent)} 
             contentType={activeContent} 
           />
         </CardContent>
