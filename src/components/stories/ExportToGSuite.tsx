@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { FileShare, Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { exportToGoogleDocs } from '@/contexts/stories/api/gsuite';
 import { useToast } from "@/hooks/use-toast";
 import { ContentType } from './ContentDisplay';
@@ -62,7 +62,7 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
       {isExporting ? (
         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
       ) : (
-        <FileShare className="h-4 w-4 mr-2" />
+        <FileText className="h-4 w-4 mr-2" />
       )}
       Google Docs
     </Button>
