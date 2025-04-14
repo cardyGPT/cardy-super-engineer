@@ -112,6 +112,8 @@ const fetchClassicJiraSprints = async (
         id: `classic-${projectId}`,
         name: 'All Issues',
         state: 'active',
+        startDate: null,
+        endDate: null, // Added missing startDate and endDate
         boardId: 'classic',
         projectId
       }];
@@ -135,6 +137,8 @@ const fetchClassicJiraSprints = async (
       id: `classic-${projectId}`,
       name: 'All Issues',
       state: 'active',
+      startDate: null,
+      endDate: null, // Added missing startDate and endDate
       boardId: 'classic',
       projectId
     });
@@ -148,6 +152,8 @@ const fetchClassicJiraSprints = async (
       id: `classic-${projectId}`,
       name: 'All Issues',
       state: 'active',
+      startDate: null,
+      endDate: null, // Added missing startDate and endDate
       boardId: 'classic',
       projectId
     }];

@@ -7,7 +7,7 @@ import { StoriesProvider } from '@/contexts/StoriesContext';
 // Pages
 import StoriesPage from '@/pages/StoriesPage';
 import SettingsPage from '@/pages/SettingsPage';
-import NotFoundPage from '@/pages/NotFoundPage';
+import NotFound from '@/pages/NotFound'; // Fixed import
 
 function App() {
   return (
@@ -17,7 +17,7 @@ function App() {
           <Route path="/" element={<StoriesPage />} />
           <Route path="/stories" element={<StoriesPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<NotFoundPage />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         <Toaster />
       </StoriesProvider>
