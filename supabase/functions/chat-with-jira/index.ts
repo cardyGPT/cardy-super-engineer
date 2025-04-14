@@ -82,6 +82,25 @@ Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
       ticketContext += `\nAcceptance Criteria:\n${safeStringify(jiraTicket.acceptance_criteria)}`;
     }
 
+    // Add story points if available
+    if (jiraTicket.story_points) {
+      ticketContext += `\nStory Points: ${safeStringify(jiraTicket.story_points)}`;
+    }
+
+    // Add labels if available
+    if (jiraTicket.labels && jiraTicket.labels.length > 0) {
+      ticketContext += `\nLabels: ${safeStringify(jiraTicket.labels.join(', '))}`;
+    }
+
+    // Add created and updated dates if available
+    if (jiraTicket.created_at) {
+      ticketContext += `\nCreated: ${safeStringify(jiraTicket.created_at)}`;
+    }
+    
+    if (jiraTicket.updated_at) {
+      ticketContext += `\nUpdated: ${safeStringify(jiraTicket.updated_at)}`;
+    }
+
     // Add any additional contexts
     if (dataModel) {
       ticketContext += `\nData Model Context:\n${safeStringify(dataModel)}`;
@@ -98,6 +117,23 @@ Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
     
     if (additionalContext?.epic) {
       ticketContext += `\nEpic Information:\n${safeStringify(additionalContext.epic)}`;
+    }
+
+    // Add framework information if provided
+    if (additionalContext?.framework) {
+      ticketContext += `\nFramework: ${safeStringify(additionalContext.framework)}`;
+    }
+    
+    if (additionalContext?.backend) {
+      ticketContext += `\nBackend: ${safeStringify(additionalContext.backend)}`;
+    }
+    
+    if (additionalContext?.database) {
+      ticketContext += `\nDatabase: ${safeStringify(additionalContext.database)}`;
+    }
+    
+    if (additionalContext?.testingFramework) {
+      ticketContext += `\nTesting Framework: ${safeStringify(additionalContext.testingFramework)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info
@@ -156,6 +192,9 @@ Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
 8. Include security considerations where applicable.
 
 The LLD should be well-structured with clear headings, code examples where appropriate, and should follow best practices for Angular (frontend), Node.js (backend), and PostgreSQL (database) architecture.
+
+Remember to specifically address the requirements and acceptance criteria mentioned in the ticket.
+
 Format your response using Markdown for easy readability.`;
       } else if (requestLower.includes('code') || requestLower.includes('implementation')) {
         contentType = 'code';
@@ -170,8 +209,9 @@ Format your response using Markdown for easy readability.`;
 7. Include proper error handling and edge case consideration.
 8. Ensure the code is efficient and performant.
 
-Focus on producing production-ready code that could be directly integrated into the project.
-Use Markdown code blocks with appropriate language syntax highlighting for each file or component.`;
+Focus on producing production-ready code that specifically addresses the requirements and acceptance criteria in the ticket.
+
+Use Markdown code blocks with appropriate language syntax highlighting for each file or component. Include file names as comments or headings.`;
       } else if (requestLower.includes('test case') || requestLower.includes('qa')) {
         contentType = 'test_cases';
         systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature. Your test cases should follow these guidelines:
@@ -185,7 +225,9 @@ Use Markdown code blocks with appropriate language syntax highlighting for each 
 7. Ensure test cases are clearly written and easy to follow.
 8. Include traceability to requirements or acceptance criteria.
 
-Format your response using Markdown with clear sections for different test categories.`;
+Make sure your test cases specifically verify that all the acceptance criteria in the ticket are met.
+
+Format your response using Markdown with clear sections for different test categories. Use tables for structured test cases with columns for ID, Description, Steps, and Expected Results.`;
       } else if (requestLower.includes('tests') || requestLower.includes('playwright')) {
         contentType = 'tests';
         systemPrompt = `You are an expert test automation engineer. Based on the provided Jira ticket, create comprehensive Playwright test scripts that follow these guidelines:
@@ -200,18 +242,20 @@ Format your response using Markdown with clear sections for different test categ
 8. Consider test data management strategies.
 9. Include error handling and reporting mechanisms.
 
+Make sure your tests specifically verify that all the acceptance criteria in the ticket are met.
+
 Code should be production-ready, following best practices for Playwright test automation.
-Use Markdown code blocks with TypeScript syntax highlighting.`;
+Use Markdown code blocks with TypeScript syntax highlighting. Include file names as comments or headings.`;
       } else if (requestLower.includes('all')) {
         contentType = 'all';
         // For 'all' we'll use a general system prompt and handle specific prompts downstream
         systemPrompt = `You are an expert software engineer with deep knowledge of software architecture, development, and testing. Based on the provided Jira ticket information, please provide a comprehensive analysis and implementation plan that addresses all aspects of the feature, including:
 
 1. A detailed low-level design
-2. Implementation code
-3. Test cases and test scripts
+2. Implementation code for Angular frontend and Node.js backend with PostgreSQL database
+3. Test cases and Playwright test scripts
 
-Your response should be thorough yet focused on the specific requirements of the ticket. Structure your response clearly with distinct sections for each component (design, code, testing).`;
+Your response should be thorough yet focused on the specific requirements and acceptance criteria of the ticket. Structure your response clearly with distinct sections for each component (design, code, testing).`;
       }
     }
 
@@ -221,32 +265,46 @@ Your response should be thorough yet focused on the specific requirements of the
         case 'lld':
           systemPrompt = `You are an expert software architect. Create a detailed low-level design document for Angular and Node.js with PostgreSQL based on the provided Jira ticket.
           Include component diagrams, data flow, API contracts, and database schema changes if applicable.
+          Address all requirements and acceptance criteria in the ticket.
           Format your response using Markdown for easy readability.`;
           break;
         
         case 'code':
           systemPrompt = `You are an expert software developer. Based on the provided Jira ticket, generate the necessary code implementation.
           Include all relevant files, classes, methods, and functions that would be needed for Angular, Node.js and PostgreSQL.
-          Focus on producing clean, maintainable, and well-documented code.
-          Use Markdown code blocks with appropriate language syntax highlighting.`;
+          Focus on producing clean, maintainable, and well-documented code that addresses all requirements and acceptance criteria.
+          Use Markdown code blocks with appropriate language syntax highlighting and include file names.`;
           break;
         
         case 'test_cases':
           systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature.
           Include both positive and negative scenarios, edge cases, and performance considerations.
-          Format your response using Markdown, with clear sections for different test categories.`;
+          Make sure all acceptance criteria are covered by your test cases.
+          Format your response using Markdown, with clear sections for different test categories and tables for structured test cases.`;
           break;
         
         case 'tests':
           systemPrompt = `You are an expert automation engineer. Based on the provided Jira ticket, create comprehensive Playwright test scripts in TypeScript.
           Include setup, teardown, assertions, and error handling. Structure tests following the Page Object Model pattern.
-          Format your response using Markdown code blocks with TypeScript syntax highlighting.`;
+          Ensure all acceptance criteria are verified by your tests.
+          Format your response using Markdown code blocks with TypeScript syntax highlighting and include file names.`;
           break;
         
         default:
           systemPrompt = `You are a helpful assistant for software development teams. Provide a detailed and comprehensive response to the user's request about the Jira ticket.`;
       }
     }
+
+    // Add specific technology stack information to the system prompt
+    const techStackPrompt = `\n\nTechnology Stack Information:
+- Frontend: Angular with TypeScript
+- Backend: Node.js with Express
+- Database: PostgreSQL
+- Testing: Playwright for automation testing
+
+Make sure your response is tailored to work with this specific technology stack.`;
+
+    systemPrompt += techStackPrompt;
 
     // Call the OpenAI API
     console.log(`Calling OpenAI API for ${contentType} generation...`);

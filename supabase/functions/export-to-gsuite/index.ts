@@ -1,9 +1,12 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
+const GSUITE_API_KEY = Deno.env.get('GSUITE_API_KEY');
+const GSUITE_CLIENT_ID = Deno.env.get('GSUITE_CLIENT_ID');
+const GSUITE_CLIENT_SECRET = Deno.env.get('GSUITE_CLIENT_SECRET');
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
@@ -14,8 +17,8 @@ serve(async (req) => {
   }
 
   try {
-    if (!GOOGLE_API_KEY) {
-      throw new Error('Google API key is not configured');
+    if (!GSUITE_API_KEY || !GSUITE_CLIENT_ID || !GSUITE_CLIENT_SECRET) {
+      throw new Error('Google Workspace API credentials are not configured');
     }
 
     const { documentName, content, artifactType, storyId } = await req.json();
@@ -70,11 +73,14 @@ serve(async (req) => {
 
 async function createGoogleDoc(title: string, content: string) {
   try {
+    // First get an access token using client ID and secret
+    const accessToken = await getAccessToken();
+    
     // Create a new Google Doc
     const createResponse = await fetch('https://docs.googleapis.com/v1/documents', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GOOGLE_API_KEY}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -94,7 +100,7 @@ async function createGoogleDoc(title: string, content: string) {
     const updateResponse = await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GOOGLE_API_KEY}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -123,6 +129,18 @@ async function createGoogleDoc(title: string, content: string) {
   }
 }
 
+// Mock function to simulate getting an access token
+// In a real implementation, this would use the client ID and secret to get a token
+async function getAccessToken() {
+  // This is a simplified version for demonstration
+  // In a real app, you would use OAuth 2.0 flow with the client ID and secret
+  console.log(`Using Client ID: ${GSUITE_CLIENT_ID?.substring(0, 5)}... and Client Secret: ${GSUITE_CLIENT_SECRET?.substring(0, 3)}...`);
+  
+  // For now, we'll just return the API key as a placeholder
+  // In a real app, this would be a proper OAuth token
+  return GSUITE_API_KEY;
+}
+
 function formatContentForDocs(content: string, artifactType: string): string {
   // Format content based on artifact type
   let formattedContent = content;
@@ -134,6 +152,8 @@ function formatContentForDocs(content: string, artifactType: string): string {
     formattedContent = `# Code Implementation\n\n${formattedContent}`;
   } else if (artifactType === 'tests') {
     formattedContent = `# Test Cases\n\n${formattedContent}`;
+  } else if (artifactType === 'test_cases') {
+    formattedContent = `# Test Cases\n\n${formattedContent}`;
   }
   
   return formattedContent;
@@ -144,7 +164,8 @@ async function updateStoryArtifact(supabase, storyId: string, artifactType: stri
   const columnMap = {
     'lld': 'lld_gsuite_id',
     'code': 'code_gsuite_id',
-    'tests': 'test_gsuite_id'
+    'tests': 'test_gsuite_id',
+    'test_cases': 'test_cases_gsuite_id'
   };
   
   const column = columnMap[artifactType];

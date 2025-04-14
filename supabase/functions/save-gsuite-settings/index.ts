@@ -33,6 +33,22 @@ serve(async (req) => {
       );
     }
     
+    // Check for required fields
+    if (!settings.clientId || !settings.clientSecret || !settings.apiKey) {
+      console.error("Missing required fields in GSuite settings");
+      return new Response(
+        JSON.stringify({ 
+          error: "Client ID, Client Secret, and API Key are required", 
+          valid: false,
+          message: "Please provide Client ID, Client Secret, and API Key."
+        }),
+        { 
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 400 
+        }
+      );
+    }
+    
     // Ensure settings has metadata for validation
     if (!settings.metadata) {
       settings.metadata = {
@@ -42,23 +58,10 @@ serve(async (req) => {
       };
     }
     
-    // First verify we have an API key
-    const apiKey = Deno.env.get('GSUITE_API_KEY');
-    
-    if (!apiKey && !settings.skipApiKeyCheck) {
-      console.error("Cannot save settings: No GSuite API key found");
-      return new Response(
-        JSON.stringify({ 
-          error: "No GSuite API key found. Please save an API key first.", 
-          valid: false,
-          message: "GSuite API key is required before saving settings."
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
-        }
-      );
-    }
+    // Store the Google API key
+    Deno.env.set('GSUITE_CLIENT_ID', settings.clientId);
+    Deno.env.set('GSUITE_CLIENT_SECRET', settings.clientSecret);
+    Deno.env.set('GSUITE_API_KEY', settings.apiKey);
     
     // Convert to string and store as environment variable
     const settingsStr = JSON.stringify(settings);
