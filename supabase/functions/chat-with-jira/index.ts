@@ -145,11 +145,18 @@ Your code should be complete, well-structured, and ready for review.`;
     } 
     else if (type === 'tests') {
       systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
-Based on the Jira ticket information, create comprehensive test cases.
+Based on the Jira ticket information, create comprehensive test code using Playwright.
 Include unit tests, integration tests, end-to-end tests, edge cases, and performance test considerations.
 Format everything properly in markdown with clear test scenarios and expected results.
 Your tests should be thorough, covering all aspects of the functionality described in the ticket.`;
     } 
+    else if (type === 'testcases') {
+      systemPrompt = `You are an expert in software testing with experience in quality assurance and test case design.
+Based on the Jira ticket information, create a comprehensive set of test cases that could be executed manually.
+Include positive tests, negative tests, edge cases, and user experience tests.
+Format everything properly in markdown with clear test steps, expected results, and preconditions.
+Your test cases should be thorough, covering all aspects of the functionality described in the ticket.`;
+    }
     else {
       systemPrompt = `You are an expert software development assistant.
 Analyze the Jira ticket information and provide a comprehensive response addressing the requirements.
@@ -174,7 +181,13 @@ Your response should be detailed, structured and directly usable by the developm
             },
             {
               role: 'user',
-              content: `${ticketContext}\n\nPlease generate a detailed, well-formatted ${type === 'lld' ? 'low-level design document' : type === 'code' ? 'implementation code' : type === 'tests' ? 'test cases' : 'response'} based on this Jira ticket information.`
+              content: `${ticketContext}\n\nPlease generate a detailed, well-formatted ${
+                type === 'lld' ? 'low-level design document' : 
+                type === 'code' ? 'implementation code' : 
+                type === 'tests' ? 'test code using Playwright' : 
+                type === 'testcases' ? 'manual test cases' : 
+                'response'
+              } based on this Jira ticket information.`
             }
           ],
           temperature: 0.5,

@@ -62,6 +62,9 @@ serve(async (req) => {
     } else if (contentType === 'tests') {
       updateData.test_content = content;
       if (gsuiteId) updateData.test_gsuite_id = gsuiteId;
+    } else if (contentType === 'testcases') {
+      updateData.testcases_content = content;
+      if (gsuiteId) updateData.testcases_gsuite_id = gsuiteId;
     }
 
     let result;

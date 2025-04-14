@@ -44,13 +44,15 @@ export const generateJiraContent = async (
     
     if (request.type === 'lld') {
       response.lld = responseContent;
+      response.lldContent = responseContent;
     } else if (request.type === 'code') {
       response.code = responseContent;
+      response.codeContent = responseContent;
     } else if (request.type === 'tests') {
       response.tests = responseContent;
-    } else if (request.type === 'all') {
-      // For 'all' type, put the content in the lld field by default
-      response.lld = responseContent;
+      response.testContent = responseContent;
+    } else if (request.type === 'testcases') {
+      response.testCasesContent = responseContent;
     }
     
     // Also include the full response for reference

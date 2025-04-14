@@ -1,3 +1,4 @@
+
 export interface JiraTicket {
   id: string;
   key: string;
@@ -55,6 +56,7 @@ export interface JiraGenerationRequest {
   jiraTicket: JiraTicket;
   projectContext?: string;
   selectedDocuments?: string[];
+  additionalContext?: any;
 }
 
 export interface JiraGenerationResponse {
@@ -65,6 +67,7 @@ export interface JiraGenerationResponse {
   tests?: string;
   testContent?: string;
   testCasesContent?: string;
+  response?: string;
 }
 
 export interface ProjectContextData {
