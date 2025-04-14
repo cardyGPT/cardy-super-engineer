@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +11,9 @@ import SettingsCard from './common/SettingsCard';
 import { SettingsProps } from '@/types/settings';
 
 const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
-  const [apiKey, setApiKey] = useState('');
+  const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -22,7 +22,6 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Load existing settings
   useEffect(() => {
     loadSettings();
   }, []);
@@ -30,7 +29,6 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
   const loadSettings = async () => {
     setIsLoading(true);
     try {
-      // Validate GSuite configuration 
       const { data, error } = await supabase.functions.invoke('validate-gsuite', {});
 
       if (error) {
@@ -43,7 +41,6 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       setIsConnected(!!data?.valid);
       if (onConfigChange) onConfigChange(!!data?.valid);
       
-      // If we have settings, populate the form fields
       if (data?.settings) {
         setRedirectUri(data.settings.redirectUri || '');
         setSyncEnabled(data.settings.autoSyncEnabled || false);
@@ -60,17 +57,16 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     setError(null);
     
     try {
-      // Validate required fields if not already connected
-      if (!isConnected && (!apiKey || !clientSecret)) {
-        throw new Error('API Key and Client Secret are required');
+      if (!isConnected && (!clientId || !clientSecret || !apiKey)) {
+        throw new Error('Client ID, Client Secret, and API Key are required');
       }
       
-      // First, if we have an API key, save it
-      if (apiKey) {
+      if (apiKey || clientId || clientSecret) {
         const { error: keyError } = await supabase.functions.invoke('store-api-keys', {
           body: {
             provider: 'gsuite',
             apiKey,
+            clientId,
             clientSecret
           }
         });
@@ -80,12 +76,11 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         }
       }
       
-      // Then save the settings
       const { error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
         body: {
           redirectUri,
           autoSyncEnabled: syncEnabled,
-          skipApiKeyCheck: !apiKey, // Skip API key check if we're not providing one
+          skipApiKeyCheck: !apiKey,
           metadata: {
             lastUpdated: new Date().toISOString(),
             version: "1.0",
@@ -98,7 +93,6 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         throw new Error(settingsError.message || 'Failed to save GSuite settings');
       }
       
-      // Validate the settings
       await validateConnection();
       
       toast({
@@ -253,6 +247,30 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       
       <div className="space-y-4">
         <div className="space-y-2">
+          <Label htmlFor="client-id">Client ID {!isConnected && <span className="text-red-500">*</span>}</Label>
+          <Input
+            id="client-id"
+            type="password"
+            placeholder="Your Google Client ID"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        
+        <div className="space-y-2">
+          <Label htmlFor="client-secret">Client Secret {!isConnected && <span className="text-red-500">*</span>}</Label>
+          <Input
+            id="client-secret"
+            type="password"
+            placeholder="Your Google Client Secret"
+            value={clientSecret}
+            onChange={(e) => setClientSecret(e.target.value)}
+            disabled={isLoading}
+          />
+        </div>
+        
+        <div className="space-y-2">
           <Label htmlFor="api-key">Google API Key {!isConnected && <span className="text-red-500">*</span>}</Label>
           <Input
             id="api-key"
@@ -273,18 +291,6 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
               How to create Google API credentials
             </a>
           </p>
-        </div>
-        
-        <div className="space-y-2">
-          <Label htmlFor="client-secret">Client Secret {!isConnected && <span className="text-red-500">*</span>}</Label>
-          <Input
-            id="client-secret"
-            type="password"
-            placeholder="Your Google Client Secret"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            disabled={isLoading}
-          />
         </div>
         
         <div className="space-y-2">

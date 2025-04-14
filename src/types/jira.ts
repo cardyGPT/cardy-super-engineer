@@ -1,4 +1,3 @@
-
 export interface JiraTicket {
   id: string;
   key: string;
@@ -51,23 +50,18 @@ export interface JiraCredentials {
 }
 
 export interface JiraGenerationRequest {
-  type: 'lld' | 'code' | 'tests' | 'all';
-  jiraTicket: JiraTicket;
-  dataModel?: any;
-  documentsContext?: any;
+  type: 'lld' | 'code' | 'tests' | 'test_cases' | 'all';
+  jiraTicket?: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
-  additionalContext?: {
-    sprint?: any;
-    epic?: any;
-  };
+  additionalContext?: Record<string, any>;
 }
 
 export interface JiraGenerationResponse {
   lld?: string;
   code?: string;
   tests?: string;
-  all?: string;
+  testCases?: string;
   response?: string;
   error?: string;
 }

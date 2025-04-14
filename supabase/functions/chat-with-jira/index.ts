@@ -73,7 +73,14 @@ Description: ${safeStringify(jiraTicket.description) || 'No description provided
 Status: ${safeStringify(jiraTicket.status) || 'Unknown'}
 Priority: ${safeStringify(jiraTicket.priority) || 'Unknown'}
 Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
+Assignee: ${safeStringify(jiraTicket.assignee?.displayName) || 'Unassigned'}
+Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
 `;
+
+    // Add acceptance criteria if available
+    if (jiraTicket.acceptance_criteria) {
+      ticketContext += `\nAcceptance Criteria:\n${safeStringify(jiraTicket.acceptance_criteria)}`;
+    }
 
     // Add any additional contexts
     if (dataModel) {
@@ -131,41 +138,114 @@ Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
 
     // Determine generation type from the request
     let contentType = 'general';
+    let systemPrompt = '';
+    
     if (request) {
       const requestLower = request.toLowerCase();
       if (requestLower.includes('low-level design') || requestLower.includes('lld')) {
         contentType = 'lld';
+        systemPrompt = `You are an expert software architect. Based on the provided Jira ticket information, create a detailed low-level design document that follows these guidelines:
+
+1. Start with a comprehensive overview of the feature or component being designed.
+2. Include detailed component diagrams showing the relationships between different parts of the system.
+3. Specify API contracts with clear endpoint definitions, request/response formats, and error handling.
+4. Document data flow between components, including sequence diagrams where appropriate.
+5. Define database schema changes if required, with entity relationships and field specifications.
+6. List technical constraints, assumptions, and dependencies.
+7. Highlight potential performance considerations and optimization strategies.
+8. Include security considerations where applicable.
+
+The LLD should be well-structured with clear headings, code examples where appropriate, and should follow best practices for Angular (frontend), Node.js (backend), and PostgreSQL (database) architecture.
+Format your response using Markdown for easy readability.`;
       } else if (requestLower.includes('code') || requestLower.includes('implementation')) {
         contentType = 'code';
-      } else if (requestLower.includes('test') || requestLower.includes('qa')) {
+        systemPrompt = `You are an expert software developer. Based on the provided Jira ticket and any contextual information, generate the necessary code implementation that adheres to these guidelines:
+
+1. Write clean, maintainable code following industry best practices.
+2. Use Angular for frontend components, with appropriate TypeScript typing and component structure.
+3. Implement Node.js for backend services, with proper error handling and API structuring.
+4. Include PostgreSQL queries where database interactions are required.
+5. Add comprehensive inline documentation explaining complex logic.
+6. Follow a modular approach with clear separation of concerns.
+7. Include proper error handling and edge case consideration.
+8. Ensure the code is efficient and performant.
+
+Focus on producing production-ready code that could be directly integrated into the project.
+Use Markdown code blocks with appropriate language syntax highlighting for each file or component.`;
+      } else if (requestLower.includes('test case') || requestLower.includes('qa')) {
+        contentType = 'test_cases';
+        systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature. Your test cases should follow these guidelines:
+
+1. Organize test cases by functional areas or user flows.
+2. Include detailed preconditions, steps, and expected results for each test case.
+3. Cover positive test scenarios that validate correct functionality.
+4. Include negative test scenarios to verify proper error handling.
+5. Add edge cases and boundary conditions.
+6. Consider performance, security, and usability testing where applicable.
+7. Ensure test cases are clearly written and easy to follow.
+8. Include traceability to requirements or acceptance criteria.
+
+Format your response using Markdown with clear sections for different test categories.`;
+      } else if (requestLower.includes('tests') || requestLower.includes('playwright')) {
         contentType = 'tests';
+        systemPrompt = `You are an expert test automation engineer. Based on the provided Jira ticket, create comprehensive Playwright test scripts that follow these guidelines:
+
+1. Use TypeScript for all Playwright test scripts.
+2. Structure tests following the Page Object Model pattern when appropriate.
+3. Include setup and teardown procedures for test initialization and cleanup.
+4. Write tests that cover critical user journeys and edge cases.
+5. Implement proper assertions to validate expected behavior.
+6. Add descriptive comments explaining the purpose of each test.
+7. Group related tests together in test suites.
+8. Consider test data management strategies.
+9. Include error handling and reporting mechanisms.
+
+Code should be production-ready, following best practices for Playwright test automation.
+Use Markdown code blocks with TypeScript syntax highlighting.`;
+      } else if (requestLower.includes('all')) {
+        contentType = 'all';
+        // For 'all' we'll use a general system prompt and handle specific prompts downstream
+        systemPrompt = `You are an expert software engineer with deep knowledge of software architecture, development, and testing. Based on the provided Jira ticket information, please provide a comprehensive analysis and implementation plan that addresses all aspects of the feature, including:
+
+1. A detailed low-level design
+2. Implementation code
+3. Test cases and test scripts
+
+Your response should be thorough yet focused on the specific requirements of the ticket. Structure your response clearly with distinct sections for each component (design, code, testing).`;
       }
     }
 
-    // Get the system prompt based on content type
-    let systemPrompt = '';
-    switch (contentType) {
-      case 'lld':
-        systemPrompt = `You are an expert software architect. Create a detailed low-level design document based on the provided Jira ticket. 
-        Include component diagrams, data flow, API contracts, and database schema changes if applicable. 
-        Format your response using Markdown for easy readability.`;
-        break;
-      
-      case 'code':
-        systemPrompt = `You are an expert software developer. Based on the provided Jira ticket and any design information, 
-        generate the necessary code implementation. Include all relevant files, classes, methods, and tests that would be needed. 
-        Focus on producing clean, maintainable, and well-documented code.
-        Use Markdown code blocks with appropriate language syntax highlighting.`;
-        break;
-      
-      case 'tests':
-        systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature.
-        Include both unit tests and integration tests where appropriate. Cover edge cases, error scenarios, and performance considerations.
-        Format your response using Markdown, with clear sections for different test categories.`;
-        break;
-      
-      default:
-        systemPrompt = `You are a helpful assistant for software development teams. Provide a detailed and comprehensive response to the user's request.`;
+    // If no specific system prompt is set, use a default based on content type
+    if (!systemPrompt) {
+      switch (contentType) {
+        case 'lld':
+          systemPrompt = `You are an expert software architect. Create a detailed low-level design document for Angular and Node.js with PostgreSQL based on the provided Jira ticket.
+          Include component diagrams, data flow, API contracts, and database schema changes if applicable.
+          Format your response using Markdown for easy readability.`;
+          break;
+        
+        case 'code':
+          systemPrompt = `You are an expert software developer. Based on the provided Jira ticket, generate the necessary code implementation.
+          Include all relevant files, classes, methods, and functions that would be needed for Angular, Node.js and PostgreSQL.
+          Focus on producing clean, maintainable, and well-documented code.
+          Use Markdown code blocks with appropriate language syntax highlighting.`;
+          break;
+        
+        case 'test_cases':
+          systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature.
+          Include both positive and negative scenarios, edge cases, and performance considerations.
+          Format your response using Markdown, with clear sections for different test categories.`;
+          break;
+        
+        case 'tests':
+          systemPrompt = `You are an expert automation engineer. Based on the provided Jira ticket, create comprehensive Playwright test scripts in TypeScript.
+          Include setup, teardown, assertions, and error handling. Structure tests following the Page Object Model pattern.
+          Format your response using Markdown code blocks with TypeScript syntax highlighting.`;
+          break;
+        
+        default:
+          systemPrompt = `You are a helpful assistant for software development teams. Provide a detailed and comprehensive response to the user's request about the Jira ticket.`;
+      }
     }
 
     // Call the OpenAI API

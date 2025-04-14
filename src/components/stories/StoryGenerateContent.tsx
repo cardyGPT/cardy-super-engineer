@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2, Download, Github, FileSpreadsheet, BookOpenText } from "lucide-react";
+import { AlertCircle, Code, FileText, TestTube, RefreshCw, Send, CheckCircle2, Download, Github, FileSpreadsheet, BookOpenText, Beaker } from "lucide-react";
 import { JiraTicket, ProjectContextData, JiraGenerationRequest } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import StoryTabContent from './StoryTabContent';
@@ -39,6 +39,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     lldContent,
     codeContent,
     testContent,
+    testCasesContent,
     refreshArtifacts
   } = useJiraArtifacts(ticket);
 
@@ -86,6 +87,28 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   };
 
+  const handleGenerateTestCases = async () => {
+    if (!ticket) return;
+    setError(null);
+    setGenerating("test_cases");
+    try {
+      const request: JiraGenerationRequest = {
+        type: 'test_cases',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+        additionalContext: {}
+      };
+      await generateContent(request);
+      await refreshArtifacts();
+      setActiveTab("test_cases");
+    } catch (err: any) {
+      setError(err.message || 'Failed to generate test cases');
+    } finally {
+      setGenerating(null);
+    }
+  };
+
   const handleGenerateTests = async () => {
     if (!ticket) return;
     setError(null);
@@ -113,30 +136,42 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     setError(null);
     setGenerating("all");
     try {
-      const lldRequest: JiraGenerationRequest = {
+      // Generate LLD
+      await generateContent({
         type: 'lld',
         jiraTicket: ticket,
         projectContext,
         selectedDocuments,
         additionalContext: {}
-      };
-      await generateContent(lldRequest);
-      const codeRequest: JiraGenerationRequest = {
+      });
+      
+      // Generate Code
+      await generateContent({
         type: 'code',
         jiraTicket: ticket,
         projectContext,
         selectedDocuments,
         additionalContext: {}
-      };
-      await generateContent(codeRequest);
-      const testsRequest: JiraGenerationRequest = {
+      });
+      
+      // Generate Test Cases
+      await generateContent({
+        type: 'test_cases',
+        jiraTicket: ticket,
+        projectContext,
+        selectedDocuments,
+        additionalContext: {}
+      });
+      
+      // Generate Tests
+      await generateContent({
         type: 'tests',
         jiraTicket: ticket,
         projectContext,
         selectedDocuments,
         additionalContext: {}
-      };
-      await generateContent(testsRequest);
+      });
+      
       await refreshArtifacts();
       toast({
         title: "Generation Complete",
@@ -202,15 +237,17 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     });
   };
 
-  const hasAnyContent = lldContent || codeContent || testContent;
-  return <Card className="w-full">
+  const hasAnyContent = lldContent || codeContent || testContent || testCasesContent;
+  
+  return (
+    <Card className="w-full">
       <CardHeader className="pb-4">
         <CardTitle className="text-xl flex justify-between items-center">
           <div className="flex items-center space-x-2">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={lldContent ? "outline" : "default"} size="sm" onClick={handleGenerateLLD} disabled={generating !== null} className="flex items-center">
+                  <Button variant="outline" size="icon" onClick={handleGenerateLLD} disabled={generating !== null} className="h-8 w-8">
                     {generating === "lld" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -223,7 +260,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={codeContent ? "outline" : "default"} size="sm" onClick={handleGenerateCode} disabled={generating !== null} className="flex items-center">
+                  <Button variant="outline" size="icon" onClick={handleGenerateCode} disabled={generating !== null} className="h-8 w-8">
                     {generating === "code" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Code className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
@@ -236,103 +273,166 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={testContent ? "outline" : "default"} size="sm" onClick={handleGenerateTests} disabled={generating !== null} className="flex items-center">
+                  <Button variant="outline" size="icon" onClick={handleGenerateTestCases} disabled={generating !== null} className="h-8 w-8">
+                    {generating === "test_cases" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Beaker className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {testCasesContent ? 'Regenerate Test Cases' : 'Generate Test Cases'}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={handleGenerateTests} disabled={generating !== null} className="h-8 w-8">
                     {generating === "tests" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <TestTube className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {testContent ? 'Regenerate Tests' : 'Generate Tests'}
+                  {testContent ? 'Regenerate Tests (Playwright)' : 'Generate Tests (Playwright)'}
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
-
+            
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant={hasAnyContent ? "outline" : "default"} size="sm" onClick={handleGenerateAll} disabled={generating !== null} className="flex items-center">
+                  <Button variant="outline" size="icon" onClick={handleGenerateAll} disabled={generating !== null} className="h-8 w-8">
                     {generating === "all" ? <RefreshCw className="h-4 w-4 animate-spin" /> : <BookOpenText className="h-4 w-4" />}
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  {hasAnyContent ? 'Regenerate All' : 'Generate All'}
+                  Generate All
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
+          
+          {hasAnyContent && (
+            <div className="flex items-center space-x-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={handleDownloadAll} className="h-8 w-8">
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Download as PDF
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={handlePushToGSuite} className="h-8 w-8">
+                      <FileSpreadsheet className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Push to GSuite
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" onClick={handlePushToBitbucket} className="h-8 w-8">
+                      <Github className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Push to Bitbucket
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+          )}
         </CardTitle>
       </CardHeader>
       
-      <CardContent>
-        {error && <Alert variant="destructive" className="mb-4">
+      <CardContent ref={contentRef}>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
-          </Alert>}
+          </Alert>
+        )}
         
-        <div className="flex justify-end mb-4 space-x-2">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handleDownloadAll} disabled={!hasAnyContent} className="flex items-center">
-                  <Download className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Download as PDF</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePushToGSuite} disabled={!hasAnyContent} className="flex items-center">
-                  <FileSpreadsheet className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Push to GSuite</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="sm" onClick={handlePushToBitbucket} disabled={!hasAnyContent} className="flex items-center">
-                  <Github className="h-4 w-4" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Push to Bitbucket</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        </div>
+        {!hasAnyContent && !generating && (
+          <div className="text-center py-8 border rounded-md bg-gray-50">
+            <FileText className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+            <h3 className="text-lg font-medium">No content generated yet</h3>
+            <p className="text-sm text-muted-foreground mt-1 mb-4">
+              Click on one of the icons above to generate content for this ticket
+            </p>
+          </div>
+        )}
         
-        <div ref={contentRef}>
+        {generating && (
+          <div className="text-center py-16 border rounded-md">
+            <RefreshCw className="h-12 w-12 mx-auto text-primary animate-spin mb-4" />
+            <h3 className="text-lg font-medium">Generating {generating === 'all' ? 'all content' : generating}...</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              This might take a few moments
+            </p>
+          </div>
+        )}
+        
+        {hasAnyContent && !generating && (
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-3 mb-4">
-              <TabsTrigger value="lld" className="flex items-center">
-                <FileText className="h-4 w-4 mr-2" />
-                <span>LLD</span>
-                {lldContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-              </TabsTrigger>
-              <TabsTrigger value="code" className="flex items-center">
-                <Code className="h-4 w-4 mr-2" />
-                <span>Code</span>
-                {codeContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-              </TabsTrigger>
-              <TabsTrigger value="tests" className="flex items-center">
-                <TestTube className="h-4 w-4 mr-2" />
-                <span>Tests</span>
-                {testContent && <CheckCircle2 className="h-3 w-3 ml-1 text-green-500" />}
-              </TabsTrigger>
+            <TabsList className="grid grid-cols-4 mb-4">
+              {lldContent && <TabsTrigger value="lld">LLD</TabsTrigger>}
+              {codeContent && <TabsTrigger value="code">Code</TabsTrigger>}
+              {testCasesContent && <TabsTrigger value="test_cases">Test Cases</TabsTrigger>}
+              {testContent && <TabsTrigger value="tests">Tests</TabsTrigger>}
             </TabsList>
             
-            <StoryTabContent tabId="lld" title="Low-Level Design" content={lldContent} contentType="lld" loading={generating === "lld"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
+            {lldContent && (
+              <TabsContent value="lld">
+                <StoryTabContent 
+                  content={lldContent} 
+                  onPushToJira={handlePushToJira}
+                />
+              </TabsContent>
+            )}
             
-            <StoryTabContent tabId="code" title="Implementation Code" content={codeContent} contentType="code" loading={generating === "code"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
+            {codeContent && (
+              <TabsContent value="code">
+                <StoryTabContent 
+                  content={codeContent} 
+                  onPushToJira={handlePushToJira}
+                />
+              </TabsContent>
+            )}
             
-            <StoryTabContent tabId="tests" title="Test Cases" content={testContent} contentType="tests" loading={generating === "tests"} ticket={ticket} projectContext={projectContext} selectedDocuments={selectedDocuments} onPushToJira={handlePushToJira} />
+            {testCasesContent && (
+              <TabsContent value="test_cases">
+                <StoryTabContent 
+                  content={testCasesContent} 
+                  onPushToJira={handlePushToJira}
+                />
+              </TabsContent>
+            )}
+            
+            {testContent && (
+              <TabsContent value="tests">
+                <StoryTabContent 
+                  content={testContent} 
+                  onPushToJira={handlePushToJira}
+                />
+              </TabsContent>
+            )}
           </Tabs>
-        </div>
+        )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 };
 
 export default StoryGenerateContent;
