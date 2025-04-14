@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JiraTicket } from '@/types/jira';
-import { Search, Filter, X, Tag, ListFilter, DownloadCloud, Clock } from "lucide-react";
+import { Search, Filter, X, Tag, ListFilter, DownloadCloud } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 
 const StoryList: React.FC = () => {
@@ -74,7 +74,7 @@ const StoryList: React.FC = () => {
         if (entries[0].isIntersecting && !loadingMore && !ticketsLoading) {
           fetchMoreTickets();
         }
-      }, { threshold: 0.3 });
+      }, { threshold: 0.5 });
       
       observer.current.observe(loadingRef.current);
     }
@@ -337,19 +337,14 @@ const StoryList: React.FC = () => {
               {hasMore && !ticketTypeFilter && !ticketStatusFilter && !searchTerm && (
                 <div 
                   ref={loadingRef} 
-                  className="py-2 text-center text-sm text-muted-foreground"
+                  className="py-4 text-center text-sm text-muted-foreground"
                 >
-                  {loadingMore ? (
-                    <div className="flex items-center justify-center">
-                      <Clock className="h-4 w-4 mr-2 animate-spin" />
-                      Loading more tickets...
-                    </div>
-                  ) : 'Scroll for more tickets'}
+                  {loadingMore ? 'Loading more tickets...' : 'Scroll for more tickets'}
                 </div>
               )}
               
               {!hasMore && tickets.length < totalTickets && (
-                <div className="py-2 text-center text-sm text-muted-foreground">
+                <div className="py-4 text-center text-sm text-muted-foreground">
                   Loaded {tickets.length} of {totalTickets} tickets
                 </div>
               )}
@@ -408,17 +403,25 @@ interface StoryListItemProps {
 const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSelect }) => {
   return (
     <div
-      className={`p-2 mb-1 border rounded-md cursor-pointer transition-colors ${
+      className={`p-3 mb-1 border rounded-md cursor-pointer transition-colors ${
         isSelected
           ? 'bg-primary/10 border-primary/50'
           : 'hover:bg-muted/50 border-transparent hover:border-muted'
       }`}
       onClick={onSelect}
     >
-      <div className="flex justify-between items-start">
+      <div className="flex justify-between items-start mb-1">
         <div className="font-medium text-sm text-primary">{ticket.key}</div>
+        {ticket.issuetype?.name && (
+          <Badge variant="outline" className="text-xs">
+            {ticket.issuetype.name}
+          </Badge>
+        )}
+      </div>
+      <div className="text-sm truncate">{ticket.summary}</div>
+      <div className="flex justify-between items-center mt-2">
         {ticket.status && (
-          <Badge className={`text-xs ml-1 ${
+          <Badge className={`text-xs ${
             ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
             ticket.status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
             ticket.status.toLowerCase().includes('review') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
@@ -426,16 +429,6 @@ const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSel
             'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
           }`}>
             {ticket.status}
-          </Badge>
-        )}
-      </div>
-      
-      <div className="text-sm truncate mt-1">{ticket.summary}</div>
-      
-      <div className="flex items-center justify-between mt-1">
-        {ticket.issuetype?.name && (
-          <Badge variant="outline" className="text-xs px-1 py-0">
-            {ticket.issuetype.name}
           </Badge>
         )}
         {ticket.assignee && (

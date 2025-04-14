@@ -5,7 +5,6 @@ import { JiraCredentials } from '@/types/jira';
 export const useAuthState = () => {
   const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   // Load credentials from localStorage on mount
   useEffect(() => {
@@ -39,7 +38,6 @@ export const useAuthState = () => {
           } else {
             console.log("Invalid credentials format in localStorage, removing");
             localStorage.removeItem('jira_credentials');
-            setError("Invalid credentials format");
           }
         } else {
           console.log("No Jira credentials found in localStorage");
@@ -47,7 +45,6 @@ export const useAuthState = () => {
       } catch (err) {
         console.error('Error loading Jira credentials:', err);
         localStorage.removeItem('jira_credentials');
-        setError("Error loading credentials");
       }
     };
 
@@ -66,11 +63,9 @@ export const useAuthState = () => {
         
         localStorage.setItem('jira_credentials', JSON.stringify(cleanCredentials));
         setIsAuthenticated(true);
-        setError(null);
         console.log("Saved Jira credentials to localStorage");
       } catch (err) {
         console.error('Error saving credentials to localStorage:', err);
-        setError("Error saving credentials");
       }
     } else {
       localStorage.removeItem('jira_credentials');
@@ -82,7 +77,6 @@ export const useAuthState = () => {
   return {
     credentials,
     setCredentials,
-    isAuthenticated,
-    error
+    isAuthenticated
   };
 };

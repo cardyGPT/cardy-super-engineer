@@ -174,7 +174,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                     <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">
                       {sprints[selectedProject.id]?.length} sprints
-                      {totalTickets > 0 ? ` / ${totalTickets} issues total` : ''}
+                      {totalTickets > 0 && ` / ${totalTickets} issues`}
                     </span>
                   </div>
                 )}

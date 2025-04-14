@@ -42,7 +42,6 @@ export interface JiraSprint {
   endDate?: string;
   boardId: string;
   projectId?: string; // Add this property to support tracking which project a sprint belongs to
-  totalIssues?: number; // Add totalIssues property
 }
 
 export interface JiraCredentials {
@@ -69,9 +68,6 @@ export interface JiraGenerationResponse {
   code?: string;
   tests?: string;
   all?: string;
-  lldContent?: string; // Add response content properties
-  codeContent?: string;
-  testContent?: string;
   response?: string;
   error?: string;
 }

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeContentForReact, ensureString } from '@/contexts/stories/api';
-import StoryTabContent from './StoryTabContent';
+import StoryGenerateContent from './StoryGenerateContent';
 
 interface StoryDetailProps {
   ticket: JiraTicket;
@@ -26,113 +26,33 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   projectContextData = null
 }) => {
   const [activeTab, setActiveTab] = useState("details");
-  const { generateContent, pushToJira, generatedContent, contentLoading } = useStories();
   
   if (isLoading) {
     return <StoryDetailSkeleton />;
   }
-
-  const handleGenerateLLD = async () => {
-    try {
-      await generateContent({
-        type: 'lld',
-        jiraTicket: ticket,
-        projectContext: projectContext || undefined,
-        selectedDocuments: selectedDocuments || [],
-      });
-      setActiveTab("lld");
-    } catch (error) {
-      console.error("Error generating LLD:", error);
-    }
-  };
-
-  const handleGenerateCode = async () => {
-    try {
-      await generateContent({
-        type: 'code',
-        jiraTicket: ticket,
-        projectContext: projectContext || undefined,
-        selectedDocuments: selectedDocuments || [],
-      });
-      setActiveTab("code");
-    } catch (error) {
-      console.error("Error generating code:", error);
-    }
-  };
-
-  const handleGenerateTests = async () => {
-    try {
-      await generateContent({
-        type: 'tests',
-        jiraTicket: ticket,
-        projectContext: projectContext || undefined,
-        selectedDocuments: selectedDocuments || [],
-      });
-      setActiveTab("tests");
-    } catch (error) {
-      console.error("Error generating tests:", error);
-    }
-  };
-
-  const handlePushToJira = async (content: string) => {
-    if (!ticket.id) return false;
-    return await pushToJira(ticket.id, content);
-  };
 
   return (
     <div className="space-y-6">
       <StoryHeader ticket={ticket} />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-2">
           <TabsTrigger value="details">Story Details</TabsTrigger>
-          <TabsTrigger value="lld">Low-Level Design</TabsTrigger>
-          <TabsTrigger value="code">Implementation</TabsTrigger>
-          <TabsTrigger value="tests">Test Cases</TabsTrigger>
+          <TabsTrigger value="generate">Generate Content</TabsTrigger>
         </TabsList>
         
         <TabsContent value="details" className="py-4">
           <StoryContent ticket={ticket} />
         </TabsContent>
         
-        <StoryTabContent
-          tabId="lld"
-          title="Low-Level Design"
-          content={generatedContent?.lld || generatedContent?.lldContent || null}
-          contentType="lld"
-          loading={contentLoading && activeTab === "lld"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateLLD}
-        />
-        
-        <StoryTabContent
-          tabId="code"
-          title="Implementation Code"
-          content={generatedContent?.code || generatedContent?.codeContent || null}
-          contentType="code"
-          loading={contentLoading && activeTab === "code"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateCode}
-        />
-        
-        <StoryTabContent
-          tabId="tests"
-          title="Test Cases"
-          content={generatedContent?.tests || generatedContent?.testContent || null}
-          contentType="tests"
-          loading={contentLoading && activeTab === "tests"}
-          ticket={ticket}
-          projectContext={projectContext}
-          selectedDocuments={selectedDocuments}
-          onPushToJira={handlePushToJira}
-          onGenerate={handleGenerateTests}
-        />
+        <TabsContent value="generate" className="py-4">
+          <StoryGenerateContent 
+            ticket={ticket}
+            projectContext={projectContext}
+            selectedDocuments={selectedDocuments}
+            projectContextData={projectContextData}
+          />
+        </TabsContent>
       </Tabs>
     </div>
   );

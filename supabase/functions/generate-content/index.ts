@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, systemPrompt, maxTokens = 4000, temperature = 0.7 } = await req.json();
+    const { prompt, systemPrompt, maxTokens = 2000, temperature = 0.7 } = await req.json();
     
     // Validate request
     if (!prompt) {
@@ -39,8 +39,6 @@ serve(async (req) => {
       );
     }
     
-    console.log("Calling OpenAI API with prompt:", prompt.substring(0, 100) + "...");
-    
     // Call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -53,7 +51,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: systemPrompt || 'You are a helpful assistant that generates technical documentation and code based on user requirements.'
+            content: systemPrompt || 'You are a helpful assistant.'
           },
           {
             role: 'user',
@@ -67,12 +65,10 @@ serve(async (req) => {
     
     if (!response.ok) {
       const error = await response.json();
-      console.error("OpenAI API error:", error);
       throw new Error(error.error?.message || "Error calling OpenAI API");
     }
     
     const data = await response.json();
-    console.log("OpenAI API response received. Token usage:", data.usage);
     
     return new Response(
       JSON.stringify({ 

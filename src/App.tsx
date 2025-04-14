@@ -1,19 +1,27 @@
 
 import React from 'react';
-import { RouterProvider } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
 import { StoriesProvider } from '@/contexts/StoriesContext';
-import { ProjectProvider } from '@/contexts/ProjectContext';
-import { routes } from './routes';
+
+// Pages
+import StoriesPage from '@/pages/StoriesPage';
+import SettingsPage from '@/pages/SettingsPage';
+import NotFound from '@/pages/NotFound';
 
 function App() {
   return (
-    <ProjectProvider>
+    <Router>
       <StoriesProvider>
-        <RouterProvider router={routes} />
+        <Routes>
+          <Route path="/" element={<StoriesPage />} />
+          <Route path="/stories" element={<StoriesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
         <Toaster />
       </StoriesProvider>
-    </ProjectProvider>
+    </Router>
   );
 }
 
