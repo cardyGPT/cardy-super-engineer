@@ -55,9 +55,6 @@ export const generateJiraContent = async (
       response.testCasesContent = responseContent;
     }
     
-    // Also include the full response for reference
-    response.response = responseContent;
-    
     // Save the generated content to the database
     try {
       if (ticket.key && ticket.projectId) {

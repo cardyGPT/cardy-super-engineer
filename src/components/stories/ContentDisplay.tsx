@@ -7,9 +7,11 @@ import rehypeHighlight from 'rehype-highlight';
 import '@/styles/markdown.css';
 import { sanitizeContentForReact } from '@/contexts/stories/api';
 
+export type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
+
 interface ContentDisplayProps {
   content: string;
-  contentType: 'lld' | 'code' | 'tests' | 'testcases';
+  contentType: ContentType;
 }
 
 const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType }) => {

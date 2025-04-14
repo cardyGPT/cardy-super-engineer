@@ -152,8 +152,19 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setError(null);
     
     try {
-      const loadedTickets = await fetchJiraTickets(credentials, selectedSprint.id);
-      setTickets(loadedTickets);
+      const result = await fetchJiraTickets(
+        credentials, 
+        selectedSprint.id, 
+        selectedProject, 
+        0, 
+        50, 
+        { 
+          type: null, 
+          status: null 
+        }
+      );
+      
+      setTickets(result.tickets);
     } catch (err) {
       console.error('Failed to load tickets:', err);
       if (err instanceof Error) {

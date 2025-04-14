@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FileText, Code, TestTube, Loader2, CheckSquare, FileDown, Send, FileCode, Github } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import ContentDisplay from './ContentDisplay';
+import ContentDisplay, { ContentType } from './ContentDisplay';
 import ExportToGSuite from './ExportToGSuite';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
@@ -20,8 +20,6 @@ interface StoryGenerateContentProps {
   generatedContent: JiraGenerationResponse | null;
   isGenerating: boolean;
 }
-
-type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
 
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,

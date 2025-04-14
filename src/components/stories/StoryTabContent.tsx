@@ -1,11 +1,10 @@
-
 import React, { useState } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ContentDisplay from './ContentDisplay';
+import ContentDisplay, { ContentType } from './ContentDisplay';
 import LoadingContent from './LoadingContent';
 import { FileDown, Send, Github, FileText, Code, TestTube, Loader2, FileCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -20,9 +19,6 @@ interface StoryTabContentProps {
   onGenerate: () => Promise<void>;
   onPushToJira: (content: string) => Promise<boolean>;
 }
-
-// Define the content type for better type safety
-type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
 
 const StoryTabContent: React.FC<StoryTabContentProps> = ({
   ticket,
