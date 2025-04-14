@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent } from "@/components/ui/card";
@@ -66,7 +65,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     }
   };
   
-  const handleApiTypeChange = (type: 'agile' | 'classic') => {
+  const handleApiTypeChange = (type: 'agile' | 'classic' | 'cloud') => {
     if (type !== apiType) {
       setApiType(type);
       // Clear selections when API type changes

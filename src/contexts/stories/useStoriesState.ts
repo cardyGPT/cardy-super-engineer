@@ -14,7 +14,7 @@ import {
   ensureString 
 } from './api';
 
-export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
+export const useStoriesState = (apiType: 'agile' | 'classic' | 'cloud' = 'agile') => {
   const { toast } = useToast();
   
   // Authentication state
