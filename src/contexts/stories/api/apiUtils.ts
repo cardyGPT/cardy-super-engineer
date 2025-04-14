@@ -35,6 +35,11 @@ export const callJiraApi = async (credentials: JiraCredentials, path: string, me
       console.error('Error details:', responseData.details);
       console.error('Requested URL:', responseData.url);
       
+      // Handle potential authentication issues
+      if (responseData.status === 401 || (responseData.details && responseData.details.message && responseData.details.message.includes('Unauthorized'))) {
+        throw new Error('Authentication failed. Please check your Jira credentials.');
+      }
+      
       // Throw a detailed error
       throw new Error(responseData.error || 'Error from Jira API');
     }
@@ -81,6 +86,12 @@ export const evaluateJiraExpression = async (credentials: JiraCredentials, issue
       console.error('Jira Expression API returned an error:', responseData.error);
       console.error('Error details:', responseData.details);
       
+      // Handle Jira Classic case where expression API might not be available
+      if (responseData.status === 404 || (responseData.details && responseData.details.message && responseData.details.message.includes('not found'))) {
+        console.warn('Expression API not available - possibly using Jira Classic');
+        return null;
+      }
+      
       // Throw a detailed error
       throw new Error(responseData.error || 'Error from Jira Expression API');
     }
@@ -123,4 +134,31 @@ export const saveGeneratedContent = async (
     console.error('Error in saveGeneratedContent:', error);
     throw error;
   }
+};
+
+// Check if a value is a string
+export const isString = (value: any): boolean => {
+  return typeof value === 'string' || value instanceof String;
+};
+
+// Safely convert any value to a string
+export const ensureString = (value: any): string => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  
+  if (isString(value)) {
+    return value as string;
+  }
+  
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch (e) {
+      console.error('Error stringifying object:', e);
+      return '[Object conversion error]';
+    }
+  }
+  
+  return String(value);
 };

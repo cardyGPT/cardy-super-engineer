@@ -1,15 +1,17 @@
-
 import { useState, useCallback, useEffect } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { 
-  fetchJiraProjects, 
+  fetchJiraProjects,
+  fetchAllJiraProjects,
+  testJiraConnection,
   fetchJiraSprints, 
   fetchJiraTickets, 
   fetchJiraTicketsByProject, 
   generateJiraContent, 
   pushContentToJira,
-  saveGeneratedContent 
+  saveGeneratedContent,
+  ensureString 
 } from './api';
 
 export const useStoriesState = () => {
@@ -33,7 +35,15 @@ export const useStoriesState = () => {
   const [sprints, setSprints] = useState<Record<string, JiraSprint[]>>({});
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   
-  // Pagination state
+  // Jira API version
+  const [apiVersion, setApiVersion] = useState<'classic' | 'agile' | 'cloud' | null>(null);
+  
+  // Pagination state for projects
+  const [projectsStartAt, setProjectsStartAt] = useState(0);
+  const [hasMoreProjects, setHasMoreProjects] = useState(true);
+  const [isLoadingMoreProjects, setIsLoadingMoreProjects] = useState(false);
+  
+  // Pagination state for tickets
   const [totalTickets, setTotalTickets] = useState(0);
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize, setPageSize] = useState(20);
@@ -82,16 +92,91 @@ export const useStoriesState = () => {
     if (credentials && projects.length === 0 && !projectsLoading) {
       console.log('Auto-fetching projects on credentials load');
       fetchProjects();
+      testJiraApiVersion();
     }
   }, [credentials]);
   
-  // Reset selected ticket when filters change
-  useEffect(() => {
-    setSelectedTicket(null);
-  }, [ticketTypeFilter, ticketStatusFilter, searchTerm]);
+  // Test Jira API version to determine if it's Classic or Agile
+  const testJiraApiVersion = useCallback(async () => {
+    if (!credentials) return;
+    
+    try {
+      const result = await testJiraConnection(credentials);
+      if (result.isConnected && result.apiVersion) {
+        setApiVersion(result.apiVersion);
+        console.log(`Detected Jira API version: ${result.apiVersion}`);
+      }
+    } catch (err) {
+      console.error('Error testing Jira API version:', err);
+      // Default to classic if we can't determine
+      setApiVersion('classic');
+    }
+  }, [credentials]);
   
-  // API method - Fetch projects
+  // API method - Fetch initial batch of projects
   const fetchProjects = useCallback(async () => {
+    if (!credentials) {
+      setError('No Jira credentials provided');
+      return;
+    }
+    
+    setProjectsLoading(true);
+    setError(null);
+    setProjectsStartAt(0);
+    setHasMoreProjects(true);
+    
+    try {
+      console.log('Fetching initial batch of Jira projects...');
+      const projectsData = await fetchJiraProjects(credentials, 0, 50);
+      
+      setProjects(projectsData);
+      setProjectsStartAt(projectsData.length);
+      setHasMoreProjects(projectsData.length === 50);
+      console.log(`Fetched ${projectsData.length} projects`);
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to fetch Jira projects';
+      console.error('Error fetching projects:', errorMessage);
+      setError(errorMessage);
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, [credentials, toast]);
+  
+  // API method - Fetch more projects (for lazy loading)
+  const fetchMoreProjects = useCallback(async () => {
+    if (!credentials || !hasMoreProjects || isLoadingMoreProjects) {
+      return;
+    }
+    
+    setIsLoadingMoreProjects(true);
+    
+    try {
+      console.log(`Fetching more projects starting at: ${projectsStartAt}`);
+      const moreProjects = await fetchJiraProjects(credentials, projectsStartAt, 50);
+      
+      if (moreProjects.length > 0) {
+        setProjects(prev => [...prev, ...moreProjects]);
+        setProjectsStartAt(prev => prev + moreProjects.length);
+        setHasMoreProjects(moreProjects.length === 50);
+        console.log(`Fetched ${moreProjects.length} more projects, total: ${projects.length + moreProjects.length}`);
+      } else {
+        setHasMoreProjects(false);
+      }
+    } catch (err: any) {
+      console.error('Error fetching more projects:', err);
+      setHasMoreProjects(false);
+    } finally {
+      setIsLoadingMoreProjects(false);
+    }
+  }, [credentials, projectsStartAt, hasMoreProjects, isLoadingMoreProjects, projects.length]);
+  
+  // API method - Fetch all projects at once (slower but more reliable)
+  const fetchAllProjectsAtOnce = useCallback(async () => {
     if (!credentials) {
       setError('No Jira credentials provided');
       return;
@@ -101,14 +186,15 @@ export const useStoriesState = () => {
     setError(null);
     
     try {
-      console.log('Fetching Jira projects...');
-      const projectsData = await fetchJiraProjects(credentials);
+      console.log('Fetching all Jira projects at once...');
+      const allProjects = await fetchAllJiraProjects(credentials);
       
-      setProjects(projectsData);
-      console.log(`Fetched ${projectsData.length} projects`);
+      setProjects(allProjects);
+      setHasMoreProjects(false);
+      console.log(`Fetched all ${allProjects.length} projects`);
     } catch (err: any) {
-      const errorMessage = err.message || 'Failed to fetch Jira projects';
-      console.error('Error fetching projects:', errorMessage);
+      const errorMessage = err.message || 'Failed to fetch all Jira projects';
+      console.error('Error fetching all projects:', errorMessage);
       setError(errorMessage);
       toast({
         title: "Error",
@@ -318,7 +404,7 @@ export const useStoriesState = () => {
     }
   }, [selectedSprint]);
   
-  // API method - Generate content
+  // API method - Generate content (updated to ensure content is always stringified)
   const generateContent = useCallback(async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
     if (!credentials || !selectedTicket) {
       setError('Missing credentials or ticket selection');
@@ -332,18 +418,28 @@ export const useStoriesState = () => {
       console.log(`Generating ${request.type} content for ticket ${selectedTicket.key}...`);
       const responseData = await generateJiraContent(selectedTicket, request);
       
+      // Ensure all response properties are strings
+      if (responseData) {
+        if (responseData.lld) responseData.lld = ensureString(responseData.lld);
+        if (responseData.code) responseData.code = ensureString(responseData.code);
+        if (responseData.tests) responseData.tests = ensureString(responseData.tests);
+        if (responseData.response) responseData.response = ensureString(responseData.response);
+        if (responseData.all) responseData.all = ensureString(responseData.all);
+      }
+      
       setGeneratedContent(responseData);
       console.log('Content generated successfully');
       
       // Save the generated content to the database for persistence
       if (responseData) {
         try {
+          const contentToSave = responseData[request.type] || responseData.response || '';
           await saveGeneratedContent(
             selectedTicket.id, 
             selectedTicket.projectId || '', 
             selectedTicket.sprintId || '', 
             request.type, 
-            responseData[request.type] || responseData.response || ''
+            ensureString(contentToSave)
           );
           console.log('Content saved to database');
         } catch (saveError) {
@@ -446,13 +542,20 @@ export const useStoriesState = () => {
     setCredentials,
     isAuthenticated,
     error,
+    apiVersion,
     
     // Data
     projects,
     sprints,
     tickets,
     
-    // Pagination
+    // Project pagination
+    hasMoreProjects,
+    isLoadingMoreProjects,
+    fetchMoreProjects,
+    fetchAllProjectsAtOnce,
+    
+    // Ticket pagination
     totalTickets,
     currentPage,
     pageSize,
@@ -493,6 +596,7 @@ export const useStoriesState = () => {
     fetchTicketsByProject,
     generateContent,
     pushToJira,
+    testJiraApiVersion,
     
     // Utility
     refreshAll

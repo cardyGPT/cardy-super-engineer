@@ -10,13 +10,20 @@ interface StoriesContextProps {
   setCredentials: (creds: JiraCredentials | null) => void;
   isAuthenticated: boolean;
   error: string | null;
+  apiVersion?: 'classic' | 'agile' | 'cloud' | null;
   
   // Data state
   projects: JiraProject[];
   sprints: Record<string, JiraSprint[]>;
   tickets: JiraTicket[];
   
-  // Pagination state
+  // Project pagination
+  hasMoreProjects: boolean;
+  isLoadingMoreProjects: boolean;
+  fetchMoreProjects: () => Promise<void>;
+  fetchAllProjectsAtOnce: () => Promise<void>;
+  
+  // Ticket pagination
   totalTickets: number;
   currentPage: number;
   pageSize: number;
@@ -55,6 +62,7 @@ interface StoriesContextProps {
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   refreshAll: () => Promise<void>;
+  testJiraApiVersion: () => Promise<void>;
   
   // Generated content
   generatedContent: JiraGenerationResponse | null;

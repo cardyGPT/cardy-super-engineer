@@ -1,30 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
-import { DEV_MODE, callJiraApi } from './apiUtils';
-
-// Helper function to ensure content is a string
-const ensureStringContent = (content: any): string => {
-  if (content === null || content === undefined) {
-    return "";
-  }
-  
-  if (typeof content === 'string') {
-    return content;
-  }
-  
-  // Handle Jira document format or any object
-  if (typeof content === 'object') {
-    try {
-      return JSON.stringify(content, null, 2);
-    } catch (e) {
-      console.error("Error stringifying content:", e);
-      return "[Content conversion error]";
-    }
-  }
-  
-  return String(content);
-};
+import { DEV_MODE, callJiraApi, ensureString } from './apiUtils';
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -60,7 +37,7 @@ export const generateJiraContent = async (
     }
     
     // Ensure response is a string
-    const responseContent = ensureStringContent(data.response);
+    const responseContent = ensureString(data.response);
     
     // Create a response object with the generated content
     // For 'all' type, we'll still return it in the correct content field instead of using 'all'
@@ -86,7 +63,7 @@ export const generateJiraContent = async (
       if (ticket.key && ticket.projectId) {
         await saveGeneratedContent(
           ticket.key,
-          ticket.projectId,
+          ticket.projectId || '',
           ticket.sprintId || '',
           request.type,
           responseContent
@@ -119,7 +96,7 @@ export const saveGeneratedContent = async (
         projectId,
         sprintId,
         contentType,
-        content
+        content: ensureString(content)
       }
     });
     
@@ -147,7 +124,7 @@ export const pushContentToJira = async (
     console.log(`Pushing content to Jira ticket ${ticketId}...`);
     
     // Ensure content is a string
-    const safeContent = ensureStringContent(content);
+    const safeContent = ensureString(content);
     
     // Convert markdown to Jira markup (a basic conversion)
     const jiraContent = safeContent

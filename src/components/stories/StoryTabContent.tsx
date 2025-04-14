@@ -40,7 +40,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
       ) : (
         <ContentDisplay
           title={title}
-          content={safeContent || undefined}
+          content={safeContent}
           contentType={contentType}
           storyKey={ticket.key}
           storyId={ticket.id}

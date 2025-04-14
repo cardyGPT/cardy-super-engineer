@@ -14,10 +14,12 @@ import {
   CalendarCheck, 
   CalendarX, 
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  RefreshCw
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 
 interface JiraProjectSelectorProps {
   lastRefreshTime?: Date | null;
@@ -35,12 +37,19 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     setSelectedSprint,
     fetchSprints,
     fetchTickets,
+    fetchTicketsByProject,
     projectsLoading,
-    sprintsLoading
+    sprintsLoading,
+    hasMoreProjects,
+    isLoadingMoreProjects,
+    fetchMoreProjects,
+    fetchAllProjectsAtOnce,
+    apiVersion
   } = useStories();
 
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
   const [isLoadingTickets, setIsLoadingTickets] = useState(false);
+  const [isSelectOpen, setIsSelectOpen] = useState(false);
 
   // Reset selections when projects change (e.g., after refresh)
   useEffect(() => {
@@ -48,6 +57,13 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
       setSelectedProject(projects[0]);
     }
   }, [lastRefreshTime, projects, selectedProject, setSelectedProject]);
+
+  // Load more projects when scrolling to the bottom of the select list
+  useEffect(() => {
+    if (isSelectOpen && hasMoreProjects && !isLoadingMoreProjects && !projectsLoading) {
+      fetchMoreProjects();
+    }
+  }, [isSelectOpen, hasMoreProjects, isLoadingMoreProjects, projectsLoading, fetchMoreProjects]);
 
   const handleProjectChange = async (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
@@ -81,6 +97,23 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     } finally {
       setIsLoadingTickets(false);
     }
+  };
+
+  const handleViewAllStories = async () => {
+    if (!selectedProject) return;
+    
+    setSelectedSprint(null);
+    setIsLoadingTickets(true);
+    
+    try {
+      await fetchTicketsByProject(selectedProject.id);
+    } finally {
+      setIsLoadingTickets(false);
+    }
+  };
+
+  const handleLoadAllProjects = async () => {
+    await fetchAllProjectsAtOnce();
   };
 
   // Get sprints for the selected project
@@ -121,34 +154,89 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
 
   return (
     <div className="space-y-4 bg-white dark:bg-card rounded-lg border border-border p-4 shadow-sm">
-      <h2 className="text-xl font-bold text-foreground mb-4">Select Project & Sprint</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-bold text-foreground">Select Project & Sprint</h2>
+        
+        {apiVersion && (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400">
+            {apiVersion === 'agile' ? 'Jira Agile' : apiVersion === 'cloud' ? 'Jira Cloud' : 'Jira Classic'}
+          </Badge>
+        )}
+      </div>
       
       <div className="space-y-4">
         <div className="space-y-2">
           <label className="block text-sm font-medium text-muted-foreground">Project</label>
           
-          {projectsLoading ? (
+          {projectsLoading && projects.length === 0 ? (
             <Skeleton className="h-10 w-full" />
           ) : (
-            <Select
-              value={selectedProject?.id}
-              onValueChange={handleProjectChange}
-              disabled={projectsLoading}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    <div className="flex items-center">
-                      <FolderOpen className="h-4 w-4 mr-2 text-primary" />
-                      {project.name} {project.key && `(${project.key})`}
+            <>
+              <Select
+                value={selectedProject?.id}
+                onValueChange={handleProjectChange}
+                disabled={projectsLoading}
+                onOpenChange={setIsSelectOpen}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select project" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      <div className="flex items-center">
+                        <FolderOpen className="h-4 w-4 mr-2 text-primary" />
+                        {project.name} {project.key && `(${project.key})`}
+                      </div>
+                    </SelectItem>
+                  ))}
+                  
+                  {isLoadingMoreProjects && (
+                    <div className="flex items-center justify-center py-2 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading more projects...
                     </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+                  )}
+                  
+                  {!isLoadingMoreProjects && hasMoreProjects && (
+                    <div className="flex items-center justify-center py-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={e => {
+                          e.preventDefault();
+                          fetchMoreProjects();
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Load more projects
+                      </Button>
+                    </div>
+                  )}
+                  
+                  {projects.length > 0 && !projectsLoading && !isLoadingMoreProjects && (
+                    <div className="flex items-center justify-center py-2">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={e => {
+                          e.preventDefault();
+                          handleLoadAllProjects();
+                        }}
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Load all projects
+                      </Button>
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+              
+              <div className="text-xs text-muted-foreground">
+                {projects.length > 0 && `${projects.length} project${projects.length !== 1 ? 's' : ''} loaded`}
+                {hasMoreProjects && ' (more available)'}
+              </div>
+            </>
           )}
         </div>
         
@@ -158,29 +246,56 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
           {(sprintsLoading || isLoadingSprints) ? (
             <Skeleton className="h-10 w-full" />
           ) : (
-            <Select
-              value={selectedSprint?.id}
-              onValueChange={handleSprintChange}
-              disabled={!selectedProject || sprintsLoading || isLoadingSprints}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select sprint" />
-              </SelectTrigger>
-              <SelectContent>
-                {projectSprints.map((sprint) => {
-                  const { icon, badge } = getSprintStateProps(sprint.state);
-                  return (
-                    <SelectItem key={sprint.id} value={sprint.id}>
-                      <div className="flex items-center">
-                        {icon}
-                        <span className="ml-2">{sprint.name}</span>
-                        {badge}
-                      </div>
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+            <>
+              <Select
+                value={selectedSprint?.id}
+                onValueChange={handleSprintChange}
+                disabled={!selectedProject || sprintsLoading || isLoadingSprints}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select sprint" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projectSprints.map((sprint) => {
+                    const { icon, badge } = getSprintStateProps(sprint.state);
+                    return (
+                      <SelectItem key={sprint.id} value={sprint.id}>
+                        <div className="flex items-center">
+                          {icon}
+                          <span className="ml-2">{sprint.name}</span>
+                          {badge}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+              
+              {selectedProject && projectSprints.length === 0 && !sprintsLoading && !isLoadingSprints && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  No sprints found for this project
+                </div>
+              )}
+              
+              {selectedProject && !selectedSprint && (
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-2 w-full"
+                  onClick={handleViewAllStories}
+                  disabled={isLoadingTickets}
+                >
+                  {isLoadingTickets ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Loading...
+                    </>
+                  ) : (
+                    <>View all stories from project</>
+                  )}
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>

@@ -3,10 +3,33 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.36.0";
 
+// Helper function to safely convert any content to string
+const safeStringify = (content: any): string => {
+  if (content === null || content === undefined) {
+    return "";
+  }
+  
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  // Handle Jira document format or any object
+  if (typeof content === 'object') {
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch (e) {
+      console.error("Error stringifying content:", e);
+      return "[Content conversion error]";
+    }
+  }
+  
+  return String(content);
+};
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders, status: 204 });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
@@ -15,7 +38,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Parse request
+    // Parse request body
     const { jiraTicket, dataModel, documentsContext, request, projectContext, selectedDocuments, additionalContext } = await req.json();
     
     if (!jiraTicket) {
@@ -28,37 +51,14 @@ serve(async (req) => {
       );
     }
 
-    // Helper function to safely convert any content to string
-    const safeStringify = (content: any): string => {
-      if (content === null || content === undefined) {
-        return "";
-      }
-      
-      if (typeof content === 'string') {
-        return content;
-      }
-      
-      // Handle Jira document format or any object
-      if (typeof content === 'object') {
-        try {
-          return JSON.stringify(content, null, 2);
-        } catch (e) {
-          console.error("Error stringifying content:", e);
-          return "[Content conversion error]";
-        }
-      }
-      
-      return String(content);
-    };
-
     // Prepare context for the model
     let ticketContext = `
 Jira Ticket: ${jiraTicket.key || 'Unknown'}
-Summary: ${jiraTicket.summary || 'No summary provided'}
+Summary: ${safeStringify(jiraTicket.summary) || 'No summary provided'}
 Description: ${safeStringify(jiraTicket.description) || 'No description provided'}
-Status: ${jiraTicket.status || 'Unknown'}
-Priority: ${jiraTicket.priority || 'Unknown'}
-Type: ${jiraTicket.issuetype?.name || 'Unknown'}
+Status: ${safeStringify(jiraTicket.status) || 'Unknown'}
+Priority: ${safeStringify(jiraTicket.priority) || 'Unknown'}
+Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
 `;
 
     // Add any additional contexts
@@ -116,12 +116,12 @@ Type: ${jiraTicket.issuetype?.name || 'Unknown'}
     }
 
     // Create a mock response since we're not actually calling OpenAI
-    const mockPrompt = request || 'Generate content';
+    const mockPrompt = safeStringify(request) || 'Generate content';
     let responseContent = '';
     
     // Generate different content based on the request type
     if (mockPrompt.includes('Low-Level Design') || mockPrompt.includes('LLD')) {
-      responseContent = `# Low Level Design for ${jiraTicket.key}: ${jiraTicket.summary}
+      responseContent = `# Low Level Design for ${jiraTicket.key}: ${safeStringify(jiraTicket.summary)}
 
 ## Overview
 This document outlines the low-level design for implementing the feature described in ${jiraTicket.key}.
@@ -172,7 +172,7 @@ DELETE /api/resource/:id
 *Document created based on ticket ${jiraTicket.key}*
 `;
     } else if (mockPrompt.includes('Implementation Code') || mockPrompt.includes('code')) {
-      responseContent = `# Implementation Code for ${jiraTicket.key}: ${jiraTicket.summary}
+      responseContent = `# Implementation Code for ${jiraTicket.key}: ${safeStringify(jiraTicket.summary)}
 
 ## Frontend Code (Angular)
 
@@ -283,7 +283,7 @@ CREATE INDEX idx_examples_email ON examples(email);
 *Code generated based on ticket ${jiraTicket.key}*
 `;
     } else if (mockPrompt.includes('Test Cases') || mockPrompt.includes('tests')) {
-      responseContent = `# Test Cases for ${jiraTicket.key}: ${jiraTicket.summary}
+      responseContent = `# Test Cases for ${jiraTicket.key}: ${safeStringify(jiraTicket.summary)}
 
 ## Unit Tests
 
@@ -425,9 +425,10 @@ describe('Example Feature', () => {
 *Test cases generated based on ticket ${jiraTicket.key}*
 `;
     } else {
-      responseContent = `Generated content for ${jiraTicket.key}: ${jiraTicket.summary}\n\n${ticketContext}`;
+      responseContent = `Generated content for ${jiraTicket.key}: ${safeStringify(jiraTicket.summary)}\n\n${ticketContext}`;
     }
 
+    // Always return a string, not an object with nested structure
     return new Response(
       JSON.stringify({ response: responseContent }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -436,9 +437,12 @@ describe('Example Feature', () => {
     console.error("Error in chat-with-jira function:", error);
     
     return new Response(
-      JSON.stringify({ error: error.message || "An error occurred processing the request" }),
+      JSON.stringify({ 
+        error: error.message || "An error occurred processing the request",
+        response: "Error occurred while generating content. Please try again." 
+      }),
       { 
-        status: 500, 
+        status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );

@@ -17,6 +17,11 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
 }) => {
   const { selectedTicket } = useStories();
 
+  // If no ticket is selected, render nothing to prevent errors
+  if (!selectedTicket) {
+    return null;
+  }
+
   return (
     <StoryDetail 
       ticket={selectedTicket}
