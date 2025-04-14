@@ -32,7 +32,6 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType = 
   return (
     <div className="prose dark:prose-invert max-w-none overflow-auto">
       <ReactMarkdown
-        className="markdown-content"
         rehypePlugins={[rehypeRaw, rehypeHighlight]}
         remarkPlugins={[remarkGfm]}
       >

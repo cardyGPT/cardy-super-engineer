@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +12,6 @@ import {
   Send, 
   CheckCircle2, 
   Download,
-  External,
   Github,
   FileSpreadsheet,
   BookOpenText
@@ -40,7 +38,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState("lld");
   const [error, setError] = useState<string | null>(null);
-  const [generating, setGenerating] = useState<string | null>(null); // Type being generated
+  const [generating, setGenerating] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   
@@ -130,7 +128,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     setGenerating("all");
     
     try {
-      // Generate LLD
       const lldRequest: JiraGenerationRequest = {
         type: 'lld',
         jiraTicket: ticket,
@@ -141,7 +138,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       await generateContent(lldRequest);
       
-      // Generate Code
       const codeRequest: JiraGenerationRequest = {
         type: 'code',
         jiraTicket: ticket,
@@ -152,7 +148,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       await generateContent(codeRequest);
       
-      // Generate Tests
       const testsRequest: JiraGenerationRequest = {
         type: 'tests',
         jiraTicket: ticket,
@@ -163,7 +158,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       await generateContent(testsRequest);
       
-      // Refresh to show new content
       await refreshArtifacts();
       
       toast({
