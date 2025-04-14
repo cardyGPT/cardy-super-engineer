@@ -12,7 +12,7 @@ import SettingsCard from './common/SettingsCard';
 import { SettingsProps } from '@/types/settings';
 
 const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
-  const [apiKey, setApiKey] = useState('');
+  const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
@@ -61,22 +61,22 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
     
     try {
       // Validate required fields if not already connected
-      if (!isConnected && (!apiKey || !clientSecret)) {
-        throw new Error('API Key and Client Secret are required');
+      if (!isConnected && (!clientId || !clientSecret)) {
+        throw new Error('Client ID and Client Secret are required');
       }
       
-      // First, if we have an API key, save it
-      if (apiKey) {
+      // First, if we have Client ID and Secret, save them
+      if (clientId && clientSecret) {
         const { error: keyError } = await supabase.functions.invoke('store-api-keys', {
           body: {
             provider: 'gsuite',
-            apiKey,
+            clientId,
             clientSecret
           }
         });
         
         if (keyError) {
-          throw new Error(keyError.message || 'Failed to save GSuite API key');
+          throw new Error(keyError.message || 'Failed to save GSuite API credentials');
         }
       }
       
@@ -85,7 +85,7 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         body: {
           redirectUri,
           autoSyncEnabled: syncEnabled,
-          skipApiKeyCheck: !apiKey, // Skip API key check if we're not providing one
+          skipApiKeyCheck: !clientId || !clientSecret, // Skip API key check if we're not providing them
           metadata: {
             lastUpdated: new Date().toISOString(),
             version: "1.0",
@@ -158,7 +158,7 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       }
       
       setIsConnected(false);
-      setApiKey('');
+      setClientId('');
       setClientSecret('');
       setRedirectUri('');
       setSyncEnabled(false);
@@ -253,13 +253,12 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="api-key">Google API Key {!isConnected && <span className="text-red-500">*</span>}</Label>
+          <Label htmlFor="client-id">Client ID {!isConnected && <span className="text-red-500">*</span>}</Label>
           <Input
-            id="api-key"
-            type="password"
-            placeholder="Your Google API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
+            id="client-id"
+            placeholder="Your Google Client ID"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
             disabled={isLoading}
           />
           <p className="text-xs text-muted-foreground flex items-center">

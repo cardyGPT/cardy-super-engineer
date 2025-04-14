@@ -204,6 +204,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                       {activeSprints.map(sprint => (
                         <SelectItem key={sprint.id} value={sprint.id} className="font-medium ml-2">
                           🟢 {sprint.name}
+                          {selectedProject && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              (Total: {typeof sprint.totalIssues === 'number' ? sprint.totalIssues : '?'})
+                            </span>
+                          )}
                         </SelectItem>
                       ))}
                       {sortedSprints.length > activeSprints.length && (
@@ -226,6 +231,11 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                       return (
                         <SelectItem key={sprint.id} value={sprint.id} className="ml-2">
                           {stateIcon} {sprint.name} ({sprintState})
+                          {selectedProject && (
+                            <span className="text-xs text-muted-foreground ml-2">
+                              (Total: {typeof sprint.totalIssues === 'number' ? sprint.totalIssues : '?'})
+                            </span>
+                          )}
                         </SelectItem>
                       );
                     })
