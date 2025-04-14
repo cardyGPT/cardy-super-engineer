@@ -1,171 +1,343 @@
 
 import React, { useState } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
-import { useStories } from '@/contexts/StoriesContext';
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { FileDown } from "lucide-react";
-import { useToast } from '@/hooks/use-toast';
-import GenerateButtons from './GenerateButtons';
-import ContentView from './ContentView';
-import { useContentGenerationActions } from './hooks/useContentGeneration';
+import { FileText, Code, TestTube, Loader2, PlusCircle, FileDown, Send, FileOutput, Github, ArrowRight } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import ContentDisplay from './ContentDisplay';
+import ExportToGSuite from './ExportToGSuite';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
-export interface StoryGenerateContentProps {
+interface StoryGenerateContentProps {
   ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: ProjectContextData | null;
+  onGenerate: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
+  onPushToJira: (ticketId: string, content: string) => Promise<boolean>;
+  generatedContent: JiraGenerationResponse | null;
+  isGenerating: boolean;
 }
 
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   ticket,
   projectContext,
-  selectedDocuments = [],
-  projectContextData = null
+  selectedDocuments,
+  projectContextData,
+  onGenerate,
+  onPushToJira,
+  generatedContent,
+  isGenerating
 }) => {
-  const { generateContent, credentials, contentLoading } = useStories();
-  const [tab, setTab] = useState('lld');
-  const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse>({});
-  const [isGenerating, setIsGenerating] = useState<Record<string, boolean>>({});
+  const [activeTab, setActiveTab] = useState<'lld' | 'code' | 'tests'>('lld');
+  const [isPushingToJira, setIsPushingToJira] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const { toast } = useToast();
   
-  const {
-    isCopied,
-    isPushing,
-    handleCopyContent,
-    handlePushToJira,
-    handlePushToGDrive,
-    handlePushToBitbucket,
-    handleDownloadPDF
-  } = useContentGenerationActions(ticket);
+  const contentRef = React.useRef<HTMLDivElement>(null);
   
-  const generateContentForType = async (type: 'lld' | 'code' | 'tests' | 'test_cases' | 'all') => {
-    setIsGenerating(prev => ({ ...prev, [type]: true }));
-    
+  const handleGenerate = async (type: 'lld' | 'code' | 'tests') => {
     try {
       const request: JiraGenerationRequest = {
         type,
         jiraTicket: ticket,
-        projectContext,
-        selectedDocuments,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
       };
       
-      console.log(`Generating ${type} content with request:`, request);
+      await onGenerate(request);
+      setActiveTab(type);
       
-      const response = await generateContent(request);
-      if (response) {
-        setGeneratedContent(prev => ({ ...prev, ...response }));
-        setTab(type);
-        
-        toast({
-          title: 'Content Generated',
-          description: `Successfully generated ${type} content`,
-        });
-      }
-    } catch (err: any) {
-      console.error(`Error generating ${type} content:`, err);
       toast({
-        title: 'Generation Failed',
-        description: err.message || `Failed to generate ${type} content`,
-        variant: 'destructive'
+        title: "Content Generated",
+        description: `${type.toUpperCase()} content has been generated successfully.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || `Failed to generate ${type.toUpperCase()} content.`,
+        variant: "destructive",
+      });
+    }
+  };
+  
+  const handleGenerateAll = async () => {
+    setIsGeneratingAll(true);
+    try {
+      const lldRequest: JiraGenerationRequest = {
+        type: 'lld',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      };
+      await onGenerate(lldRequest);
+      
+      const codeRequest: JiraGenerationRequest = {
+        type: 'code',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      };
+      await onGenerate(codeRequest);
+      
+      const testsRequest: JiraGenerationRequest = {
+        type: 'tests',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      };
+      await onGenerate(testsRequest);
+      
+      setActiveTab('lld');
+      
+      toast({
+        title: "All Content Generated",
+        description: "LLD, Code, and Tests content has been generated successfully.",
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to generate all content.",
+        variant: "destructive",
       });
     } finally {
-      setIsGenerating(prev => ({ ...prev, [type]: false }));
+      setIsGeneratingAll(false);
+    }
+  };
+  
+  const handlePushToJira = async () => {
+    const contentType = activeTab;
+    const content = getContentByType(activeTab);
+    
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to push to Jira.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsPushingToJira(true);
+    try {
+      const success = await onPushToJira(ticket.id, content);
+      
+      if (success) {
+        toast({
+          title: "Content Pushed",
+          description: `${contentType.toUpperCase()} content has been pushed to Jira ticket ${ticket.key}.`,
+        });
+      } else {
+        throw new Error("Failed to push content to Jira.");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to push content to Jira.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPushingToJira(false);
+    }
+  };
+  
+  const exportToPDF = async () => {
+    if (!contentRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const content = contentRef.current;
+      const canvas = await html2canvas(content);
+      const imgData = canvas.toDataURL('image/png');
+      
+      const contentType = activeTab;
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const imgWidth = 210;
+      const imgHeight = canvas.height * imgWidth / canvas.width;
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+      pdf.save(`${ticket.key}_${contentType}.pdf`);
+      
+      toast({
+        title: "PDF Exported",
+        description: `${contentType.toUpperCase()} content has been exported as PDF.`,
+      });
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to export content as PDF.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+  
+  const getContentByType = (type: 'lld' | 'code' | 'tests') => {
+    if (!generatedContent) return '';
+    
+    switch (type) {
+      case 'lld':
+        return generatedContent.lldContent || generatedContent.lld || '';
+      case 'code':
+        return generatedContent.codeContent || generatedContent.code || '';
+      case 'tests':
+        return generatedContent.testContent || generatedContent.tests || '';
+      default:
+        return '';
     }
   };
   
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Generate Content</CardTitle>
-        <CardDescription>
-          Generate various types of content for this ticket using AI
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <GenerateButtons 
-          onGenerate={generateContentForType}
-          isGenerating={isGenerating}
-          contentLoading={contentLoading}
-        />
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleGenerate('lld')}
+          disabled={isGenerating}
+        >
+          {isGenerating && activeTab === 'lld' ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <FileText className="h-4 w-4 mr-2" />
+          )}
+          Generate LLD
+        </Button>
         
-        {Object.keys(generatedContent).length > 0 ? (
-          <Tabs value={tab} onValueChange={setTab} className="mt-6">
-            <TabsList className="grid grid-cols-4">
-              <TabsTrigger value="lld" disabled={!generatedContent.lld}>LLD</TabsTrigger>
-              <TabsTrigger value="code" disabled={!generatedContent.code}>Code</TabsTrigger>
-              <TabsTrigger value="tests" disabled={!generatedContent.tests}>Tests</TabsTrigger>
-              <TabsTrigger value="test_cases" disabled={!generatedContent.testCases}>Test Cases</TabsTrigger>
-            </TabsList>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleGenerate('code')}
+          disabled={isGenerating}
+        >
+          {isGenerating && activeTab === 'code' ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Code className="h-4 w-4 mr-2" />
+          )}
+          Generate Code
+        </Button>
+        
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => handleGenerate('tests')}
+          disabled={isGenerating}
+        >
+          {isGenerating && activeTab === 'tests' ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <TestTube className="h-4 w-4 mr-2" />
+          )}
+          Generate Tests
+        </Button>
+        
+        <Button
+          variant="default"
+          size="sm"
+          onClick={handleGenerateAll}
+          disabled={isGeneratingAll || isGenerating}
+        >
+          {isGeneratingAll ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <PlusCircle className="h-4 w-4 mr-2" />
+          )}
+          Generate All
+        </Button>
+      </div>
+      
+      {generatedContent && (
+        <Card className="overflow-hidden">
+          <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'lld' | 'code' | 'tests')}>
+            <div className="flex justify-between items-center border-b px-4 py-2">
+              <TabsList>
+                <TabsTrigger value="lld" disabled={!getContentByType('lld')}>
+                  <FileText className="h-4 w-4 mr-2" />
+                  LLD
+                </TabsTrigger>
+                <TabsTrigger value="code" disabled={!getContentByType('code')}>
+                  <Code className="h-4 w-4 mr-2" />
+                  Code
+                </TabsTrigger>
+                <TabsTrigger value="tests" disabled={!getContentByType('tests')}>
+                  <TestTube className="h-4 w-4 mr-2" />
+                  Tests
+                </TabsTrigger>
+              </TabsList>
+              
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={exportToPDF}
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <FileDown className="h-4 w-4 mr-2" />
+                  )}
+                  Export PDF
+                </Button>
+                
+                <ExportToGSuite
+                  storyId={ticket.id}
+                  storyKey={ticket.key}
+                  content={getContentByType(activeTab)}
+                  contentType={activeTab}
+                />
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePushToJira}
+                  disabled={isPushingToJira || !getContentByType(activeTab)}
+                >
+                  {isPushingToJira ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Send className="h-4 w-4 mr-2" />
+                  )}
+                  Push to Jira
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={true}
+                >
+                  <Github className="h-4 w-4 mr-2" />
+                  Bitbucket
+                </Button>
+              </div>
+            </div>
             
-            <TabsContent value="lld" className="space-y-4 pt-4">
-              <ContentView
-                content={generatedContent.lld}
-                contentType="lld"
-                isCopied={isCopied}
-                isPushing={isPushing}
-                onCopy={handleCopyContent}
-                onPushToJira={handlePushToJira}
-                onPushToGDrive={handlePushToGDrive}
-                onPushToBitbucket={handlePushToBitbucket}
-                onDownloadPDF={handleDownloadPDF}
-              />
-            </TabsContent>
-            
-            <TabsContent value="code" className="space-y-4 pt-4">
-              <ContentView
-                content={generatedContent.code}
-                contentType="code"
-                isCopied={isCopied}
-                isPushing={isPushing}
-                onCopy={handleCopyContent}
-                onPushToJira={handlePushToJira}
-                onPushToGDrive={handlePushToGDrive}
-                onPushToBitbucket={handlePushToBitbucket}
-                onDownloadPDF={handleDownloadPDF}
-              />
-            </TabsContent>
-            
-            <TabsContent value="tests" className="space-y-4 pt-4">
-              <ContentView
-                content={generatedContent.tests}
-                contentType="tests"
-                isCopied={isCopied}
-                isPushing={isPushing}
-                onCopy={handleCopyContent}
-                onPushToJira={handlePushToJira}
-                onPushToGDrive={handlePushToGDrive}
-                onPushToBitbucket={handlePushToBitbucket}
-                onDownloadPDF={handleDownloadPDF}
-              />
-            </TabsContent>
-            
-            <TabsContent value="test_cases" className="space-y-4 pt-4">
-              <ContentView
-                content={generatedContent.testCases}
-                contentType="test_cases"
-                isCopied={isCopied}
-                isPushing={isPushing}
-                onCopy={handleCopyContent}
-                onPushToJira={handlePushToJira}
-                onPushToGDrive={handlePushToGDrive}
-                onPushToBitbucket={handlePushToBitbucket}
-                onDownloadPDF={handleDownloadPDF}
-              />
-            </TabsContent>
+            <div className="p-4" ref={contentRef}>
+              <TabsContent value="lld" className="mt-0">
+                <ContentDisplay content={getContentByType('lld')} contentType="lld" />
+              </TabsContent>
+              <TabsContent value="code" className="mt-0">
+                <ContentDisplay content={getContentByType('code')} contentType="code" />
+              </TabsContent>
+              <TabsContent value="tests" className="mt-0">
+                <ContentDisplay content={getContentByType('tests')} contentType="tests" />
+              </TabsContent>
+            </div>
           </Tabs>
-        ) : (
-          <Alert className="mt-4">
-            <FileDown className="h-4 w-4" />
-            <AlertTitle>No content generated yet</AlertTitle>
-            <AlertDescription>
-              Use the buttons above to generate content for this ticket.
-            </AlertDescription>
-          </Alert>
-        )}
-      </CardContent>
-    </Card>
+        </Card>
+      )}
+    </div>
   );
 };
 

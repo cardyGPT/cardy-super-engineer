@@ -1,100 +1,79 @@
 
-import React from 'react';
-import { AlertCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import React from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card } from "@/components/ui/card";
+import { AlertCircle, LoaderCircle, Info, RefreshCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
-interface LoadingContentProps {
+export interface LoadingContentProps {
   count?: number;
+  titleWidth?: string;
+  showTitle?: boolean;
+  message?: string;
   isLoading?: boolean;
   isError?: boolean;
+  isInfo?: boolean;
   isWarning?: boolean;
-  isSuccess?: boolean;
-  message?: string;
+  onRetry?: () => void;
   additionalMessage?: string;
-  small?: boolean;
-  inline?: boolean;
 }
 
-const LoadingContent: React.FC<LoadingContentProps> = ({
-  count = 3,
+const LoadingContent: React.FC<LoadingContentProps> = ({ 
+  count = 4, 
+  titleWidth = "w-1/3",
+  showTitle = true,
+  message = "Loading content...",
   isLoading = false,
   isError = false,
+  isInfo = false,
   isWarning = false,
-  isSuccess = false,
-  message = "Loading...",
-  additionalMessage,
-  small = false,
-  inline = false
+  onRetry,
+  additionalMessage
 }) => {
-  if (inline) {
-    return (
-      <div className="flex items-center">
-        <div className="h-4 w-4 rounded-full animate-pulse bg-muted-foreground mr-2"></div>
-        <span>{message}</span>
-      </div>
-    );
-  }
-  
-  if (isLoading) {
-    return (
-      <div className={`space-y-${small ? '1' : '2'}`}>
-        {Array.from({ length: count }).map((_, i) => (
-          <Skeleton key={i} className={`w-full ${small ? 'h-4' : 'h-12'}`} />
-        ))}
-      </div>
-    );
-  }
-
-  if (isError) {
-    return (
-      <Alert variant="destructive">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          {message}
-          {additionalMessage && (
-            <div className="mt-2 text-xs">{additionalMessage}</div>
-          )}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (isWarning) {
-    return (
-      <Alert variant="default" className={`bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/30 dark:border-amber-700 dark:text-amber-400`}>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          {message}
-          {additionalMessage && (
-            <div className="mt-2 text-xs">{additionalMessage}</div>
-          )}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
-  if (isSuccess) {
-    return (
-      <Alert variant="default" className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400">
-        <CheckCircle2 className="h-4 w-4" />
-        <AlertDescription>
-          {message}
-          {additionalMessage && (
-            <div className="mt-2 text-xs">{additionalMessage}</div>
-          )}
-        </AlertDescription>
-      </Alert>
-    );
-  }
-
   return (
-    <div className="text-center p-4 text-muted-foreground">
-      {message}
-      {additionalMessage && (
-        <div className="mt-2 text-xs">{additionalMessage}</div>
-      )}
-    </div>
+    <Card className="p-4">
+      <div className="space-y-3">
+        {showTitle && <Skeleton className={`h-8 ${titleWidth}`} />}
+        {Array.from({ length: count }).map((_, i) => (
+          <Skeleton 
+            key={i} 
+            className={`h-4 ${i % 2 === 0 ? 'w-full' : (i % 3 === 0 ? 'w-2/3' : 'w-3/4')}`} 
+          />
+        ))}
+        <div className={`flex items-center justify-center gap-2 text-center text-sm ${
+          isError ? 'text-red-500' : (isWarning ? 'text-amber-500' : (isInfo ? 'text-blue-500' : 'text-muted-foreground'))
+        } mt-4`}>
+          {isError ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : isWarning ? (
+            <AlertCircle className="h-4 w-4" />
+          ) : isInfo ? (
+            <Info className="h-4 w-4" />
+          ) : (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          )}
+          <p>{message}</p>
+          
+          {onRetry && (
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="ml-2 h-6 px-2 text-xs"
+              onClick={onRetry}
+            >
+              <RefreshCw className="h-3 w-3 mr-1" />
+              Retry
+            </Button>
+          )}
+        </div>
+        
+        {additionalMessage && (
+          <div className="mt-2 text-xs text-center text-muted-foreground">
+            <p>{additionalMessage}</p>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 };
 

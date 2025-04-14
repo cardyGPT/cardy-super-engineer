@@ -1,77 +1,87 @@
 
 import { useState, useEffect } from 'react';
 import { JiraCredentials } from '@/types/jira';
-import { testJiraConnection } from '../api';
 
 export const useAuthState = () => {
   const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Load credentials from localStorage on mount
   useEffect(() => {
-    // Check for stored credentials in localStorage on initial load
-    const storedCredentials = localStorage.getItem('jira_credentials');
-    if (storedCredentials) {
+    const loadCredentials = () => {
       try {
-        const parsed = JSON.parse(storedCredentials);
-        setCredentials(parsed);
-        // Validate credentials
-        testJiraConnection(parsed)
-          .then(() => {
+        const savedCreds = localStorage.getItem('jira_credentials');
+        if (savedCreds) {
+          const parsedCreds = JSON.parse(savedCreds) as JiraCredentials;
+          
+          // Validate the credentials format
+          if (parsedCreds.domain && parsedCreds.email && parsedCreds.apiToken) {
+            // Clean up domain - ensure it has no trailing slashes and is properly formatted
+            const cleanDomain = parsedCreds.domain.replace(/\/+$/, '');
+            
+            // Save the cleaned credentials
+            const cleanedCreds = {
+              ...parsedCreds,
+              domain: cleanDomain
+            };
+            
+            setCredentials(cleanedCreds);
             setIsAuthenticated(true);
-            setError(null);
-          })
-          .catch(err => {
-            console.error('Error validating stored credentials:', err);
-            setIsAuthenticated(false);
-            setError('Stored credentials are invalid');
-            // Clear invalid credentials
+            console.log("Loaded valid Jira credentials from localStorage");
+            
+            // Log the detected auth type based on token format (for debugging purposes)
+            if (parsedCreds.apiToken.length > 50) {
+              console.log("Detected PAT token format (long token)");
+            } else {
+              console.log("Detected Classic API token format (shorter token)");
+            }
+          } else {
+            console.log("Invalid credentials format in localStorage, removing");
             localStorage.removeItem('jira_credentials');
-            setCredentials(null);
-          });
+            setError("Invalid credentials format");
+          }
+        } else {
+          console.log("No Jira credentials found in localStorage");
+        }
       } catch (err) {
-        console.error('Error parsing stored credentials:', err);
+        console.error('Error loading Jira credentials:', err);
         localStorage.removeItem('jira_credentials');
+        setError("Error loading credentials");
       }
-    }
+    };
+
+    loadCredentials();
   }, []);
 
-  // Update authentication state whenever credentials change
+  // Update localStorage when credentials change
   useEffect(() => {
-    if (!credentials) {
-      setIsAuthenticated(false);
-      return;
-    }
-
-    // Store credentials
-    localStorage.setItem('jira_credentials', JSON.stringify(credentials));
-    
-    // Validate Jira connection
-    testJiraConnection(credentials)
-      .then(() => {
+    if (credentials) {
+      try {
+        // Ensure domain doesn't have trailing slashes and is properly formatted
+        const cleanCredentials = {
+          ...credentials,
+          domain: credentials.domain.replace(/\/+$/, '')
+        };
+        
+        localStorage.setItem('jira_credentials', JSON.stringify(cleanCredentials));
         setIsAuthenticated(true);
         setError(null);
-      })
-      .catch(err => {
-        console.error('Error validating credentials:', err);
-        setIsAuthenticated(false);
-        setError(err.message || 'Failed to authenticate with Jira');
-      });
-  }, [credentials]);
-
-  const setCredentialsWithAuth = (newCredentials: JiraCredentials | null) => {
-    setCredentials(newCredentials);
-    
-    // If null, clear authentication
-    if (!newCredentials) {
-      setIsAuthenticated(false);
+        console.log("Saved Jira credentials to localStorage");
+      } catch (err) {
+        console.error('Error saving credentials to localStorage:', err);
+        setError("Error saving credentials");
+      }
+    } else {
       localStorage.removeItem('jira_credentials');
+      setIsAuthenticated(false);
+      console.log("Removed Jira credentials from localStorage");
     }
-  };
+  }, [credentials]);
 
   return {
     credentials,
-    setCredentials: setCredentialsWithAuth,
+    setCredentials,
     isAuthenticated,
     error
   };

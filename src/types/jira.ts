@@ -1,3 +1,4 @@
+
 export interface JiraTicket {
   id: string;
   key: string;
@@ -41,6 +42,7 @@ export interface JiraSprint {
   endDate?: string;
   boardId: string;
   projectId?: string; // Add this property to support tracking which project a sprint belongs to
+  totalIssues?: number; // Add totalIssues property
 }
 
 export interface JiraCredentials {
@@ -50,18 +52,26 @@ export interface JiraCredentials {
 }
 
 export interface JiraGenerationRequest {
-  type: 'lld' | 'code' | 'tests' | 'test_cases' | 'all';
-  jiraTicket?: JiraTicket;
+  type: 'lld' | 'code' | 'tests' | 'all';
+  jiraTicket: JiraTicket;
+  dataModel?: any;
+  documentsContext?: any;
   projectContext?: string | null;
   selectedDocuments?: string[];
-  additionalContext?: Record<string, any>;
+  additionalContext?: {
+    sprint?: any;
+    epic?: any;
+  };
 }
 
 export interface JiraGenerationResponse {
   lld?: string;
   code?: string;
   tests?: string;
-  testCases?: string;
+  all?: string;
+  lldContent?: string; // Add response content properties
+  codeContent?: string;
+  testContent?: string;
   response?: string;
   error?: string;
 }

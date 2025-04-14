@@ -1,95 +1,168 @@
+
 import { supabase } from '@/lib/supabase';
-import { JiraCredentials } from '@/types/jira';
+import { JiraCredentials, JiraProject } from '@/types/jira';
 
-// Development mode flag
-export const DEV_MODE = process.env.NODE_ENV === 'development';
+// Development mode flag for testing
+export const DEV_MODE = false;
 
-// Helper function to ensure a value is a string
-export const ensureString = (value: any): string => {
-  if (value === null || value === undefined) {
-    return '';
-  }
-  if (typeof value === 'string') {
-    return value;
-  }
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch (e) {
-    console.error('Error stringifying value:', e);
-    return String(value);
-  }
-};
-
-// Call the Jira API with proper authentication
+// Call the Jira API via our Supabase edge function
 export const callJiraApi = async (
   credentials: JiraCredentials,
-  endpoint: string,
+  path: string,
   method: string = 'GET',
   data?: any
 ) => {
-  const { domain, email, apiToken } = credentials;
-  
-  // Ensure domain doesn't have trailing slash
-  const baseDomain = domain.endsWith('/') ? domain.slice(0, -1) : domain;
-  
-  // Construct the full URL
-  const url = `${baseDomain}/rest/api/2/${endpoint}`;
-  
-  // Create authorization header with Base64 encoded credentials
-  const auth = btoa(`${email}:${apiToken}`);
-  
-  // Set up request options
-  const options: RequestInit = {
-    method,
-    headers: {
-      'Authorization': `Basic ${auth}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-  };
-  
-  // Add body for non-GET requests
-  if (method !== 'GET' && data) {
-    options.body = JSON.stringify(data);
-  }
-  
-  // Make the request
-  const response = await fetch(url, options);
-  
-  // Check if the response is OK
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`Jira API error (${response.status}):`, errorText);
-    throw new Error(`Jira API error: ${response.status} ${response.statusText}`);
-  }
-  
-  // Parse and return the response
   try {
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    } else {
-      return await response.text();
+    console.log(`Calling Jira API: ${path} (${method})`);
+    
+    const { data: responseData, error } = await supabase.functions.invoke('jira-api', {
+      body: {
+        domain: credentials.domain,
+        email: credentials.email,
+        apiToken: credentials.apiToken,
+        path,
+        method,
+        data
+      }
+    });
+    
+    if (error) {
+      console.error('Error calling Jira API via edge function:', error);
+      throw new Error(`Edge function error: ${error.message}`);
     }
-  } catch (error) {
-    console.error('Error parsing Jira API response:', error);
-    throw new Error('Failed to parse Jira API response');
+    
+    // If the API itself returned an error, it will be in responseData.error
+    if (responseData && responseData.error) {
+      console.error('Jira API returned error:', responseData);
+      throw new Error(responseData.error);
+    }
+    
+    return responseData;
+  } catch (err) {
+    console.error(`Error in callJiraApi (${path}):`, err);
+    throw err;
   }
 };
 
-// Test Jira connection
-export const testJiraConnection = async (credentials: JiraCredentials): Promise<boolean> => {
+// Test Jira connection and determine API version
+export const testJiraConnection = async (credentials: JiraCredentials) => {
   try {
-    // Try to fetch the current user as a simple test
-    await callJiraApi(credentials, 'myself');
-    return true;
+    // Try agile API first (most common for newer Jira instances)
+    try {
+      console.log('Testing Jira connection with Agile API...');
+      const data = await callJiraApi(credentials, 'agile/1.0/board');
+      
+      if (data && !data.error) {
+        console.log('Successfully connected using Agile API');
+        return { isConnected: true, apiVersion: 'agile' as const };
+      }
+    } catch (agileError) {
+      console.log('Agile API test failed, trying Cloud API next...');
+    }
+    
+    // Try cloud API next
+    try {
+      const data = await callJiraApi(credentials, 'api/2/myself');
+      
+      if (data && !data.error) {
+        console.log('Successfully connected using Cloud API');
+        return { isConnected: true, apiVersion: 'cloud' as const };
+      }
+    } catch (cloudError) {
+      console.log('Cloud API test failed, falling back to Classic API...');
+    }
+    
+    // Finally try classic API
+    const data = await callJiraApi(credentials, 'project');
+    
+    if (data && !data.error) {
+      console.log('Successfully connected using Classic API');
+      return { isConnected: true, apiVersion: 'classic' as const };
+    }
+    
+    return { isConnected: false, apiVersion: null };
   } catch (error) {
-    console.error('Jira connection test failed:', error);
-    return false;
+    console.error('Error testing Jira connection:', error);
+    return { isConnected: false, apiVersion: null };
   }
 };
 
-// Save generated content to the database
+// Ensure all content is properly converted to string
+export const ensureString = (content: any): string => {
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  if (content === null || content === undefined) {
+    return '';
+  }
+  
+  if (typeof content === 'object') {
+    try {
+      return JSON.stringify(content);
+    } catch (e) {
+      return String(content);
+    }
+  }
+  
+  return String(content);
+};
+
+// Function to extract JQL from a Jira URL
+export const extractJqlFromUrl = (url: string): string | null => {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.searchParams.get('jql');
+  } catch (e) {
+    console.error('Error parsing URL:', e);
+    return null;
+  }
+};
+
+// Helper to extract error message from complex error objects
+export const extractErrorMessage = (error: any): string => {
+  if (!error) {
+    return 'Unknown error occurred';
+  }
+  
+  if (typeof error === 'string') {
+    return error;
+  }
+  
+  // Check for response error format from Jira
+  if (error.response && error.response.data) {
+    const { data } = error.response;
+    
+    if (data.errorMessages && data.errorMessages.length > 0) {
+      return data.errorMessages[0];
+    }
+    
+    if (data.message) {
+      return data.message;
+    }
+  }
+  
+  // Check for fetch error or axios error
+  if (error.message) {
+    return error.message;
+  }
+  
+  // Fallback
+  return 'An error occurred with the Jira API';
+};
+
+// Sanitize HTML content (for safety when rendering)
+export const sanitizeHtml = (html: string): string => {
+  if (!html) return '';
+  
+  // Replace potentially dangerous tags
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/javascript:/gi, '')
+    .replace(/on\w+=/gi, 'data-disabled-event=');
+};
+
+// Save generated content to database (used in contentApi.ts)
 export const saveGeneratedContent = async (
   storyId: string,
   projectId: string,
@@ -98,47 +171,52 @@ export const saveGeneratedContent = async (
   content: string
 ): Promise<void> => {
   try {
-    // Call the save-story-artifacts function
     const { error } = await supabase.functions.invoke('save-story-artifacts', {
       body: {
         storyId,
         projectId,
         sprintId,
         contentType,
-        content
+        content: ensureString(content)
       }
     });
     
     if (error) {
       console.error('Error saving generated content:', error);
-      throw new Error('Failed to save generated content');
+      throw new Error(error.message || 'Failed to save generated content');
     }
-  } catch (error) {
-    console.error('Error in saveGeneratedContent:', error);
-    throw error;
+  } catch (err) {
+    console.error('Error in saveGeneratedContent:', err);
+    throw err;
   }
 };
 
-// Sanitize content for React rendering
-export const sanitizeContentForReact = (content: string): string => {
-  // Prevent potential XSS attacks and ensure content is safe for React
-  if (!content) return '';
+// Sanitize content for rendering in React components
+export const sanitizeContentForReact = (content: any): string => {
+  // Check if content is null or undefined
+  if (content === null || content === undefined) {
+    return '';
+  }
   
-  // Basic sanitization - you can expand this based on your needs
-  return content
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/javascript:/gi, 'removed:');
-};
-
-// Sanitize HTML content
-export const sanitizeHtml = (html: string): string => {
-  if (!html) return '';
+  // Ensure content is a string before calling string methods
+  const contentStr = ensureString(content);
   
-  // Remove potentially dangerous tags and attributes
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/javascript:/gi, 'removed:')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/on\w+='[^']*'/gi, '')
-    .replace(/on\w+=\w+/gi, '');
+  // Format JSON if the content appears to be JSON
+  if (contentStr.trim().startsWith('{') || contentStr.trim().startsWith('[')) {
+    try {
+      const parsedJson = JSON.parse(contentStr);
+      return JSON.stringify(parsedJson, null, 2);
+    } catch (e) {
+      // Not valid JSON, continue with regular formatting
+    }
+  }
+  
+  // Replace HTML entities and other problematic characters
+  return contentStr
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/\r\n/g, '\n'); // Normalize line endings
 };

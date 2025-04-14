@@ -8,11 +8,9 @@ export interface JiraArtifacts {
   lldContent: string | null;
   codeContent: string | null;
   testContent: string | null;
-  testCasesContent: string | null;
   isLldGenerated: boolean;
   isCodeGenerated: boolean;
   isTestsGenerated: boolean;
-  isTestCasesGenerated: boolean;
 }
 
 export const useJiraArtifacts = (ticket: JiraTicket | null) => {
@@ -20,11 +18,9 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
     lldContent: null,
     codeContent: null,
     testContent: null,
-    testCasesContent: null,
     isLldGenerated: false,
     isCodeGenerated: false,
-    isTestsGenerated: false,
-    isTestCasesGenerated: false
+    isTestsGenerated: false
   });
   
   const [loading, setLoading] = useState(false);
@@ -61,11 +57,9 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
           lldContent: data.lld_content || null,
           codeContent: data.code_content || null,
           testContent: data.test_content || null,
-          testCasesContent: data.test_cases_content || null,
           isLldGenerated: Boolean(data.lld_content),
           isCodeGenerated: Boolean(data.code_content),
-          isTestsGenerated: Boolean(data.test_content),
-          isTestCasesGenerated: Boolean(data.test_cases_content)
+          isTestsGenerated: Boolean(data.test_content)
         });
       } else {
         console.log('No artifacts found for this ticket');
@@ -74,11 +68,9 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
           lldContent: null,
           codeContent: null,
           testContent: null,
-          testCasesContent: null,
           isLldGenerated: false,
           isCodeGenerated: false,
-          isTestsGenerated: false,
-          isTestCasesGenerated: false
+          isTestsGenerated: false
         });
       }
     } catch (err) {

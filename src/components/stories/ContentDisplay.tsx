@@ -13,6 +13,8 @@ interface ContentDisplayProps {
 const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType = 'lld' }) => {
   // Format JSON content (if it appears to be JSON)
   const formatContent = (text: string) => {
+    if (!text) return '';
+    
     try {
       // Check if the content is JSON
       if (text.trim().startsWith('{') || text.trim().startsWith('[')) {

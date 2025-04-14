@@ -1,324 +1,287 @@
+import React, { useState, useEffect } from "react";
+import AppLayout from "@/components/layout/AppLayout";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { ArrowLeft, Factory, Link, FileDown, FileCheck } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useNavigate } from "react-router-dom";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import React, { useState, useEffect } from 'react';
-import AppLayout from '@/components/layout/AppLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/lib/supabase';
-import { CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
-
-interface ConnectionSettingsProps {
-  apiKey: string;
-  setApiKey: React.Dispatch<React.SetStateAction<string>>;
-  clientId: string;
-  setClientId: React.Dispatch<React.SetStateAction<string>>;
-  clientSecret: string;
-  setClientSecret: React.Dispatch<React.SetStateAction<string>>;
-  defaultDriveFolder: string;
-  setDefaultDriveFolder: React.Dispatch<React.SetStateAction<string>>;
-  isConnected: boolean;
-  isValidating: boolean;
-  handleConnect: () => Promise<void>;
-  handleDisconnect: () => Promise<void>;
-}
-
-const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
-  apiKey,
-  setApiKey,
-  clientId,
-  setClientId,
-  clientSecret,
-  setClientSecret,
-  defaultDriveFolder,
-  setDefaultDriveFolder,
-  isConnected,
-  isValidating,
-  handleConnect,
-  handleDisconnect
-}) => {
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4">
-        <div className="grid gap-2">
-          <Label htmlFor="api-key">Google API Key</Label>
-          <Input
-            id="api-key"
-            placeholder="Enter your Google API Key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            disabled={isConnected}
-          />
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="client-id">Client ID</Label>
-          <Input
-            id="client-id"
-            placeholder="Enter your OAuth Client ID"
-            value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            disabled={isConnected}
-          />
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="client-secret">Client Secret</Label>
-          <Input
-            id="client-secret"
-            placeholder="Enter your OAuth Client Secret"
-            type="password"
-            value={clientSecret}
-            onChange={(e) => setClientSecret(e.target.value)}
-            disabled={isConnected}
-          />
-        </div>
-        
-        <div className="grid gap-2">
-          <Label htmlFor="default-folder">Default Drive Folder ID (optional)</Label>
-          <Input
-            id="default-folder"
-            placeholder="Enter default Google Drive folder ID"
-            value={defaultDriveFolder}
-            onChange={(e) => setDefaultDriveFolder(e.target.value)}
-            disabled={isConnected}
-          />
-          <p className="text-sm text-muted-foreground">
-            If provided, content will be saved to this folder by default
-          </p>
-        </div>
-      </div>
-      
-      <div className="flex justify-end">
-        {!isConnected ? (
-          <Button onClick={handleConnect} disabled={isValidating || !apiKey || !clientId || !clientSecret}>
-            {isValidating ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Validating...
-              </>
-            ) : (
-              'Connect'
-            )}
-          </Button>
-        ) : (
-          <Button variant="destructive" onClick={handleDisconnect} disabled={isValidating}>
-            {isValidating ? (
-              <>
-                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                Disconnecting...
-              </>
-            ) : (
-              'Disconnect'
-            )}
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-};
+import ConnectionSettings from "@/components/settings/gsuite/ConnectionSettings";
+import QuickStartGuide from "@/components/settings/gsuite/QuickStartGuide";
+import ExportSettings from "@/components/settings/gsuite/ExportSettings";
+import AccountInfo from "@/components/settings/gsuite/AccountInfo";
+import DocumentOptions from "@/components/settings/gsuite/DocumentOptions";
+import SecurityAlert from "@/components/settings/gsuite/SecurityAlert";
 
 const GSuiteSettingsPage: React.FC = () => {
-  const [apiKey, setApiKey] = useState('');
-  const [clientId, setClientId] = useState('');
-  const [clientSecret, setClientSecret] = useState('');
-  const [defaultDriveFolder, setDefaultDriveFolder] = useState('');
-  const [isConnected, setIsConnected] = useState(false);
-  const [isValidating, setIsValidating] = useState(false);
-  const [status, setStatus] = useState<'success' | 'error' | 'loading' | null>(null);
-  const [message, setMessage] = useState('');
+  const [apiKey, setApiKey] = useState<string>("");
+  const [clientId, setClientId] = useState<string>("");
+  const [clientSecret, setClientSecret] = useState<string>("");
+  const [defaultDriveFolder, setDefaultDriveFolder] = useState<string>("");
+  const [driveScope, setDriveScope] = useState<string>("drive.file");
+  const [docsScope, setDocsScope] = useState<string>("docs.full");
+  const [sheetsScope, setSheetsScope] = useState<string>("sheets.full");
+  const [exportFormat, setExportFormat] = useState<string>("docs");
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(false);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [connectionSuccess, setConnectionSuccess] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+  const [activeTab, setActiveTab] = useState("connection");
+  const [includeMetadata, setIncludeMetadata] = useState(true);
+  const [formatCode, setFormatCode] = useState(true);
+  const [autoToc, setAutoToc] = useState(true);
+  const [exportOptions, setExportOptions] = useState({
+    angular: true,
+    nodejs: true,
+    postgres: true
+  });
   
   const { toast } = useToast();
-  
+  const navigate = useNavigate();
+
   useEffect(() => {
-    // Load existing settings
-    const loadSettings = async () => {
+    let timeoutId: number;
+    if (connectionSuccess) {
+      timeoutId = window.setTimeout(() => {
+        setConnectionSuccess(false);
+      }, 5000);
+    }
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [connectionSuccess]);
+
+  useEffect(() => {
+    const checkGSuiteSettings = async () => {
       try {
-        setStatus('loading');
-        
-        const { data, error } = await supabase.functions.invoke('validate-gsuite');
+        console.log("Checking GSuite settings...");
+        const { data, error } = await supabase.functions.invoke('validate-gsuite', {});
         
         if (error) {
-          console.error('Error validating GSuite:', error);
-          setStatus('error');
-          setMessage('Failed to validate GSuite connection');
+          console.error("Error checking GSuite settings:", error);
+          setIsConnected(false);
+          setInitializing(false);
           return;
         }
         
-        if (data.valid) {
+        if (data?.valid) {
+          console.log("GSuite is connected. Settings:", data.settings);
           setIsConnected(true);
-          setApiKey(data.settings?.apiKey || '');
-          setClientId(data.settings?.clientId || '');
-          setClientSecret(data.settings?.clientSecret || '');
-          setDefaultDriveFolder(data.settings?.defaultFolder || '');
-          setStatus('success');
-          setMessage('GSuite connection is active');
-        } else {
-          setIsConnected(false);
           
-          // If settings exist but connection is invalid, load the settings
           if (data.settings) {
-            setApiKey(data.settings.apiKey || '');
-            setClientId(data.settings.clientId || '');
-            setClientSecret(data.settings.clientSecret || '');
-            setDefaultDriveFolder(data.settings.defaultFolder || '');
+            setClientId(data.settings.clientId || "");
+            setClientSecret(data.settings.clientSecret || "");
+            setDefaultDriveFolder(data.settings.defaultDriveFolder || "");
+            setAutoSyncEnabled(data.settings.autoSync || false);
+            setDriveScope(data.settings.driveScope || "drive.file");
+            setDocsScope(data.settings.docsScope || "docs.full");
+            setSheetsScope(data.settings.sheetsScope || "sheets.full");
+            setExportFormat(data.settings.exportFormat || "docs");
+            
+            if (data.settings.exportOptions) {
+              setExportOptions(data.settings.exportOptions);
+            }
+            
+            if (data.settings.contentOptions) {
+              setIncludeMetadata(data.settings.contentOptions.includeMetadata ?? true);
+              setFormatCode(data.settings.contentOptions.formatCode ?? true);
+              setAutoToc(data.settings.contentOptions.autoToc ?? true);
+            }
           }
           
-          setStatus('error');
-          setMessage(data.message || 'GSuite connection is not configured');
+          toast({
+            title: "GSuite Connection",
+            description: "Your GSuite integration is configured and working",
+          });
+        } else {
+          console.log("GSuite is not connected:", data?.message);
+          setIsConnected(false);
         }
       } catch (err) {
-        console.error('Error loading GSuite settings:', err);
-        setStatus('error');
-        setMessage('Failed to load GSuite settings');
+        console.error("Error checking GSuite settings:", err);
+      } finally {
+        setInitializing(false);
       }
     };
     
-    loadSettings();
-  }, []);
-  
-  const handleConnect = async () => {
+    checkGSuiteSettings();
+  }, [toast]);
+
+  const handleSaveSettings = async () => {
+    setIsLoading(true);
+    
     try {
-      setIsValidating(true);
+      console.log("Saving GSuite settings...");
       
-      const { data, error } = await supabase.functions.invoke('connect-gsuite', {
-        body: {
-          apiKey,
-          clientId,
-          clientSecret,
-          defaultFolder: defaultDriveFolder
+      if (apiKey.trim() || clientId.trim() || clientSecret.trim()) {
+        const { data: storedData, error: storeError } = await supabase.functions.invoke('store-api-keys', {
+          body: { 
+            provider: 'gsuite',
+            apiKey,
+            clientId,
+            clientSecret
+          }
+        });
+        
+        if (storeError) {
+          throw new Error(storeError.message);
         }
+        
+        console.log("API key stored successfully:", storedData);
+      }
+      
+      const contentOptions = {
+        includeMetadata,
+        formatCode,
+        autoToc
+      };
+      
+      const enhancedSettings = {
+        defaultDriveFolder,
+        autoSync: autoSyncEnabled,
+        driveScope,
+        docsScope,
+        sheetsScope,
+        exportFormat,
+        exportOptions,
+        contentOptions,
+        metadata: {
+          lastUpdated: new Date().toISOString(),
+          version: "1.0",
+          status: "active"
+        }
+      };
+      
+      const { data: settingsData, error: settingsError } = await supabase.functions.invoke('save-gsuite-settings', {
+        body: enhancedSettings
       });
       
-      if (error) {
-        console.error('Error connecting to GSuite:', error);
-        toast({
-          title: 'Connection Failed',
-          description: error.message || 'Failed to connect to GSuite',
-          variant: 'destructive'
-        });
-        setStatus('error');
-        setMessage('Failed to connect to GSuite');
-        return;
+      if (settingsError) {
+        throw new Error(settingsError.message);
       }
       
-      if (data.success) {
-        setIsConnected(true);
-        setStatus('success');
-        setMessage('GSuite connection is active');
-        toast({
-          title: 'Connection Successful',
-          description: 'Successfully connected to GSuite',
-        });
-      } else {
-        setStatus('error');
-        setMessage(data.message || 'Failed to connect to GSuite');
-        toast({
-          title: 'Connection Failed',
-          description: data.message || 'Failed to connect to GSuite',
-          variant: 'destructive'
-        });
+      console.log("Settings saved successfully:", settingsData);
+      
+      const { data: validationData, error: validationError } = await supabase.functions.invoke('validate-gsuite', {});
+      
+      if (validationError) {
+        throw new Error(validationError.message);
       }
-    } catch (err: any) {
-      console.error('Error connecting to GSuite:', err);
+      
+      console.log("Validation after save:", validationData);
+      
+      setIsConnected(validationData?.valid || false);
+      setApiKey("");
+      setConnectionSuccess(true);
+      
       toast({
-        title: 'Connection Failed',
-        description: err.message || 'Failed to connect to GSuite',
-        variant: 'destructive'
+        title: "Connection Successful",
+        description: "Your GSuite integration settings have been saved securely.",
+        variant: "success",
       });
-      setStatus('error');
-      setMessage('Failed to connect to GSuite');
+    } catch (error: any) {
+      console.error("Error saving GSuite settings:", error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save GSuite settings",
+        variant: "destructive",
+      });
     } finally {
-      setIsValidating(false);
+      setIsLoading(false);
     }
   };
-  
+
   const handleDisconnect = async () => {
+    setIsLoading(true);
+    
     try {
-      setIsValidating(true);
-      
-      const { error } = await supabase.functions.invoke('disconnect-gsuite');
+      const { error } = await supabase.functions.invoke('delete-gsuite-config', {});
       
       if (error) {
-        console.error('Error disconnecting from GSuite:', error);
-        toast({
-          title: 'Disconnection Failed',
-          description: error.message || 'Failed to disconnect from GSuite',
-          variant: 'destructive'
-        });
-        return;
+        throw new Error(error.message);
       }
       
       setIsConnected(false);
-      setStatus('error');
-      setMessage('GSuite connection is not configured');
+      setDefaultDriveFolder("");
+      setAutoSyncEnabled(false);
+      
       toast({
-        title: 'Disconnection Successful',
-        description: 'Successfully disconnected from GSuite',
+        title: "Disconnected",
+        description: "Your GSuite account has been disconnected.",
+        variant: "default",
       });
-    } catch (err: any) {
-      console.error('Error disconnecting from GSuite:', err);
+    } catch (error: any) {
       toast({
-        title: 'Disconnection Failed',
-        description: err.message || 'Failed to disconnect from GSuite',
-        variant: 'destructive'
+        title: "Error",
+        description: error.message || "Failed to disconnect GSuite",
+        variant: "destructive",
       });
     } finally {
-      setIsValidating(false);
+      setIsLoading(false);
     }
   };
   
+  const handleBackToSettings = () => {
+    navigate('/settings');
+  };
+  
+  const navigateToStories = () => {
+    navigate('/stories');
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">GSuite Settings</h1>
-          <p className="text-muted-foreground">
-            Configure your GSuite connection for Google Drive integration
-          </p>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleBackToSettings} 
+              className="mr-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-1" />
+              Back to Settings
+            </Button>
+            <h1 className="text-3xl font-bold flex items-center">
+              GSuite Integration Settings
+            </h1>
+          </div>
+          <Button onClick={navigateToStories} variant="outline" className="flex items-center">
+            <Factory className="h-4 w-4 mr-2" />
+            Back to Jira Stories
+          </Button>
         </div>
         
-        <div className="grid gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Connection Status</CardTitle>
-              <CardDescription>
-                Status of your GSuite API connection
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {status === 'loading' ? (
-                <div className="flex items-center">
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  <span>Checking connection status...</span>
-                </div>
-              ) : status === 'success' ? (
-                <Alert className="bg-green-50 border-green-200 text-green-800 dark:bg-green-900/30 dark:border-green-700 dark:text-green-400">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <AlertTitle>Connected</AlertTitle>
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              ) : status === 'error' ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertTitle>Not Connected</AlertTitle>
-                  <AlertDescription>{message}</AlertDescription>
-                </Alert>
-              ) : null}
-            </CardContent>
-          </Card>
+        <SecurityAlert />
+        
+        {connectionSuccess && (
+          <div className="mb-6 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
+            <span>Connection successful! Your GSuite account is now linked securely.</span>
+          </div>
+        )}
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid grid-cols-3 mb-4 w-full max-w-md mx-auto">
+            <TabsTrigger value="connection" className="flex items-center gap-1">
+              <Link className="h-4 w-4" />
+              <span>Connection</span>
+            </TabsTrigger>
+            <TabsTrigger value="export" className="flex items-center gap-1">
+              <FileDown className="h-4 w-4" />
+              <span>Export</span>
+            </TabsTrigger>
+            <TabsTrigger value="options" className="flex items-center gap-1">
+              <FileCheck className="h-4 w-4" />
+              <span>Options</span>
+            </TabsTrigger>
+          </TabsList>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>GSuite API Settings</CardTitle>
-              <CardDescription>
-                Enter your Google API credentials to enable Drive integration
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ConnectionSettings
+          <TabsContent value="connection">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ConnectionSettings 
                 apiKey={apiKey}
                 setApiKey={setApiKey}
                 clientId={clientId}
@@ -327,14 +290,61 @@ const GSuiteSettingsPage: React.FC = () => {
                 setClientSecret={setClientSecret}
                 defaultDriveFolder={defaultDriveFolder}
                 setDefaultDriveFolder={setDefaultDriveFolder}
+                autoSyncEnabled={autoSyncEnabled}
+                setAutoSyncEnabled={setAutoSyncEnabled}
+                driveScope={driveScope}
+                setDriveScope={setDriveScope}
+                docsScope={docsScope}
+                setDocsScope={setDocsScope}
                 isConnected={isConnected}
-                isValidating={isValidating}
-                handleConnect={handleConnect}
+                isLoading={isLoading}
+                initializing={initializing}
+                handleSaveSettings={handleSaveSettings}
                 handleDisconnect={handleDisconnect}
               />
-            </CardContent>
-          </Card>
-        </div>
+              
+              <QuickStartGuide />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="export">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ExportSettings 
+                exportFormat={exportFormat}
+                setExportFormat={setExportFormat}
+                includeMetadata={includeMetadata}
+                setIncludeMetadata={setIncludeMetadata}
+                formatCode={formatCode}
+                setFormatCode={setFormatCode}
+                autoToc={autoToc}
+                setAutoToc={setAutoToc}
+                exportOptions={exportOptions}
+                setExportOptions={setExportOptions}
+                isLoading={isLoading}
+                initializing={initializing}
+                handleSaveSettings={handleSaveSettings}
+              />
+              
+              <AccountInfo 
+                isConnected={isConnected}
+                driveScope={driveScope}
+                docsScope={docsScope}
+                isLoading={isLoading}
+                initializing={initializing}
+                handleSaveSettings={handleSaveSettings}
+                apiKey={apiKey}
+              />
+            </div>
+          </TabsContent>
+          
+          <TabsContent value="options">
+            <DocumentOptions 
+              isLoading={isLoading}
+              initializing={initializing}
+              handleSaveSettings={handleSaveSettings}
+            />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );

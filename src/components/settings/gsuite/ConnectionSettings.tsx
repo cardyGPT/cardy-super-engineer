@@ -10,12 +10,12 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface ConnectionSettingsProps {
+  apiKey: string;
+  setApiKey: (value: string) => void;
   clientId: string;
   setClientId: (value: string) => void;
   clientSecret: string;
   setClientSecret: (value: string) => void;
-  apiKey: string;
-  setApiKey: (value: string) => void;
   defaultDriveFolder: string;
   setDefaultDriveFolder: (value: string) => void;
   autoSyncEnabled: boolean;
@@ -32,12 +32,12 @@ interface ConnectionSettingsProps {
 }
 
 const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
+  apiKey,
+  setApiKey,
   clientId,
   setClientId,
   clientSecret,
   setClientSecret,
-  apiKey,
-  setApiKey,
   defaultDriveFolder,
   setDefaultDriveFolder,
   autoSyncEnabled,
@@ -74,12 +74,12 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
             disabled={initializing}
           />
           <p className="text-sm text-muted-foreground">
-            This client ID must have access to Google Drive and Google Docs APIs
+            Get your Google API Client ID from the Google Cloud Console
           </p>
         </div>
         
         <div className="space-y-2">
-          <Label htmlFor="client-secret">Google Client Secret</Label>
+          <Label htmlFor="client-secret">Client Secret</Label>
           <Input 
             id="client-secret" 
             placeholder="Enter your Google Client Secret" 
@@ -89,25 +89,23 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
             disabled={initializing}
           />
           <p className="text-sm text-muted-foreground">
-            The client secret associated with your Client ID
+            Your Client Secret is used to authenticate with Google APIs
           </p>
         </div>
         
+        {/* Only show API key field if needed */}
         <div className="space-y-2">
-          <Label htmlFor="api-key">Google API Key</Label>
+          <Label htmlFor="api-key">API Key (Optional)</Label>
           <Input 
             id="api-key" 
-            placeholder="Enter your Google API key" 
+            placeholder="Enter your Google API Key (optional)" 
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             type="password"
             disabled={initializing}
           />
-          <p className="text-sm text-muted-foreground">
-            API key for accessing Google APIs directly
-          </p>
         </div>
-        
+
         <div className="space-y-2">
           <Label htmlFor="drive-folder">Default Drive Folder ID (optional)</Label>
           <Input 
@@ -216,7 +214,7 @@ const ConnectionSettings: React.FC<ConnectionSettingsProps> = ({
           <Button 
             className="w-full" 
             onClick={handleSaveSettings} 
-            disabled={(!clientId || !clientSecret || !apiKey) && !isConnected || isLoading || initializing}
+            disabled={(!clientId || !clientSecret) && !isConnected || isLoading || initializing}
           >
             {isLoading ? (
               <span className="flex items-center gap-2">

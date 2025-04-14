@@ -1,7 +1,7 @@
 
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
-import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent, sanitizeContentForReact } from './apiUtils';
+import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent } from './apiUtils';
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -16,37 +16,14 @@ export const generateJiraContent = async (
       request.jiraTicket = ticket;
     }
     
-    // Ensure we have all the necessary ticket information
-    const enhancedTicket = {
-      ...ticket,
-      key: ticket.key || '',
-      summary: ticket.summary || '',
-      description: ticket.description || '',
-      status: ticket.status || '',
-      priority: ticket.priority || '',
-      assignee: ticket.assignee || '',
-      labels: ticket.labels || [],
-      story_points: ticket.story_points || 0,
-      acceptance_criteria: ticket.acceptance_criteria || '',
-      created_at: ticket.created_at || '',
-      updated_at: ticket.updated_at || '',
-      issuetype: ticket.issuetype || { id: '', name: '' }
-    };
-    
-    // Call the Supabase function to generate content
-    console.log('Sending request to chat-with-jira with enhancedTicket:', JSON.stringify(enhancedTicket, null, 2));
-    
+    // Call the Supabase function to generate content with OpenAI
     const { data, error } = await supabase.functions.invoke('chat-with-jira', {
       body: {
-        jiraTicket: enhancedTicket,
-        request: `Generate ${request.type} for this ticket`,
+        jiraTicket: ticket,
+        type: request.type,
         projectContext: request.projectContext,
         selectedDocuments: request.selectedDocuments,
-        additionalContext: request.additionalContext,
-        contentType: request.type, // Pass content type explicitly
-        model: 'gpt-4o', // Specify model explicitly 
-        quality: 'high', // Request high-quality output
-        includeTicketDetails: true // Include all ticket details in the prompt
+        additionalContext: request.additionalContext
       }
     });
 
@@ -56,12 +33,11 @@ export const generateJiraContent = async (
     }
 
     if (!data || !data.response) {
-      console.error('No response received from content generation service:', data);
       throw new Error('No response received from content generation service');
     }
     
-    // Ensure response is a string and sanitize it
-    const responseContent = sanitizeContentForReact(ensureString(data.response));
+    // Ensure response is a string
+    const responseContent = ensureString(data.response);
     
     // Create a response object with the generated content
     let response: JiraGenerationResponse = {};
@@ -72,8 +48,6 @@ export const generateJiraContent = async (
       response.code = responseContent;
     } else if (request.type === 'tests') {
       response.tests = responseContent;
-    } else if (request.type === 'test_cases') {
-      response.testCases = responseContent;
     } else if (request.type === 'all') {
       // For 'all' type, put the content in the lld field by default
       response.lld = responseContent;
@@ -92,10 +66,6 @@ export const generateJiraContent = async (
           request.type,
           responseContent
         );
-        
-        console.log(`Content successfully saved for ${ticket.key}, type: ${request.type}`);
-      } else {
-        console.warn('Cannot save content: Missing ticket key or projectId');
       }
     } catch (saveError) {
       console.error('Error saving generated content:', saveError);
@@ -154,113 +124,3 @@ export const pushContentToJira = async (
     throw err;
   }
 };
-
-// Push content to Google Drive
-export const pushContentToGDrive = async (
-  ticketId: string,
-  content: string,
-  contentType: string
-): Promise<boolean> => {
-  try {
-    if (!ticketId || !content) {
-      throw new Error('Missing required parameters for pushing to Google Drive');
-    }
-    
-    console.log(`Pushing ${contentType} content to Google Drive for ticket ${ticketId}...`);
-    
-    // Call the Supabase function to push to Google Drive
-    const { error } = await supabase.functions.invoke('push-to-gdrive', {
-      body: {
-        ticketId,
-        content,
-        contentType,
-        fileName: `${ticketId}-${contentType}.md`
-      }
-    });
-    
-    if (error) {
-      console.error('Error pushing content to Google Drive:', error);
-      throw new Error(error.message || 'Failed to push content to Google Drive');
-    }
-    
-    return true;
-  } catch (err) {
-    console.error('Error in pushContentToGDrive:', err);
-    throw err;
-  }
-};
-
-// Push content to Bitbucket
-export const pushContentToBitbucket = async (
-  ticketId: string,
-  content: string,
-  contentType: string
-): Promise<boolean> => {
-  try {
-    if (!ticketId || !content) {
-      throw new Error('Missing required parameters for pushing to Bitbucket');
-    }
-    
-    console.log(`Pushing ${contentType} content to Bitbucket for ticket ${ticketId}...`);
-    
-    // Call the Supabase function to push to Bitbucket
-    const { error } = await supabase.functions.invoke('push-to-bitbucket', {
-      body: {
-        ticketId,
-        content,
-        contentType,
-        fileName: `${ticketId}-${contentType}.md`
-      }
-    });
-    
-    if (error) {
-      console.error('Error pushing content to Bitbucket:', error);
-      throw new Error(error.message || 'Failed to push content to Bitbucket');
-    }
-    
-    return true;
-  } catch (err) {
-    console.error('Error in pushContentToBitbucket:', err);
-    throw err;
-  }
-};
-
-// Generate PDF from content
-export const generatePDF = async (
-  ticketId: string,
-  content: string,
-  contentType: string
-): Promise<string> => {
-  try {
-    if (!ticketId || !content) {
-      throw new Error('Missing required parameters for generating PDF');
-    }
-    
-    console.log(`Generating PDF for ${contentType} content for ticket ${ticketId}...`);
-    
-    // Call the Supabase function to generate PDF
-    const { data, error } = await supabase.functions.invoke('generate-pdf', {
-      body: {
-        ticketId,
-        content,
-        contentType,
-        fileName: `${ticketId}-${contentType}.pdf`
-      }
-    });
-    
-    if (error) {
-      console.error('Error generating PDF:', error);
-      throw new Error(error.message || 'Failed to generate PDF');
-    }
-    
-    if (!data || !data.url) {
-      throw new Error('No PDF URL received');
-    }
-    
-    return data.url;
-  } catch (err) {
-    console.error('Error in generatePDF:', err);
-    throw err;
-  }
-};
-

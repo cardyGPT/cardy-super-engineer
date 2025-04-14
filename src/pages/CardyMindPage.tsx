@@ -1,46 +1,102 @@
 
-import React from "react";
+import React, { useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BrainCircuit, MessageSquare, Plus } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { useCardyMind } from "@/hooks/useCardyMind";
+
+// Import components
+import DocumentSelection from "@/components/cardy-mind/DocumentSelection";
+import ConversationDisplay from "@/components/cardy-mind/ConversationDisplay";
+import ChatInputForm from "@/components/cardy-mind/ChatInputForm";
+import RagInfoCard from "@/components/cardy-mind/RagInfoCard";
+import CardyMindHeader from "@/components/cardy-mind/CardyMindHeader";
 
 const CardyMindPage: React.FC = () => {
+  const {
+    projects,
+    documents,
+    messages,
+    selectedProject,
+    selectedProjectName,
+    isLoading,
+    userInput,
+    isRefreshing,
+    usedDocuments,
+    selectedDocuments,
+    setUserInput,
+    handleSubmit,
+    handleSelectProject,
+    handleClearProject,
+    handleDocumentToggle,
+    handleSelectAllDocuments,
+    handleClearAllDocuments,
+    handleRefreshDocuments,
+    handleClearChat,
+    forceProcessDocuments,
+    updateSelectedDocuments
+  } = useCardyMind();
+
+  useEffect(() => {
+    updateSelectedDocuments();
+  }, [selectedProject, documents]);
+
+  useEffect(() => {
+    console.log("Available documents:", documents.map(d => ({ id: d.id, name: d.name, project: d.projectId })));
+    if (selectedProject) {
+      console.log("Selected project documents:", documents
+        .filter(doc => doc.projectId === selectedProject)
+        .map(d => ({ id: d.id, name: d.name }))
+      );
+    }
+  }, [documents, selectedProject]);
+
   return (
     <AppLayout>
       <div className="container mx-auto py-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Cardy Mind</h1>
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
-            New Conversation
-          </Button>
-        </div>
-        
-        <div className="grid grid-cols-1 gap-6">
-          <Card className="h-[calc(100vh-12rem)]">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">AI Assistant</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col h-full">
-              <div className="flex-1 border-2 border-dashed rounded-md flex flex-col items-center justify-center mb-4">
-                <BrainCircuit className="h-12 w-12 text-muted-foreground mb-4" />
-                <p className="text-muted-foreground mb-2">Ask me anything about your project</p>
-                <p className="text-xs text-muted-foreground max-w-md text-center">
-                  I can help you understand your project's data model, documents, and provide recommendations based on best practices.
-                </p>
-              </div>
+        <div className="flex flex-col space-y-6">
+          <CardyMindHeader 
+            isRefreshing={isRefreshing}
+            onForceProcess={forceProcessDocuments}
+            hasSelectedDocuments={selectedDocuments.length > 0}
+          />
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <ConversationDisplay 
+                messages={messages}
+                isLoading={isLoading}
+                selectedProjectName={selectedProjectName}
+                usedDocuments={usedDocuments}
+                handleClearChat={handleClearChat}
+              />
+            </div>
+            
+            <div className="lg:col-span-1 space-y-6">
+              <DocumentSelection 
+                documents={documents}
+                selectedProject={selectedProject}
+                selectedDocuments={selectedDocuments}
+                isProcessing={isRefreshing}
+                handleDocumentToggle={handleDocumentToggle}
+                handleSelectAllDocuments={handleSelectAllDocuments}
+                handleClearAllDocuments={handleClearAllDocuments}
+                handleRefreshDocuments={handleRefreshDocuments}
+              />
               
-              <div className="flex gap-2">
-                <Input placeholder="Type your message here..." className="flex-1" />
-                <Button>
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  Send
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              <ChatInputForm
+                projects={projects}
+                selectedProject={selectedProject}
+                selectedProjectName={selectedProjectName}
+                isLoading={isLoading}
+                userInput={userInput}
+                setUserInput={setUserInput}
+                handleSelectProject={handleSelectProject}
+                handleClearProject={handleClearProject}
+                handleSubmit={handleSubmit}
+              />
+              
+              <RagInfoCard />
+            </div>
+          </div>
         </div>
       </div>
     </AppLayout>

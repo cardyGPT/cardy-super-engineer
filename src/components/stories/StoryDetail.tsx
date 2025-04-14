@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
@@ -7,8 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeContentForReact, ensureString } from '@/contexts/stories/api';
-import StoryGenerateContent from './StoryGenerateContent';
-import StoryHeader from './StoryHeader';
+import StoryTabContent from './StoryTabContent';
 
 interface StoryDetailProps {
   ticket: JiraTicket;
@@ -26,34 +26,195 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
   projectContextData = null
 }) => {
   const [activeTab, setActiveTab] = useState("details");
+  const { generateContent, pushToJira, generatedContent, contentLoading } = useStories();
   
   if (isLoading) {
     return <StoryDetailSkeleton />;
   }
+
+  const handleGenerateLLD = async () => {
+    try {
+      await generateContent({
+        type: 'lld',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      });
+      setActiveTab("lld");
+    } catch (error) {
+      console.error("Error generating LLD:", error);
+    }
+  };
+
+  const handleGenerateCode = async () => {
+    try {
+      await generateContent({
+        type: 'code',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      });
+      setActiveTab("code");
+    } catch (error) {
+      console.error("Error generating code:", error);
+    }
+  };
+
+  const handleGenerateTests = async () => {
+    try {
+      await generateContent({
+        type: 'tests',
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+      });
+      setActiveTab("tests");
+    } catch (error) {
+      console.error("Error generating tests:", error);
+    }
+  };
+
+  const handlePushToJira = async (content: string) => {
+    if (!ticket.id) return false;
+    return await pushToJira(ticket.id, content);
+  };
 
   return (
     <div className="space-y-6">
       <StoryHeader ticket={ticket} />
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full grid grid-cols-2">
+        <TabsList className="w-full grid grid-cols-4">
           <TabsTrigger value="details">Story Details</TabsTrigger>
-          <TabsTrigger value="generate">Generate Content</TabsTrigger>
+          <TabsTrigger value="lld">Low-Level Design</TabsTrigger>
+          <TabsTrigger value="code">Implementation</TabsTrigger>
+          <TabsTrigger value="tests">Test Cases</TabsTrigger>
         </TabsList>
         
         <TabsContent value="details" className="py-4">
           <StoryContent ticket={ticket} />
         </TabsContent>
         
-        <TabsContent value="generate" className="py-4">
-          <StoryGenerateContent 
-            ticket={ticket}
-            projectContext={projectContext}
-            selectedDocuments={selectedDocuments}
-            projectContextData={projectContextData}
-          />
-        </TabsContent>
+        <StoryTabContent
+          tabId="lld"
+          title="Low-Level Design"
+          content={generatedContent?.lld || generatedContent?.lldContent || null}
+          contentType="lld"
+          loading={contentLoading && activeTab === "lld"}
+          ticket={ticket}
+          projectContext={projectContext}
+          selectedDocuments={selectedDocuments}
+          onPushToJira={handlePushToJira}
+          onGenerate={handleGenerateLLD}
+        />
+        
+        <StoryTabContent
+          tabId="code"
+          title="Implementation Code"
+          content={generatedContent?.code || generatedContent?.codeContent || null}
+          contentType="code"
+          loading={contentLoading && activeTab === "code"}
+          ticket={ticket}
+          projectContext={projectContext}
+          selectedDocuments={selectedDocuments}
+          onPushToJira={handlePushToJira}
+          onGenerate={handleGenerateCode}
+        />
+        
+        <StoryTabContent
+          tabId="tests"
+          title="Test Cases"
+          content={generatedContent?.tests || generatedContent?.testContent || null}
+          contentType="tests"
+          loading={contentLoading && activeTab === "tests"}
+          ticket={ticket}
+          projectContext={projectContext}
+          selectedDocuments={selectedDocuments}
+          onPushToJira={handlePushToJira}
+          onGenerate={handleGenerateTests}
+        />
       </Tabs>
+    </div>
+  );
+};
+
+const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
+  const getJiraTicketUrl = () => {
+    if (!ticket.domain || !ticket.key) return '#';
+    return `${ticket.domain}/browse/${ticket.key}`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <h3 className="text-lg font-semibold text-primary">
+            {ticket.key}
+          </h3>
+          {ticket.issuetype?.name && (
+            <Badge variant="outline">
+              {ticket.issuetype.name}
+            </Badge>
+          )}
+        </div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => window.open(getJiraTicketUrl(), '_blank')}
+          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          <ExternalLink className="h-4 w-4 mr-1" />
+          View in Jira
+        </Button>
+      </div>
+      
+      <h2 className="text-2xl font-bold">
+        {ticket.summary}
+      </h2>
+      
+      <div className="flex flex-wrap gap-2 pt-1">
+        {ticket.status && (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+            {ticket.status}
+          </Badge>
+        )}
+        
+        {ticket.priority && (
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            Priority: {ticket.priority}
+          </Badge>
+        )}
+        
+        {ticket.story_points > 0 && (
+          <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300">
+            {ticket.story_points} points
+          </Badge>
+        )}
+      </div>
+      
+      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+        {ticket.assignee && (
+          <div className="flex items-center">
+            <User className="h-4 w-4 mr-1" />
+            {ticket.assignee}
+          </div>
+        )}
+        
+        {ticket.created_at && (
+          <div className="flex items-center">
+            <CalendarClock className="h-4 w-4 mr-1" />
+            Created: {new Date(ticket.created_at).toLocaleDateString()}
+          </div>
+        )}
+        
+        {ticket.updated_at && (
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 mr-1" />
+            Updated: {new Date(ticket.updated_at).toLocaleDateString()}
+          </div>
+        )}
+      </div>
     </div>
   );
 };

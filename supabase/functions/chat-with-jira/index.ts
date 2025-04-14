@@ -38,33 +38,14 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
-    
-    // Get the OpenAI API key
     const openAIApiKey = Deno.env.get('OPENAI_API_KEY');
     
     if (!openAIApiKey) {
-      return new Response(
-        JSON.stringify({ error: "OpenAI API key is not configured" }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
-        }
-      );
+      throw new Error("OpenAI API key is not configured");
     }
 
     // Parse request body
-    const { 
-      jiraTicket, 
-      dataModel, 
-      documentsContext, 
-      request, 
-      projectContext, 
-      selectedDocuments, 
-      additionalContext,
-      contentType 
-    } = await req.json();
-    
-    console.log(`Request received for ${jiraTicket?.key || 'Unknown ticket'}, content type: ${contentType || 'unknown'}`);
+    const { jiraTicket, dataModel, documentsContext, request, projectContext, selectedDocuments, additionalContext, type } = await req.json();
     
     if (!jiraTicket) {
       return new Response(
@@ -84,32 +65,10 @@ Description: ${safeStringify(jiraTicket.description) || 'No description provided
 Status: ${safeStringify(jiraTicket.status) || 'Unknown'}
 Priority: ${safeStringify(jiraTicket.priority) || 'Unknown'}
 Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
-Assignee: ${safeStringify(jiraTicket.assignee?.displayName) || 'Unassigned'}
-Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
 `;
 
-    // Add acceptance criteria if available
     if (jiraTicket.acceptance_criteria) {
-      ticketContext += `\nAcceptance Criteria:\n${safeStringify(jiraTicket.acceptance_criteria)}`;
-    }
-
-    // Add story points if available
-    if (jiraTicket.story_points) {
-      ticketContext += `\nStory Points: ${safeStringify(jiraTicket.story_points)}`;
-    }
-
-    // Add labels if available
-    if (jiraTicket.labels && jiraTicket.labels.length > 0) {
-      ticketContext += `\nLabels: ${safeStringify(jiraTicket.labels.join(', '))}`;
-    }
-
-    // Add created and updated dates if available
-    if (jiraTicket.created_at) {
-      ticketContext += `\nCreated: ${safeStringify(jiraTicket.created_at)}`;
-    }
-    
-    if (jiraTicket.updated_at) {
-      ticketContext += `\nUpdated: ${safeStringify(jiraTicket.updated_at)}`;
+      ticketContext += `\nAcceptance Criteria: ${safeStringify(jiraTicket.acceptance_criteria)}`;
     }
 
     // Add any additional contexts
@@ -128,23 +87,6 @@ Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
     
     if (additionalContext?.epic) {
       ticketContext += `\nEpic Information:\n${safeStringify(additionalContext.epic)}`;
-    }
-
-    // Add framework information if provided
-    if (additionalContext?.framework) {
-      ticketContext += `\nFramework: ${safeStringify(additionalContext.framework)}`;
-    }
-    
-    if (additionalContext?.backend) {
-      ticketContext += `\nBackend: ${safeStringify(additionalContext.backend)}`;
-    }
-    
-    if (additionalContext?.database) {
-      ticketContext += `\nDatabase: ${safeStringify(additionalContext.database)}`;
-    }
-    
-    if (additionalContext?.testingFramework) {
-      ticketContext += `\nTesting Framework: ${safeStringify(additionalContext.testingFramework)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info
@@ -183,167 +125,80 @@ Reporter: ${safeStringify(jiraTicket.reporter?.displayName) || 'Unknown'}
       }
     }
 
-    // Determine generation type from the request or explicit contentType
-    let generationContentType = contentType || 'general';
-    if (!generationContentType && request) {
-      const requestLower = request.toLowerCase();
-      if (requestLower.includes('low-level design') || requestLower.includes('lld')) {
-        generationContentType = 'lld';
-      } else if (requestLower.includes('code') || requestLower.includes('implementation')) {
-        generationContentType = 'code';
-      } else if (requestLower.includes('test case') || requestLower.includes('qa')) {
-        generationContentType = 'test_cases';
-      } else if (requestLower.includes('tests') || requestLower.includes('playwright')) {
-        generationContentType = 'tests';
-      } else if (requestLower.includes('all')) {
-        generationContentType = 'all';
+    // Create the system prompt based on the content type
+    let systemPrompt = "";
+    
+    if (type === 'lld') {
+      systemPrompt = `You are an expert software architect who creates detailed low-level design documents.
+Based on the Jira ticket information, create a comprehensive low-level design document.
+Include component breakdowns, data models, API endpoints, sequence diagrams, error handling, and security considerations.
+Format everything properly in markdown with clear headings, code blocks, and diagrams.
+Your response should be detailed, structured, and directly usable in a technical documentation system.`;
+    } 
+    else if (type === 'code') {
+      systemPrompt = `You are an expert software developer specializing in AngularJS (frontend), NodeJS (backend), and PostgreSQL.
+Based on the Jira ticket information, create implementation code that addresses the requirements.
+Include all necessary components, services, and utility functions.
+Structure your code following best practices, with clear comments and error handling.
+Format everything properly in markdown with appropriate syntax highlighting.
+Your code should be complete, well-structured, and ready for review.`;
+    } 
+    else if (type === 'tests') {
+      systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
+Based on the Jira ticket information, create comprehensive test cases.
+Include unit tests, integration tests, end-to-end tests, edge cases, and performance test considerations.
+Format everything properly in markdown with clear test scenarios and expected results.
+Your tests should be thorough, covering all aspects of the functionality described in the ticket.`;
+    } 
+    else {
+      systemPrompt = `You are an expert software development assistant.
+Analyze the Jira ticket information and provide a comprehensive response addressing the requirements.
+Format your response cleanly and professionally in markdown.
+Your response should be detailed, structured and directly usable by the development team.`;
+    }
+
+    // Call OpenAI API
+    try {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: `${ticketContext}\n\nPlease generate a detailed, well-formatted ${type === 'lld' ? 'low-level design document' : type === 'code' ? 'implementation code' : type === 'tests' ? 'test cases' : 'response'} based on this Jira ticket information.`
+            }
+          ],
+          temperature: 0.5,
+          max_tokens: 4000,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(`OpenAI API error: ${errorData.error?.message || response.statusText}`);
       }
+
+      const data = await response.json();
+      const responseContent = data.choices[0].message.content;
+
+      // Return the generated content
+      return new Response(
+        JSON.stringify({ response: responseContent }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (openAIError) {
+      console.error("Error calling OpenAI API:", openAIError);
+      throw new Error(`Failed to generate content: ${openAIError.message}`);
     }
-
-    console.log(`Selected content type: ${generationContentType}`);
-    
-    // Get system prompt based on the generation type
-    let systemPrompt = '';
-    
-    switch (generationContentType) {
-      case 'lld':
-        systemPrompt = `You are an expert software architect. Based on the provided Jira ticket information, create a detailed low-level design document that follows these guidelines:
-
-1. Start with a comprehensive overview of the feature or component being designed.
-2. Include detailed component diagrams showing the relationships between different parts of the system.
-3. Specify API contracts with clear endpoint definitions, request/response formats, and error handling.
-4. Document data flow between components, including sequence diagrams where appropriate.
-5. Define database schema changes if required, with entity relationships and field specifications.
-6. List technical constraints, assumptions, and dependencies.
-7. Highlight potential performance considerations and optimization strategies.
-8. Include security considerations where applicable.
-
-The LLD should be well-structured with clear headings, code examples where appropriate, and should follow best practices for Angular (frontend), Node.js (backend), and PostgreSQL (database) architecture.
-
-Remember to specifically address the requirements and acceptance criteria mentioned in the ticket.
-
-Format your response using Markdown for easy readability.`;
-        break;
-      
-      case 'code':
-        systemPrompt = `You are an expert software developer. Based on the provided Jira ticket and any contextual information, generate the necessary code implementation that adheres to these guidelines:
-
-1. Write clean, maintainable code following industry best practices.
-2. Use Angular for frontend components, with appropriate TypeScript typing and component structure.
-3. Implement Node.js for backend services, with proper error handling and API structuring.
-4. Include PostgreSQL queries where database interactions are required.
-5. Add comprehensive inline documentation explaining complex logic.
-6. Follow a modular approach with clear separation of concerns.
-7. Include proper error handling and edge case consideration.
-8. Ensure the code is efficient and performant.
-
-Focus on producing production-ready code that specifically addresses the requirements and acceptance criteria in the ticket.
-
-Use Markdown code blocks with appropriate language syntax highlighting for each file or component. Include file names as comments or headings.`;
-        break;
-      
-      case 'test_cases':
-        systemPrompt = `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature. Your test cases should follow these guidelines:
-
-1. Organize test cases by functional areas or user flows.
-2. Include detailed preconditions, steps, and expected results for each test case.
-3. Cover positive test scenarios that validate correct functionality.
-4. Include negative test scenarios to verify proper error handling.
-5. Add edge cases and boundary conditions.
-6. Consider performance, security, and usability testing where applicable.
-7. Ensure test cases are clearly written and easy to follow.
-8. Include traceability to requirements or acceptance criteria.
-
-Make sure your test cases specifically verify that all the acceptance criteria in the ticket are met.
-
-Format your response using Markdown with clear sections for different test categories. Use tables for structured test cases with columns for ID, Description, Steps, and Expected Results.`;
-        break;
-      
-      case 'tests':
-        systemPrompt = `You are an expert test automation engineer. Based on the provided Jira ticket, create comprehensive Playwright test scripts that follow these guidelines:
-
-1. Use TypeScript for all Playwright test scripts.
-2. Structure tests following the Page Object Model pattern when appropriate.
-3. Include setup and teardown procedures for test initialization and cleanup.
-4. Write tests that cover critical user journeys and edge cases.
-5. Implement proper assertions to validate expected behavior.
-6. Add descriptive comments explaining the purpose of each test.
-7. Group related tests together in test suites.
-8. Consider test data management strategies.
-9. Include error handling and reporting mechanisms.
-
-Make sure your tests specifically verify that all the acceptance criteria in the ticket are met.
-
-Code should be production-ready, following best practices for Playwright test automation.
-Use Markdown code blocks with TypeScript syntax highlighting. Include file names as comments or headings.`;
-        break;
-      
-      case 'all':
-        systemPrompt = `You are an expert software engineer with deep knowledge of software architecture, development, and testing. Based on the provided Jira ticket information, please provide a comprehensive analysis and implementation plan that addresses all aspects of the feature, including:
-
-1. A detailed low-level design
-2. Implementation code for Angular frontend and Node.js backend with PostgreSQL database
-3. Test cases and Playwright test scripts
-
-Your response should be thorough yet focused on the specific requirements and acceptance criteria of the ticket. Structure your response clearly with distinct sections for each component (design, code, testing).`;
-        break;
-        
-      default:
-        systemPrompt = `You are a helpful assistant for software development teams. Provide a detailed and comprehensive response to the user's request about the Jira ticket.`;
-    }
-
-    // Add specific technology stack information to the system prompt
-    const techStackPrompt = `\n\nTechnology Stack Information:
-- Frontend: Angular with TypeScript
-- Backend: Node.js with Express
-- Database: PostgreSQL
-- Testing: Playwright for automation testing
-
-Make sure your response is tailored to work with this specific technology stack.`;
-
-    systemPrompt += techStackPrompt;
-
-    // Call the OpenAI API
-    console.log(`Calling OpenAI API for ${generationContentType} generation using gpt-4o model...`);
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: `${request || `Generate ${generationContentType} for the following Jira ticket`}:\n\n${ticketContext}`
-          }
-        ],
-        max_tokens: 4000,
-        temperature: 0.7,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("OpenAI API error:", errorData);
-      throw new Error(errorData.error?.message || "Error calling OpenAI API");
-    }
-    
-    const data = await response.json();
-    const generatedContent = data.choices[0].message.content;
-    
-    console.log(`Successfully generated content for ${jiraTicket.key || 'Unknown ticket'}`);
-    
-    // Return the generated content
-    return new Response(
-      JSON.stringify({ response: generatedContent }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error) {
     console.error("Error in chat-with-jira function:", error);
     
