@@ -1,4 +1,3 @@
-
 export interface JiraTicket {
   id: string;
   key: string;
@@ -67,7 +66,6 @@ export interface JiraGenerationResponse {
   tests?: string;
   testContent?: string;
   testCasesContent?: string;
-  response?: string;
 }
 
 export interface ProjectContextData {

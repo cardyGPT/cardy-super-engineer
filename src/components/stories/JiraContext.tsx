@@ -1,9 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket } from '@/types/jira';
 import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets } from '@/contexts/stories/api';
-
-export type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
+import { ContentType } from './ContentDisplay';
 
 export interface JiraContextData {
   credentials: JiraCredentials | null;
@@ -55,7 +53,6 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [generatingContent, setGeneratingContent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Check local storage for saved credentials on initial load
   useEffect(() => {
     const savedCreds = localStorage.getItem('jira_credentials');
     if (savedCreds) {
@@ -67,7 +64,6 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
   
-  // Load projects when credentials change
   useEffect(() => {
     if (credentials) {
       localStorage.setItem('jira_credentials', JSON.stringify(credentials));
@@ -83,7 +79,6 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [credentials]);
   
-  // Load sprints when selected project changes
   useEffect(() => {
     if (selectedProject && credentials) {
       loadSprints();
@@ -93,7 +88,6 @@ export const JiraProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [selectedProject]);
   
-  // Load tickets when selected sprint changes
   useEffect(() => {
     if (selectedSprint && credentials) {
       loadTickets();
