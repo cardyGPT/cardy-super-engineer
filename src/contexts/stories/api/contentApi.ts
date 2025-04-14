@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
 import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent } from './apiUtils';
