@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
@@ -7,7 +6,7 @@ import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User } from "lu
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { sanitizeContentForReact } from '@/contexts/stories/api';
+import { sanitizeContentForReact, ensureString } from '@/contexts/stories/api';
 import StoryGenerateContent from './StoryGenerateContent';
 
 interface StoryDetailProps {
@@ -59,7 +58,6 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
 };
 
 const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
-  // Get external URL for the ticket
   const getJiraTicketUrl = () => {
     if (!ticket.domain || !ticket.key) return '#';
     return `${ticket.domain}/browse/${ticket.key}`;
@@ -141,8 +139,8 @@ const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
 };
 
 const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
-  const fixedDescription = sanitizeContentForReact(ticket.description);
-  const fixedAcceptanceCriteria = sanitizeContentForReact(ticket.acceptance_criteria);
+  const fixedDescription = ticket.description ? sanitizeContentForReact(ticket.description) : '';
+  const fixedAcceptanceCriteria = ticket.acceptance_criteria ? sanitizeContentForReact(ticket.acceptance_criteria) : '';
   
   return (
     <div className="space-y-6">

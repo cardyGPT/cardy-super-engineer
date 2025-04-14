@@ -1,4 +1,3 @@
-
 import { supabase } from '@/lib/supabase';
 import { JiraCredentials, JiraProject } from '@/types/jira';
 
@@ -192,11 +191,17 @@ export const saveGeneratedContent = async (
 };
 
 // Sanitize content for rendering in React components
-export const sanitizeContentForReact = (content: string): string => {
-  if (!content) return '';
+export const sanitizeContentForReact = (content: any): string => {
+  // Check if content is null or undefined
+  if (content === null || content === undefined) {
+    return '';
+  }
+  
+  // Ensure content is a string before calling string methods
+  const contentStr = ensureString(content);
   
   // Replace HTML entities and other problematic characters
-  return content
+  return contentStr
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&amp;/g, '&')
