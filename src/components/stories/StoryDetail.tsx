@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
@@ -9,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { sanitizeContentForReact, ensureString } from '@/contexts/stories/api';
 import StoryGenerateContent from './StoryGenerateContent';
+import StoryHeader from './StoryHeader';
 
 interface StoryDetailProps {
   ticket: JiraTicket;
@@ -54,87 +54,6 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
           />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-};
-
-const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
-  const getJiraTicketUrl = () => {
-    if (!ticket.domain || !ticket.key) return '#';
-    return `${ticket.domain}/browse/${ticket.key}`;
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <h3 className="text-lg font-semibold text-primary">
-            {ticket.key}
-          </h3>
-          {ticket.issuetype?.name && (
-            <Badge variant="outline">
-              {ticket.issuetype.name}
-            </Badge>
-          )}
-        </div>
-        
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={() => window.open(getJiraTicketUrl(), '_blank')}
-          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-        >
-          <ExternalLink className="h-4 w-4 mr-1" />
-          View in Jira
-        </Button>
-      </div>
-      
-      <h2 className="text-2xl font-bold">
-        {ticket.summary}
-      </h2>
-      
-      <div className="flex flex-wrap gap-2 pt-1">
-        {ticket.status && (
-          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
-            {ticket.status}
-          </Badge>
-        )}
-        
-        {ticket.priority && (
-          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
-            Priority: {ticket.priority}
-          </Badge>
-        )}
-        
-        {ticket.story_points > 0 && (
-          <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300">
-            {ticket.story_points} points
-          </Badge>
-        )}
-      </div>
-      
-      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-        {ticket.assignee && (
-          <div className="flex items-center">
-            <User className="h-4 w-4 mr-1" />
-            {ticket.assignee}
-          </div>
-        )}
-        
-        {ticket.created_at && (
-          <div className="flex items-center">
-            <CalendarClock className="h-4 w-4 mr-1" />
-            Created: {new Date(ticket.created_at).toLocaleDateString()}
-          </div>
-        )}
-        
-        {ticket.updated_at && (
-          <div className="flex items-center">
-            <Clock className="h-4 w-4 mr-1" />
-            Updated: {new Date(ticket.updated_at).toLocaleDateString()}
-          </div>
-        )}
-      </div>
     </div>
   );
 };

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,17 +44,14 @@ const StoryList: React.FC = () => {
   const observer = useRef<IntersectionObserver | null>(null);
   const loadingRef = useRef<HTMLDivElement>(null);
   
-  // Extract unique types and statuses from tickets
   useEffect(() => {
     if (tickets.length > 0) {
-      // Get unique issue types
       const types = tickets
         .map(ticket => ticket.issuetype?.name)
         .filter((type, index, self) => 
           type && self.indexOf(type) === index
         ) as string[];
       
-      // Get unique statuses
       const statuses = tickets
         .map(ticket => ticket.status)
         .filter((status, index, self) => 
@@ -67,7 +63,6 @@ const StoryList: React.FC = () => {
     }
   }, [tickets]);
   
-  // Set up intersection observer for infinite scrolling
   useEffect(() => {
     if (loadingRef.current && hasMore) {
       observer.current = new IntersectionObserver((entries) => {
@@ -86,12 +81,10 @@ const StoryList: React.FC = () => {
     };
   }, [hasMore, loadingMore, fetchMoreTickets, tickets.length, ticketsLoading]);
   
-  // Update localSearchTerm when searchTerm changes
   useEffect(() => {
     setLocalSearchTerm(searchTerm);
   }, [searchTerm]);
   
-  // Apply search term and filtering to tickets
   useEffect(() => {
     let results = [...tickets];
     
@@ -103,14 +96,12 @@ const StoryList: React.FC = () => {
       );
     }
     
-    // Apply type filter if selected
     if (ticketTypeFilter) {
       results = results.filter(ticket => 
         ticket.issuetype?.name === ticketTypeFilter
       );
     }
     
-    // Apply status filter if selected
     if (ticketStatusFilter) {
       results = results.filter(ticket => 
         ticket.status === ticketStatusFilter
@@ -157,10 +148,7 @@ const StoryList: React.FC = () => {
     
     setIsLoadingAll(true);
     try {
-      // Clear any filters first
       clearFilters();
-      
-      // Load tickets directly from the project instead of sprint
       await fetchTicketsByProject(selectedProject.id);
     } catch (error) {
       console.error("Error loading all tickets:", error);
@@ -176,7 +164,6 @@ const StoryList: React.FC = () => {
       if (selectedSprint) {
         await fetchTickets(selectedSprint.id);
       } else {
-        // If no sprint is selected, try loading from project
         await fetchTicketsByProject(selectedProject.id);
       }
     } catch (error) {
@@ -403,7 +390,7 @@ interface StoryListItemProps {
 const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSelect }) => {
   return (
     <div
-      className={`p-3 mb-1 border rounded-md cursor-pointer transition-colors ${
+      className={`p-2 mb-0.5 border rounded-md cursor-pointer transition-colors ${
         isSelected
           ? 'bg-primary/10 border-primary/50'
           : 'hover:bg-muted/50 border-transparent hover:border-muted'
@@ -412,27 +399,29 @@ const StoryListItem: React.FC<StoryListItemProps> = ({ ticket, isSelected, onSel
     >
       <div className="flex justify-between items-start mb-1">
         <div className="font-medium text-sm text-primary">{ticket.key}</div>
-        {ticket.issuetype?.name && (
-          <Badge variant="outline" className="text-xs">
-            {ticket.issuetype.name}
-          </Badge>
-        )}
+        <div className="flex flex-wrap gap-1 items-center">
+          {ticket.status && (
+            <Badge className={`text-xs ${
+              ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
+              ticket.status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
+              ticket.status.toLowerCase().includes('review') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
+              ticket.status.toLowerCase().includes('block') ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
+              'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
+            }`}>
+              {ticket.status}
+            </Badge>
+          )}
+          {ticket.issuetype?.name && (
+            <Badge variant="outline" className="text-xs">
+              {ticket.issuetype.name}
+            </Badge>
+          )}
+        </div>
       </div>
       <div className="text-sm truncate">{ticket.summary}</div>
-      <div className="flex justify-between items-center mt-2">
-        {ticket.status && (
-          <Badge className={`text-xs ${
-            ticket.status.toLowerCase().includes('done') ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' :
-            ticket.status.toLowerCase().includes('progress') ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' :
-            ticket.status.toLowerCase().includes('review') ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300' :
-            ticket.status.toLowerCase().includes('block') ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' :
-            'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300'
-          }`}>
-            {ticket.status}
-          </Badge>
-        )}
+      <div className="flex justify-between items-center mt-1 text-xs text-muted-foreground">
         {ticket.assignee && (
-          <span className="text-xs text-muted-foreground truncate max-w-[150px]">
+          <span className="truncate max-w-[150px]">
             {ticket.assignee}
           </span>
         )}

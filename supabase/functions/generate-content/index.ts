@@ -13,7 +13,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, systemPrompt, maxTokens = 2000, temperature = 0.7 } = await req.json();
+    const { prompt, systemPrompt, ticketData, contentType, projectContext, maxTokens = 2000, temperature = 0.7 } = await req.json();
     
     // Validate request
     if (!prompt) {
@@ -39,6 +39,9 @@ serve(async (req) => {
       );
     }
     
+    // Create a rich context based on the ticket data and context
+    const enhancedPrompt = createEnhancedPrompt(prompt, ticketData, contentType, projectContext);
+    
     // Call the OpenAI API
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -51,11 +54,11 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: systemPrompt || 'You are a helpful assistant.'
+            content: systemPrompt || getDefaultSystemPrompt(contentType)
           },
           {
             role: 'user',
-            content: prompt
+            content: enhancedPrompt
           }
         ],
         max_tokens: maxTokens,
@@ -92,3 +95,59 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper functions to create enhanced prompts and system prompts
+function createEnhancedPrompt(basePrompt: string, ticketData: any, contentType: string, projectContext: any): string {
+  let enhancedPrompt = basePrompt;
+  
+  if (ticketData) {
+    enhancedPrompt += `\n\n### Jira Ticket Details:\n`;
+    enhancedPrompt += `- Key: ${ticketData.key}\n`;
+    enhancedPrompt += `- Summary: ${ticketData.summary}\n`;
+    
+    if (ticketData.description) {
+      enhancedPrompt += `\n### Description:\n${ticketData.description}\n`;
+    }
+    
+    if (ticketData.acceptance_criteria) {
+      enhancedPrompt += `\n### Acceptance Criteria:\n${ticketData.acceptance_criteria}\n`;
+    }
+    
+    if (ticketData.status) {
+      enhancedPrompt += `\n- Status: ${ticketData.status}\n`;
+    }
+    
+    if (ticketData.priority) {
+      enhancedPrompt += `- Priority: ${ticketData.priority}\n`;
+    }
+  }
+  
+  if (projectContext) {
+    enhancedPrompt += `\n\n### Project Context:\n${JSON.stringify(projectContext, null, 2)}\n`;
+  }
+  
+  return enhancedPrompt;
+}
+
+function getDefaultSystemPrompt(contentType: string): string {
+  switch (contentType) {
+    case 'lld':
+      return `You are an expert software architect. Create a detailed low-level design document based on the provided Jira ticket. 
+      Include component diagrams, data flow, API contracts, and database schema changes if applicable. 
+      Format your response using Markdown for easy readability.`;
+    
+    case 'code':
+      return `You are an expert software developer. Based on the provided Jira ticket and any design information, 
+      generate the necessary code implementation. Include all relevant files, classes, methods, and tests that would be needed. 
+      Focus on producing clean, maintainable, and well-documented code.
+      Use Markdown code blocks with appropriate language syntax highlighting.`;
+    
+    case 'tests':
+      return `You are an expert QA engineer. Based on the provided Jira ticket, create comprehensive test cases to validate the feature.
+      Include both unit tests and integration tests where appropriate. Cover edge cases, error scenarios, and performance considerations.
+      Format your response using Markdown, with clear sections for different test categories.`;
+    
+    default:
+      return `You are a helpful assistant for software development teams. Provide a detailed and comprehensive response to the user's request.`;
+  }
+}

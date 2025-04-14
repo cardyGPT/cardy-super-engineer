@@ -29,6 +29,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     apiType,
     setApiType,
     totalTickets,
+    tickets,
     fetchProjects,
     fetchSprints
   } = useStories();
@@ -174,7 +175,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                     <Calendar className="h-3 w-3 mr-1 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">
                       {sprints[selectedProject.id]?.length} sprints
-                      {totalTickets > 0 && ` / ${totalTickets} issues`}
+                      {tickets.length > 0 && totalTickets > 0 && ` / ${tickets.length} of ${totalTickets} issues`}
                     </span>
                   </div>
                 )}
