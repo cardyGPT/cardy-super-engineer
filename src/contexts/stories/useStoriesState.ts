@@ -14,7 +14,7 @@ import {
   ensureString 
 } from './api';
 
-export const useStoriesState = () => {
+export const useStoriesState = (apiType: 'agile' | 'classic' = 'agile') => {
   const { toast } = useToast();
   
   // Authentication state
@@ -34,9 +34,6 @@ export const useStoriesState = () => {
   const [projects, setProjects] = useState<JiraProject[]>([]);
   const [sprints, setSprints] = useState<Record<string, JiraSprint[]>>({});
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
-  
-  // Jira API version
-  const [apiVersion, setApiVersion] = useState<'classic' | 'agile' | 'cloud' | null>(null);
   
   // Pagination state for projects
   const [projectsStartAt, setProjectsStartAt] = useState(0);
@@ -92,26 +89,29 @@ export const useStoriesState = () => {
     if (credentials && projects.length === 0 && !projectsLoading) {
       console.log('Auto-fetching projects on credentials load');
       fetchProjects();
-      testJiraApiVersion();
     }
   }, [credentials]);
   
-  // Test Jira API version to determine if it's Classic or Agile
-  const testJiraApiVersion = useCallback(async () => {
-    if (!credentials) return;
+  // Clear data when API type changes
+  useEffect(() => {
+    // Clear selections and data when API type changes
+    setProjects([]);
+    setSprints({});
+    setTickets([]);
+    setSelectedProject(null);
+    setSelectedSprint(null);
+    setSelectedTicket(null);
     
-    try {
-      const result = await testJiraConnection(credentials);
-      if (result.isConnected && result.apiVersion) {
-        setApiVersion(result.apiVersion);
-        console.log(`Detected Jira API version: ${result.apiVersion}`);
-      }
-    } catch (err) {
-      console.error('Error testing Jira API version:', err);
-      // Default to classic if we can't determine
-      setApiVersion('classic');
+    // Reset pagination
+    setProjectsStartAt(0);
+    setHasMoreProjects(true);
+    setCurrentPage(0);
+    setHasMore(false);
+    
+    if (credentials) {
+      fetchProjects();
     }
-  }, [credentials]);
+  }, [apiType]);
   
   // API method - Fetch initial batch of projects
   const fetchProjects = useCallback(async () => {
@@ -126,7 +126,7 @@ export const useStoriesState = () => {
     setHasMoreProjects(true);
     
     try {
-      console.log('Fetching initial batch of Jira projects...');
+      console.log(`Fetching initial batch of Jira projects using ${apiType} API...`);
       const projectsData = await fetchJiraProjects(credentials, 0, 50);
       
       setProjects(projectsData);
@@ -145,7 +145,7 @@ export const useStoriesState = () => {
     } finally {
       setProjectsLoading(false);
     }
-  }, [credentials, toast]);
+  }, [credentials, apiType, toast]);
   
   // API method - Fetch more projects (for lazy loading)
   const fetchMoreProjects = useCallback(async () => {
@@ -217,8 +217,8 @@ export const useStoriesState = () => {
     setError(null);
     
     try {
-      console.log(`Fetching sprints for project ${projectId}...`);
-      const sprintsData = await fetchJiraSprints(credentials, projectId);
+      console.log(`Fetching sprints for project ${projectId} using ${apiType} API...`);
+      const sprintsData = await fetchJiraSprints(credentials, projectId, apiType);
       
       // Update sprints state with new data for this project
       setSprints(prev => ({ ...prev, [projectId]: sprintsData }));
@@ -227,7 +227,7 @@ export const useStoriesState = () => {
         console.log(`No sprints found for project ${projectId}`);
         toast({
           title: "No Sprints Found",
-          description: "This project doesn't have any sprints available. Try viewing all stories from the project instead.",
+          description: `This project doesn't have any sprints available using the ${apiType} API. Try switching API type.`,
           variant: "default",
         });
       } else {
@@ -248,7 +248,7 @@ export const useStoriesState = () => {
     } finally {
       setSprintsLoading(false);
     }
-  }, [credentials, toast]);
+  }, [credentials, apiType, toast]);
   
   // API method - Fetch initial tickets
   const fetchTickets = useCallback(async (sprintId: string) => {
@@ -542,7 +542,6 @@ export const useStoriesState = () => {
     setCredentials,
     isAuthenticated,
     error,
-    apiVersion,
     
     // Data
     projects,
@@ -596,7 +595,6 @@ export const useStoriesState = () => {
     fetchTicketsByProject,
     generateContent,
     pushToJira,
-    testJiraApiVersion,
     
     // Utility
     refreshAll

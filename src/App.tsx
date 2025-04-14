@@ -1,28 +1,27 @@
 
-import React from 'react'
-import { RouterProvider } from 'react-router-dom'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Toaster } from "@/components/ui/toaster";
+import { StoriesProvider } from '@/contexts/StoriesContext';
 
-import { ThemeProvider } from '@/components/theme-provider'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { Toaster } from '@/components/ui/toaster'
-import { routes } from './routes'
-import { StoriesProvider } from './contexts/StoriesContext';
-import { ProjectProvider } from './contexts/ProjectContext';
+// Pages
+import StoriesPage from '@/pages/StoriesPage';
+import SettingsPage from '@/pages/SettingsPage';
+import NotFoundPage from '@/pages/NotFoundPage';
 
 function App() {
-  const queryClient = new QueryClient()
-  
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <ProjectProvider>
-          <StoriesProvider>
-            <RouterProvider router={routes} />
-            <Toaster />
-          </StoriesProvider>
-        </ProjectProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <Router>
+      <StoriesProvider>
+        <Routes>
+          <Route path="/" element={<StoriesPage />} />
+          <Route path="/stories" element={<StoriesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Routes>
+        <Toaster />
+      </StoriesProvider>
+    </Router>
   );
 }
 

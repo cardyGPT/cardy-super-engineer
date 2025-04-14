@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useStoriesState } from './stories/useStoriesState';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 
@@ -10,7 +10,10 @@ interface StoriesContextProps {
   setCredentials: (creds: JiraCredentials | null) => void;
   isAuthenticated: boolean;
   error: string | null;
-  apiVersion?: 'classic' | 'agile' | 'cloud' | null;
+  
+  // API type
+  apiType: 'agile' | 'classic';
+  setApiType: (type: 'agile' | 'classic') => void;
   
   // Data state
   projects: JiraProject[];
@@ -62,10 +65,6 @@ interface StoriesContextProps {
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   refreshAll: () => Promise<void>;
-  testJiraApiVersion: () => Promise<void>;
-  
-  // Generated content
-  generatedContent: JiraGenerationResponse | null;
 }
 
 // Create the context
@@ -73,10 +72,25 @@ const StoriesContext = createContext<StoriesContextProps | undefined>(undefined)
 
 // Provider component
 export const StoriesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const storiesState = useStoriesState();
+  const [apiType, setApiType] = useState<'agile' | 'classic'>(() => {
+    // Try to load from localStorage on initialization
+    try {
+      return localStorage.getItem('jira_api_type') as 'agile' | 'classic' || 'agile';
+    } catch (err) {
+      return 'agile';
+    }
+  });
+  
+  // Save API type to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('jira_api_type', apiType);
+  }, [apiType]);
+  
+  // Create the stories state with the API type
+  const storiesState = useStoriesState(apiType);
   
   return (
-    <StoriesContext.Provider value={storiesState}>
+    <StoriesContext.Provider value={{ ...storiesState, apiType, setApiType }}>
       {children}
     </StoriesContext.Provider>
   );
