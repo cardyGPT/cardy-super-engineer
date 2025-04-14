@@ -63,8 +63,8 @@ const fetchAgileJiraSprints = async (
             id: sprint.id,
             name: sprint.name,
             state: (sprint.state || '').toLowerCase(),
-            startDate: sprint.startDate,
-            endDate: sprint.endDate,
+            startDate: sprint.startDate || null,
+            endDate: sprint.endDate || null,
             boardId: board.id,
             projectId
           }));
@@ -127,7 +127,7 @@ const fetchClassicJiraSprints = async (
       name: version.name,
       state: version.released ? 'closed' : 'active',
       startDate: null,
-      endDate: version.releaseDate,
+      endDate: version.releaseDate || null,
       boardId: 'classic',
       projectId
     }));

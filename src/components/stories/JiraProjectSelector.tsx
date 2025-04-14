@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { JiraProject, JiraSprint } from '@/types/jira';
-import { AlertCircle, ExternalLink, Archive, RefreshCw, Calendar, CheckCircle2 } from "lucide-react";
+import { AlertCircle, ExternalLink, RefreshCw, Calendar, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -25,17 +25,13 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     sprints, 
     sprintsLoading, 
     projectsLoading,
-    fetchAllProjectsAtOnce,
     error,
     apiType,
     setApiType,
-    hasMoreProjects,
     totalTickets,
     fetchProjects,
     fetchSprints
   } = useStories();
-  
-  const [loadingAllProjects, setLoadingAllProjects] = useState(false);
   
   // Refresh projects when API type changes
   useEffect(() => {
@@ -67,17 +63,6 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     const sprint = sprints[selectedProject.id]?.find(s => s.id === sprintId);
     if (sprint) {
       setSelectedSprint(sprint);
-    }
-  };
-  
-  const handleLoadAllProjects = async () => {
-    setLoadingAllProjects(true);
-    try {
-      await fetchAllProjectsAtOnce();
-    } catch (err) {
-      console.error('Error loading all projects:', err);
-    } finally {
-      setLoadingAllProjects(false);
     }
   };
   
@@ -131,25 +116,10 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                 Jira Project {apiType && <span className="text-xs text-muted-foreground">({apiType})</span>}
                 {projects.length > 0 && (
                   <span className="text-xs text-muted-foreground ml-1">
-                    ({projects.length} {hasMoreProjects ? '+ more' : 'loaded'})
+                    ({projects.length} loaded)
                   </span>
                 )}
               </label>
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleLoadAllProjects}
-                disabled={loadingAllProjects}
-                className="h-8 px-2 text-xs"
-              >
-                {loadingAllProjects ? (
-                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                ) : (
-                  <Archive className="h-3 w-3 mr-1" />
-                )}
-                Load All Projects
-              </Button>
             </div>
             
             {projectsLoading ? (

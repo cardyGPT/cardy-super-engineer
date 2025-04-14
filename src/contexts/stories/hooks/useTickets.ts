@@ -13,6 +13,7 @@ export const useTickets = (
   const [tickets, setTickets] = useState<JiraTicket[]>([]);
   const [selectedTicket, setSelectedTicket] = useState<JiraTicket | null>(null);
   const [ticketTypeFilter, setTicketTypeFilter] = useState<string | null>(null);
+  const [ticketStatusFilter, setTicketStatusFilter] = useState<string | null>(null);
   const { toast } = useToast();
 
   const fetchTickets = async (sprintId?: string) => {
@@ -38,7 +39,17 @@ export const useTickets = (
 
     try {
       console.log(`Fetching tickets for sprint ID: ${sprintToUse} in project ID: ${selectedProject.id}`);
-      const result = await fetchJiraTickets(credentials, sprintToUse, selectedProject, 0, 20);
+      const result = await fetchJiraTickets(
+        credentials, 
+        sprintToUse, 
+        selectedProject, 
+        0, 
+        50, 
+        { 
+          type: ticketTypeFilter, 
+          status: ticketStatusFilter 
+        }
+      );
       
       console.log(`Found ${result.tickets.length} tickets for sprint ID: ${sprintToUse}`);
       setTickets(result.tickets);
@@ -64,6 +75,8 @@ export const useTickets = (
     setSelectedTicket,
     fetchTickets,
     ticketTypeFilter,
-    setTicketTypeFilter
+    setTicketTypeFilter,
+    ticketStatusFilter,
+    setTicketStatusFilter
   };
 };
