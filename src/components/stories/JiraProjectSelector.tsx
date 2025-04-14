@@ -15,11 +15,13 @@ import {
   CalendarX, 
   Loader2,
   CheckCircle2,
-  RefreshCw
+  RefreshCw,
+  ExternalLink
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface JiraProjectSelectorProps {
   lastRefreshTime?: Date | null;
@@ -31,6 +33,7 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
   const { 
     projects, 
     sprints,
+    tickets,
     selectedProject, 
     selectedSprint,
     setSelectedProject, 
@@ -44,7 +47,8 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     isLoadingMoreProjects,
     fetchMoreProjects,
     fetchAllProjectsAtOnce,
-    apiVersion
+    apiVersion,
+    totalTickets
   } = useStories();
 
   const [isLoadingSprints, setIsLoadingSprints] = useState(false);
@@ -116,8 +120,24 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     await fetchAllProjectsAtOnce();
   };
 
+  const openJiraProject = () => {
+    if (!selectedProject?.domain || !selectedProject?.key) return;
+    
+    const jiraUrl = `${selectedProject.domain}/browse/${selectedProject.key}`;
+    window.open(jiraUrl, '_blank', 'noopener,noreferrer');
+  };
+
   // Get sprints for the selected project
   const projectSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
+  
+  // Remove duplicate sprints (based on sprint ID)
+  const uniqueSprints = projectSprints.reduce((acc, sprint) => {
+    const exists = acc.find(s => s.id === sprint.id);
+    if (!exists) {
+      acc.push(sprint);
+    }
+    return acc;
+  }, [] as typeof projectSprints);
 
   // Get a color and icon based on sprint state
   const getSprintStateProps = (state: string) => {
@@ -140,9 +160,9 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
     }
     if (stateStr === 'closed') {
       return { 
-        icon: <CalendarX className="h-4 w-4 text-gray-500" />, 
+        icon: <CalendarX className="h-4 w-4 text-red-500" />, 
         text: '(closed)',
-        badge: <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400 ml-2">Closed</Badge>
+        badge: <Badge className="bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400 ml-2">Closed</Badge>
       };
     }
     return { 
@@ -166,7 +186,29 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
       
       <div className="space-y-4">
         <div className="space-y-2">
-          <label className="block text-sm font-medium text-muted-foreground">Project</label>
+          <div className="flex justify-between items-center">
+            <label className="block text-sm font-medium text-muted-foreground">Project</label>
+            
+            {selectedProject && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-6 w-6" 
+                      onClick={openJiraProject}
+                    >
+                      <ExternalLink className="h-4 w-4 text-blue-500" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Open in Jira</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           
           {projectsLoading && projects.length === 0 ? (
             <Skeleton className="h-10 w-full" />
@@ -256,14 +298,16 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
                   <SelectValue placeholder="Select sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  {projectSprints.map((sprint) => {
+                  {uniqueSprints.map((sprint) => {
                     const { icon, badge } = getSprintStateProps(sprint.state);
                     return (
                       <SelectItem key={sprint.id} value={sprint.id}>
-                        <div className="flex items-center">
-                          {icon}
-                          <span className="ml-2">{sprint.name}</span>
-                          {badge}
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center">
+                            {icon}
+                            <span className="ml-2">{sprint.name}</span>
+                            {badge}
+                          </div>
                         </div>
                       </SelectItem>
                     );
@@ -271,9 +315,16 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({
                 </SelectContent>
               </Select>
               
-              {selectedProject && projectSprints.length === 0 && !sprintsLoading && !isLoadingSprints && (
+              {selectedProject && uniqueSprints.length === 0 && !sprintsLoading && !isLoadingSprints && (
                 <div className="text-xs text-muted-foreground mt-1">
                   No sprints found for this project
+                </div>
+              )}
+              
+              {selectedSprint && (
+                <div className="text-xs text-muted-foreground mt-1">
+                  {tickets.length} {tickets.length === 1 ? 'ticket' : 'tickets'} loaded
+                  {totalTickets > tickets.length && ` (of ${totalTickets} total)`}
                 </div>
               )}
               

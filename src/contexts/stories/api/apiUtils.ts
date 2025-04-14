@@ -218,3 +218,57 @@ export const testJiraConnection = async (credentials: JiraCredentials): Promise<
   }
 };
 
+// Function to sanitize content for React rendering
+// This prevents "Objects are not valid as a React child" errors
+export const sanitizeContentForReact = (content: any): string => {
+  if (content === null || content === undefined) {
+    return '';
+  }
+  
+  if (typeof content === 'string') {
+    return content;
+  }
+  
+  if (typeof content === 'object') {
+    // Check if it's an object with type, version, content structure (Jira custom format)
+    if (content.type && content.version && content.content) {
+      try {
+        // Extract plain text from Jira's Atlassian Document Format
+        let plainText = '';
+        const extractText = (items: any[]) => {
+          if (!Array.isArray(items)) return;
+          items.forEach(item => {
+            if (item.type === 'paragraph' && item.content) {
+              extractText(item.content);
+              plainText += '\n\n';
+            } else if (item.type === 'text' && item.text) {
+              plainText += item.text;
+            } else if (item.type === 'bulletList' && item.content) {
+              extractText(item.content);
+            } else if (item.type === 'listItem' && item.content) {
+              plainText += '- ';
+              extractText(item.content);
+            } else if (item.content && Array.isArray(item.content)) {
+              extractText(item.content);
+            }
+          });
+        };
+        
+        extractText(content.content);
+        return plainText.trim();
+      } catch (e) {
+        console.error('Error extracting text from Atlassian Document Format:', e);
+        return JSON.stringify(content);
+      }
+    }
+    
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch (e) {
+      console.error('Error stringifying object:', e);
+      return '[Complex object]';
+    }
+  }
+  
+  return String(content);
+};

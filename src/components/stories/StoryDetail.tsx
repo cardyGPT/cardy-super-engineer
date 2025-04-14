@@ -1,190 +1,206 @@
 
-import React, { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useStories } from "@/contexts/StoriesContext";
-import { JiraTicket, ProjectContextData } from "@/types/jira";
-import { supabase } from "@/lib/supabase";
-import ContentDisplay from "./ContentDisplay";
-import StoryDetailEmpty from "./StoryDetailEmpty";
-import StoryHeader from "./StoryHeader";
-import StoryOverview from "./StoryOverview";
-import LoadingContent from "./LoadingContent";
-import StoryTabContent from "./StoryTabContent";
-import { useArtifacts } from "./hooks/useArtifacts";
+import React from 'react';
+import { useStories } from '@/contexts/StoriesContext';
+import { JiraTicket } from '@/types/jira';
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, CalendarClock, Check, Clock, ExternalLink, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { sanitizeContentForReact } from '@/contexts/stories/api';
 
 interface StoryDetailProps {
-  ticket: JiraTicket | null;
-  projectContext?: string | null;
-  selectedDocuments?: string[];
-  projectContextData?: ProjectContextData | null;
+  ticket: JiraTicket;
+  isLoading?: boolean;
 }
 
-const StoryDetail: React.FC<StoryDetailProps> = ({ 
-  ticket, 
-  projectContext, 
-  selectedDocuments = [],
-  projectContextData = null
-}) => {
-  const { generateContent, pushToJira } = useStories();
-  const [activeTab, setActiveTab] = useState("overview");
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  
-  const {
-    lldContent,
-    codeContent,
-    testContent,
-    isLldGenerated,
-    isCodeGenerated,
-    isTestsGenerated,
-    checkExistingArtifacts
-  } = useArtifacts(ticket);
-
-  // Check if artifacts already exist when ticket changes
-  useEffect(() => {
-    if (ticket) {
-      checkExistingArtifacts();
-    }
-  }, [ticket, checkExistingArtifacts]);
-
-  const handleGenerateLLD = async () => {
-    if (!ticket) return;
-    await generateContentWithType('lld', 'lld');
-  };
-
-  const handleGenerateCode = async () => {
-    if (!ticket) return;
-    await generateContentWithType('code', 'code');
-  };
-
-  const handleGenerateTests = async () => {
-    if (!ticket) return;
-    await generateContentWithType('tests', 'tests');
-  };
-
-  const handleGenerateAll = async () => {
-    if (!ticket) return;
-    await generateContentWithType('all', 'lld');
-  };
-
-  const generateContentWithType = async (type: 'lld' | 'code' | 'tests' | 'all', tabToActivate: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await generateContent({
-        type,
-        jiraTicket: ticket,
-        projectContext,
-        selectedDocuments
-      });
-      
-      if (response) {
-        setActiveTab(tabToActivate);
-        // Force refresh artifacts after generation
-        await checkExistingArtifacts();
-      }
-    } catch (err: any) {
-      console.error(`Error generating ${type}:`, err);
-      setError(err.message || `Failed to generate ${type}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openTicketInJira = () => {
-    if (!ticket || !ticket.domain) return;
-    
-    const url = `${ticket.domain}/browse/${ticket.key}`;
-    window.open(url, '_blank');
-  };
-
-  // Wrapper function for pushToJira to match the expected signature in ContentDisplay
-  const handlePushToJira = (content: string) => {
-    if (!ticket || !ticket.key) return Promise.resolve(false);
-    return pushToJira(ticket.key, content);
-  };
-
-  if (!ticket) {
-    return <StoryDetailEmpty />;
+const StoryDetail: React.FC<StoryDetailProps> = ({ ticket, isLoading = false }) => {
+  if (isLoading) {
+    return <StoryDetailSkeleton />;
   }
 
   return (
-    <div className="space-y-4">
-      <Card className="w-full h-fit">
-        <CardHeader>
-          <StoryHeader 
-            ticket={ticket}
-            isLldGenerated={isLldGenerated}
-            isCodeGenerated={isCodeGenerated}
-            isTestsGenerated={isTestsGenerated}
-            onOpenInJira={openTicketInJira}
-          />
-        </CardHeader>
-        <CardContent>
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="mb-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="lld" disabled={!isLldGenerated && !loading}>LLD</TabsTrigger>
-              <TabsTrigger value="code" disabled={!isCodeGenerated && !loading}>Code</TabsTrigger>
-              <TabsTrigger value="tests" disabled={!isTestsGenerated && !loading}>Tests</TabsTrigger>
-            </TabsList>
-            
-            <TabsContent value="overview">
-              <StoryOverview
-                ticket={ticket}
-                loading={loading}
-                error={error}
-                isLldGenerated={isLldGenerated}
-                isCodeGenerated={isCodeGenerated}
-                isTestsGenerated={isTestsGenerated}
-                projectContextData={projectContextData}
-                onGenerateLLD={handleGenerateLLD}
-                onGenerateCode={handleGenerateCode}
-                onGenerateTests={handleGenerateTests}
-                onGenerateAll={handleGenerateAll}
-              />
-            </TabsContent>
-            
-            <StoryTabContent 
-              tabId="lld"
-              title="Low Level Design"
-              content={lldContent}
-              contentType="lld"
-              loading={loading}
-              ticket={ticket}
-              onPushToJira={handlePushToJira}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-            />
-            
-            <StoryTabContent 
-              tabId="code"
-              title="Implementation Code"
-              content={codeContent}
-              contentType="code"
-              loading={loading}
-              ticket={ticket}
-              onPushToJira={handlePushToJira}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-            />
-            
-            <StoryTabContent 
-              tabId="tests"
-              title="Test Cases"
-              content={testContent}
-              contentType="tests"
-              loading={loading}
-              ticket={ticket}
-              onPushToJira={handlePushToJira}
-              projectContext={projectContext}
-              selectedDocuments={selectedDocuments}
-            />
-          </Tabs>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      <StoryHeader ticket={ticket} />
+      <StoryContent ticket={ticket} />
+    </div>
+  );
+};
+
+const StoryHeader: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
+  // Get external URL for the ticket
+  const getJiraTicketUrl = () => {
+    if (!ticket.domain || !ticket.key) return '#';
+    return `${ticket.domain}/browse/${ticket.key}`;
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          <h3 className="text-lg font-semibold text-primary">
+            {ticket.key}
+          </h3>
+          {ticket.issuetype?.name && (
+            <Badge variant="outline">
+              {ticket.issuetype.name}
+            </Badge>
+          )}
+        </div>
+        
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => window.open(getJiraTicketUrl(), '_blank')}
+          className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+        >
+          <ExternalLink className="h-4 w-4 mr-1" />
+          View in Jira
+        </Button>
+      </div>
+      
+      <h2 className="text-2xl font-bold">
+        {ticket.summary}
+      </h2>
+      
+      <div className="flex flex-wrap gap-2 pt-1">
+        {ticket.status && (
+          <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">
+            {ticket.status}
+          </Badge>
+        )}
+        
+        {ticket.priority && (
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300">
+            Priority: {ticket.priority}
+          </Badge>
+        )}
+        
+        {ticket.story_points > 0 && (
+          <Badge variant="outline" className="border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-300">
+            {ticket.story_points} points
+          </Badge>
+        )}
+      </div>
+      
+      <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+        {ticket.assignee && (
+          <div className="flex items-center">
+            <User className="h-4 w-4 mr-1" />
+            {ticket.assignee}
+          </div>
+        )}
+        
+        {ticket.created_at && (
+          <div className="flex items-center">
+            <CalendarClock className="h-4 w-4 mr-1" />
+            Created: {new Date(ticket.created_at).toLocaleDateString()}
+          </div>
+        )}
+        
+        {ticket.updated_at && (
+          <div className="flex items-center">
+            <Clock className="h-4 w-4 mr-1" />
+            Updated: {new Date(ticket.updated_at).toLocaleDateString()}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const StoryContent: React.FC<{ ticket: JiraTicket }> = ({ ticket }) => {
+  const fixedDescription = sanitizeContentForReact(ticket.description);
+  const fixedAcceptanceCriteria = sanitizeContentForReact(ticket.acceptance_criteria);
+  
+  return (
+    <div className="space-y-6">
+      {fixedDescription ? (
+        <div className="space-y-2">
+          <h3 className="text-md font-semibold flex items-center">
+            <Check className="h-4 w-4 mr-2 text-green-500" />
+            Description
+          </h3>
+          <div className="text-sm bg-muted/50 p-4 rounded-md whitespace-pre-wrap">
+            {fixedDescription}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="text-md font-semibold flex items-center">
+            <AlertCircle className="h-4 w-4 mr-2 text-amber-500" />
+            Description
+          </h3>
+          <div className="text-sm text-muted-foreground italic">
+            No description provided
+          </div>
+        </div>
+      )}
+      
+      {fixedAcceptanceCriteria ? (
+        <div className="space-y-2">
+          <h3 className="text-md font-semibold flex items-center">
+            <Check className="h-4 w-4 mr-2 text-green-500" />
+            Acceptance Criteria
+          </h3>
+          <div className="text-sm bg-muted/50 p-4 rounded-md whitespace-pre-wrap">
+            {fixedAcceptanceCriteria}
+          </div>
+        </div>
+      ) : null}
+      
+      {ticket.labels && ticket.labels.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-md font-semibold">Labels</h3>
+          <div className="flex flex-wrap gap-2">
+            {ticket.labels.map((label, index) => (
+              <Badge key={index} variant="outline">{label}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {ticket.epicInfo && (
+        <div className="space-y-2">
+          <h3 className="text-md font-semibold">Epic</h3>
+          <div className="text-sm bg-muted/50 p-4 rounded-md">
+            {typeof ticket.epicInfo === 'string' 
+              ? ticket.epicInfo 
+              : JSON.stringify(ticket.epicInfo)}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StoryDetailSkeleton: React.FC = () => {
+  return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-6 w-20" />
+          <Skeleton className="h-8 w-24" />
+        </div>
+        <Skeleton className="h-8 w-full" />
+        <div className="flex gap-2">
+          <Skeleton className="h-5 w-16" />
+          <Skeleton className="h-5 w-24" />
+        </div>
+        <div className="flex gap-4">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-4 w-32" />
+        </div>
+      </div>
+      
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-32 w-full" />
+      </div>
+      
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-36" />
+        <Skeleton className="h-24 w-full" />
+      </div>
     </div>
   );
 };

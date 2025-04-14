@@ -5,7 +5,8 @@ export {
   DEV_MODE, 
   saveGeneratedContent, 
   ensureString,
-  testJiraConnection
+  testJiraConnection,
+  sanitizeContentForReact
 } from './apiUtils';
 
 export { 

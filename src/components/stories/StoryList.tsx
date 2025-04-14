@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, AlertCircle, Filter } from "lucide-react";
+import { Search, AlertCircle, Filter, Loader2 } from "lucide-react";
 import { useStories } from '@/contexts/StoriesContext';
 import { JiraTicket } from '@/types/jira';
 import LoadingContent from './LoadingContent';
@@ -25,7 +25,8 @@ const StoryList: React.FC = () => {
     setTicketStatusFilter,
     hasMore,
     loadingMore,
-    fetchMoreTickets
+    fetchMoreTickets,
+    totalTickets
   } = useStories();
   
   const [selectedTicketIds, setSelectedTicketIds] = useState<Set<string>>(new Set());
@@ -182,17 +183,24 @@ const StoryList: React.FC = () => {
   };
   
   return (
-    <Card className="overflow-hidden h-full">
+    <Card className="overflow-hidden">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg flex items-center justify-between">
           <span>Stories</span>
-          {filteredTickets.length > 0 && (
-            <Badge variant="outline" className="ml-2">
-              {filteredTickets.length} 
-              {ticketTypeFilter ? ` ${ticketTypeFilter}` : ' tickets'}
-              {ticketStatusFilter ? ` (${ticketStatusFilter})` : ''}
-            </Badge>
-          )}
+          <div className="flex items-center space-x-2">
+            {filteredTickets.length > 0 && (
+              <Badge variant="outline" className="ml-2">
+                {filteredTickets.length} 
+                {ticketTypeFilter ? ` ${ticketTypeFilter}` : ' tickets'}
+                {ticketStatusFilter ? ` (${ticketStatusFilter})` : ''}
+              </Badge>
+            )}
+            {totalTickets > tickets.length && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                {tickets.length} of {totalTickets} loaded
+              </Badge>
+            )}
+          </div>
         </CardTitle>
         
         <div className="space-y-3">
@@ -270,7 +278,7 @@ const StoryList: React.FC = () => {
             )}
           </div>
         ) : (
-          <div className="max-h-[550px] overflow-y-auto" ref={listRef}>
+          <div className="max-h-[500px] overflow-y-auto" ref={listRef}>
             <div className="divide-y">
               {filteredTickets.map((ticket: JiraTicket, index: number) => (
                 <div
@@ -338,7 +346,7 @@ const StoryList: React.FC = () => {
             {loadingMore && (
               <div className="p-3 text-center">
                 <span className="flex items-center justify-center text-sm text-muted-foreground">
-                  <span className="h-4 w-4 border-2 border-b-transparent border-t-current border-l-current border-r-current rounded-full inline-block animate-spin mr-2"></span>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   Loading more stories...
                 </span>
               </div>
