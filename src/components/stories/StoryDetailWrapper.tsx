@@ -1,13 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useStories } from '@/contexts/StoriesContext';
-import StoryDetailEmpty from './StoryDetailEmpty';
 import StoryDetail from './StoryDetail';
-import { Tab, TabList, TabPanel, Tabs, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectContextData } from '@/types/jira';
-import StoryTabContent from './StoryTabContent';
-import StoryGenerateContent from './generate-content/StoryGenerateContent';
-import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface StoryDetailWrapperProps {
   projectContext?: string | null;
@@ -15,107 +13,38 @@ interface StoryDetailWrapperProps {
   projectContextData?: ProjectContextData | null;
 }
 
-const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
-  projectContext,
-  selectedDocuments,
-  projectContextData
+const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({ 
+  projectContext = null, 
+  selectedDocuments = [],
+  projectContextData = null
 }) => {
-  const { 
-    selectedTicket, 
-    generateContent, 
-    pushToJira, 
-    generatedContent, 
-    contentLoading 
-  } = useStories();
-  
-  const [activeTab, setActiveTab] = useState("overview");
-  
-  const {
-    lldContent,
-    codeContent,
-    testContent,
-    testCasesContent,
-    loading: artifactsLoading,
-    refreshArtifacts
-  } = useJiraArtifacts(selectedTicket);
-  
-  // When a ticket is selected, default to overview tab
-  useEffect(() => {
-    if (selectedTicket) {
-      setActiveTab("overview");
-    }
-  }, [selectedTicket?.id]);
-  
-  const handleGenerate = async () => {
-    if (!selectedTicket) return;
-    
-    try {
-      await generateContent({
-        type: 'lld',
-        jiraTicket: selectedTicket,
-        projectContext: projectContext || undefined,
-        selectedDocuments: selectedDocuments || []
-      });
-    } catch (error) {
-      console.error("Error generating content:", error);
-    }
-  };
-  
-  const handlePushToJira = async (content: string) => {
-    if (!selectedTicket) return false;
-    
-    try {
-      return await pushToJira(selectedTicket.id, content);
-    } catch (error) {
-      console.error("Error pushing to Jira:", error);
-      return false;
-    }
-  };
-  
+  const { selectedTicket } = useStories();
+
   if (!selectedTicket) {
-    return <StoryDetailEmpty />;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Story Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Select a story to view details
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
   }
-  
-  const existingArtifacts = {
-    lldContent,
-    codeContent,
-    testContent,
-    testCasesContent
-  };
-  
+
   return (
-    <div className="bg-white rounded-lg border shadow-sm">
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="border-b px-2">
-          <TabList className="flex">
-            <TabsTrigger value="overview" className="flex-1 py-3">
-              Overview
-            </TabsTrigger>
-            <TabsTrigger value="generate" className="flex-1 py-3">
-              Generate
-            </TabsTrigger>
-          </TabList>
-        </div>
-        
-        <TabPanel value="overview" className="p-4">
-          <StoryDetail ticket={selectedTicket} />
-        </TabPanel>
-        
-        <TabPanel value="generate" className="p-4">
-          <StoryGenerateContent 
-            ticket={selectedTicket}
-            projectContext={projectContext}
-            selectedDocuments={selectedDocuments}
-            projectContextData={projectContextData}
-            onGenerate={generateContent}
-            onPushToJira={pushToJira}
-            generatedContent={generatedContent}
-            isGenerating={contentLoading}
-            existingArtifacts={existingArtifacts}
-          />
-        </TabPanel>
-      </Tabs>
-    </div>
+    <StoryDetail 
+      ticket={selectedTicket}
+      projectContext={projectContext} 
+      selectedDocuments={selectedDocuments}
+      projectContextData={projectContextData}
+    />
   );
 };
 

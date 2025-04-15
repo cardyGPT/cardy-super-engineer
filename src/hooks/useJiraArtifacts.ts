@@ -44,7 +44,7 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
       console.log(`Fetching artifacts for ticket: ${ticket.key}`);
       
       const { data, error } = await supabase
-        .from('ticket_artifacts')
+        .from('story_artifacts')
         .select('*')
         .eq('story_id', ticket.key)
         .maybeSingle();

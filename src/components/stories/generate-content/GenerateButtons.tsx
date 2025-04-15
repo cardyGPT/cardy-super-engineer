@@ -36,7 +36,7 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
     if (isGenerating && generatingContentType !== type) return true;
     if (isGeneratingAll) return true;
     
-    // Enforce generation sequence: LLD → Code → Test Cases → Tests
+    // Enforce generation sequence
     if (type === 'code' && !hasLldContent) return true;
     if (type === 'testcases' && !hasLldContent) return true;
     if (type === 'tests' && !hasCodeContent) return true;
@@ -75,7 +75,6 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
   return (
     <TooltipProvider>
       <div className="flex flex-wrap gap-2">
-        {/* LLD Generation Button - First in sequence */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -98,7 +97,6 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
           </TooltipContent>
         </Tooltip>
         
-        {/* Code Generation Button - Second in sequence */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -121,7 +119,6 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
           </TooltipContent>
         </Tooltip>
         
-        {/* Test Cases Generation Button - Third in sequence */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -144,7 +141,6 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
           </TooltipContent>
         </Tooltip>
         
-        {/* Tests Generation Button - Fourth in sequence */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -163,11 +159,10 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
           </TooltipTrigger>
           <TooltipContent>
             <p>{hasTestsContent ? 'Regenerate Tests' : 'Generate Tests'}</p>
-            <p className="text-xs text-muted-foreground">Step 4: Playwright Tests</p>
+            <p className="text-xs text-muted-foreground">Step 4: Unit Tests</p>
           </TooltipContent>
         </Tooltip>
         
-        {/* Generate All Button */}
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

@@ -173,7 +173,7 @@ export type Database = {
         }
         Relationships: []
       }
-      ticket_artifacts: {
+      story_artifacts: {
         Row: {
           code_content: string | null
           created_at: string

@@ -6,13 +6,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import ContentDisplay, { ContentType } from './ContentDisplay';
 import LoadingContent from './LoadingContent';
-import { Loader2 } from "lucide-react";
+import { FileDown, Send, Github, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import ExportToGSuite from './ExportToGSuite';
+import { Button } from "@/components/ui/button";
 import { getContentByType } from './generate-content/utils';
 import ContentTabs from './generate-content/ContentTabs';
-import ContentActions from './generate-content/ContentActions';
 
 interface StoryTabContentProps {
   ticket: JiraTicket;
@@ -136,37 +137,75 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
   
   return (
     <div className="space-y-4">
-      <Card className="border rounded-md overflow-hidden shadow-sm">
-        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as ContentType)}>
-          <div className="flex justify-between items-center border-b px-4 py-2">
-            <ContentTabs
-              activeTab={activeContent}
-              onChange={(value) => setActiveContent(value)}
-              hasLldContent={!!getContentByType(generatedContent, 'lld')}
-              hasCodeContent={!!getContentByType(generatedContent, 'code')}
-              hasTestsContent={!!getContentByType(generatedContent, 'tests')}
-              hasTestCasesContent={!!getContentByType(generatedContent, 'testcases')}
-            />
-            
-            <ContentActions 
-              activeTab={activeContent}
-              content={getContentByType(generatedContent, activeContent)}
-              isExporting={isExporting}
-              isPushingToJira={isPushingToJira}
-              onExportPDF={exportToPDF}
-              onPushToJira={handlePushToJira}
-              storyId={ticket.id}
-              storyKey={ticket.key}
-            />
-          </div>
-          
-          <CardContent className="p-6" ref={contentRef}>
-            <ContentDisplay 
-              content={getContentByType(generatedContent, activeContent)} 
-              contentType={activeContent} 
-            />
-          </CardContent>
+      <div className="flex justify-between items-center">
+        <Tabs value={activeContent} onValueChange={(value) => setActiveContent(value as ContentType)} className="w-full">
+          <ContentTabs
+            activeTab={activeContent}
+            onChange={(value) => setActiveContent(value)}
+            hasLldContent={!!getContentByType(generatedContent, 'lld')}
+            hasCodeContent={!!getContentByType(generatedContent, 'code')}
+            hasTestsContent={!!getContentByType(generatedContent, 'tests')}
+            hasTestCasesContent={!!getContentByType(generatedContent, 'testcases')}
+          />
         </Tabs>
+        
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportToPDF}
+            disabled={isExporting || !getContentByType(generatedContent, activeContent)}
+            className="h-9"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <FileDown className="h-4 w-4 mr-1" />
+            )}
+            PDF
+          </Button>
+          
+          <ExportToGSuite
+            storyId={ticket.id}
+            storyKey={ticket.key}
+            content={getContentByType(generatedContent, activeContent)}
+            contentType={activeContent}
+          />
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePushToJira}
+            disabled={isPushingToJira || !getContentByType(generatedContent, activeContent)}
+            className="h-9"
+          >
+            {isPushingToJira ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4 mr-1" />
+            )}
+            Jira
+          </Button>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={true}
+            className="h-9"
+          >
+            <Github className="h-4 w-4 mr-1" />
+            Bitbucket
+          </Button>
+        </div>
+      </div>
+      
+      <Card className="border rounded-md overflow-hidden shadow-sm">
+        <CardContent className="p-6" ref={contentRef}>
+          <ContentDisplay 
+            content={getContentByType(generatedContent, activeContent)} 
+            contentType={activeContent} 
+          />
+        </CardContent>
       </Card>
     </div>
   );
