@@ -98,8 +98,8 @@ Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
       ticketContext += `\n\nPreviously Generated Code:\n${safeStringify(additionalContext.codeContent)}`;
     }
     
-    if (additionalContext?.testContent && type === 'testcases') {
-      ticketContext += `\n\nPreviously Generated Tests:\n${safeStringify(additionalContext.testContent)}`;
+    if (additionalContext?.testCasesContent && type === 'tests') {
+      ticketContext += `\n\nPreviously Generated Test Cases:\n${safeStringify(additionalContext.testCasesContent)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info
@@ -146,7 +146,17 @@ Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
 Based on the Jira ticket information, create a comprehensive low-level design document.
 Include component breakdowns, data models, API endpoints, sequence diagrams, error handling, and security considerations.
 Format everything properly in markdown with clear headings, code blocks, and diagrams.
-Your response should be detailed, structured, and directly usable in a technical documentation system.`;
+Your response should be detailed, structured, and directly usable in a technical documentation system.
+
+Format your response with these sections:
+1. Overview
+2. Component Breakdown
+3. Data Models
+4. API Endpoints
+5. Sequence Diagrams
+6. Error Handling
+7. Security Considerations
+8. Implementation Notes`;
     } 
     else if (type === 'code') {
       systemPrompt = `You are an expert software developer specializing in AngularJS (frontend), NodeJS (backend), and PostgreSQL.
@@ -154,21 +164,44 @@ Based on the Jira ticket information and the Low-Level Design document provided,
 Include all necessary components, services, and utility functions.
 Structure your code following best practices, with clear comments and error handling.
 Format everything properly in markdown with appropriate syntax highlighting.
-Your code should be complete, well-structured, and ready for review.`;
+Your code should be complete, well-structured, and ready for review.
+
+Format your response with these sections:
+1. Implementation Overview
+2. Component Code
+3. Service Code
+4. Utility Functions
+5. Database Queries
+6. Integration Points`;
     } 
     else if (type === 'tests') {
       systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
 Based on the Jira ticket information, previously generated Low-Level Design, and implementation code, create comprehensive test code using Playwright.
 Include unit tests, integration tests, end-to-end tests, edge cases, and performance test considerations.
 Format everything properly in markdown with clear test scenarios and expected results.
-Your tests should be thorough, covering all aspects of the functionality described in the ticket and implementation.`;
+Your tests should be thorough, covering all aspects of the functionality described in the ticket and implementation.
+
+Format your response with these sections:
+1. Testing Strategy
+2. Unit Tests
+3. Integration Tests
+4. End-to-End Tests
+5. Edge Cases
+6. Performance Tests`;
     } 
     else if (type === 'testcases') {
       systemPrompt = `You are an expert in software testing with experience in quality assurance and test case design.
 Based on the Jira ticket information, Low-Level Design document, and other available context, create a comprehensive set of test cases that could be executed manually.
 Include positive tests, negative tests, edge cases, and user experience tests.
 Format everything properly in markdown with clear test steps, expected results, and preconditions.
-Your test cases should be thorough, covering all aspects of the functionality described in the ticket.`;
+Your test cases should be thorough, covering all aspects of the functionality described in the ticket.
+
+Format your response with these sections:
+1. Test Strategy
+2. Positive Test Cases
+3. Negative Test Cases
+4. Edge Cases
+5. User Experience Test Cases`;
     }
     else {
       systemPrompt = `You are an expert software development assistant.
@@ -204,7 +237,7 @@ Your response should be detailed, structured and directly usable by the developm
                 'response'
               } based on this Jira ticket information.${
                 type !== 'lld' ? ' Make sure to utilize the previously generated artifacts in your response.' : ''
-              }`
+              }\n\nEnsure your response is well-structured with clear headings, proper code formatting, and follows the requested format structure.`
             }
           ],
           temperature: 0.5,
@@ -226,7 +259,7 @@ Your response should be detailed, structured and directly usable by the developm
           console.log(`Saving ${type} content for ticket ${jiraTicket.key}`);
           
           const { data: existingData, error: checkError } = await supabase
-            .from('story_artifacts')
+            .from('ticket_artifacts')
             .select('*')
             .eq('story_id', jiraTicket.key)
             .maybeSingle();
@@ -251,7 +284,7 @@ Your response should be detailed, structured and directly usable by the developm
           if (existingData) {
             // Update existing record
             const { error: updateError } = await supabase
-              .from('story_artifacts')
+              .from('ticket_artifacts')
               .update(updateData)
               .eq('id', existingData.id);
               
@@ -261,7 +294,7 @@ Your response should be detailed, structured and directly usable by the developm
           } else {
             // Insert new record
             const { error: insertError } = await supabase
-              .from('story_artifacts')
+              .from('ticket_artifacts')
               .insert(updateData);
               
             if (insertError) {

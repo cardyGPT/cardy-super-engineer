@@ -32,14 +32,34 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
 }) => {
   // Determine if a button should be disabled based on the generation sequence
   const isDisabled = (type: ContentType) => {
-    // If we're generating anything, disable all buttons except the current one
+    // If we're generating anything, disable all buttons except the one that's generating
     if (isGenerating && generatingContentType !== type) return true;
+    
+    // If we're generating all, disable all buttons
     if (isGeneratingAll) return true;
     
-    // Enforce generation sequence
-    if (type === 'code' && !hasLldContent) return true;
-    if (type === 'testcases' && !hasLldContent) return true;
-    if (type === 'tests' && !hasCodeContent) return true;
+    // Enforce the generation sequence: LLD → Code → Test Cases → Tests
+    // Only one button should be enabled at a time based on the current state
+    
+    if (type === 'lld') {
+      // LLD is always available (unless something is generating)
+      return false;
+    }
+    
+    if (type === 'code') {
+      // Code can only be generated after LLD
+      return !hasLldContent;
+    }
+    
+    if (type === 'testcases') {
+      // Test cases can only be generated after Code
+      return !hasCodeContent;
+    }
+    
+    if (type === 'tests') {
+      // Tests can only be generated after Test Cases
+      return !hasTestCasesContent;
+    }
     
     return false;
   };

@@ -9,6 +9,7 @@ import {
 } from '@/types/jira';
 import { generateJiraContent, pushContentToJira } from '../api';
 import { supabase } from '@/lib/supabase';
+import { ContentType } from '@/components/stories/ContentDisplay';
 
 export const useContentGeneration = (
   credentials: JiraCredentials | null, 
@@ -54,7 +55,7 @@ export const useContentGeneration = (
   };
 
   const saveContentToDatabase = async (
-    contentType: 'lld' | 'code' | 'tests' | 'testcases',
+    contentType: ContentType,
     content: string
   ): Promise<boolean> => {
     if (!selectedTicket || !content) {
@@ -66,7 +67,7 @@ export const useContentGeneration = (
     
     try {
       // Prepare the data for saving
-      const columnMapping = {
+      const columnMapping: Record<ContentType, string> = {
         lld: 'lld_content',
         code: 'code_content',
         tests: 'test_content',

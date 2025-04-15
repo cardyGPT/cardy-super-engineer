@@ -12,7 +12,7 @@ import ContentTabs from './ContentTabs';
 import ContentActions from './ContentActions';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Loader2 } from "lucide-react";
 import { useStories } from '@/contexts/StoriesContext';
 
 interface ExistingArtifacts {
@@ -91,36 +91,24 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     combinedContent.testCasesContent
   );
   
+  // Get the status message based on the content type being generated
+  const getStatusMessage = (type: ContentType): string => {
+    switch (type) {
+      case 'lld':
+        return '🛠️ Low-Level Design in progress...\nWe\'re generating the LLD based on your story, project context, and existing artifacts. This will guide the next steps in your development flow.';
+      case 'code':
+        return '💻 Code is being generated...\nWe\'re translating your LLD into clean, production-ready code. All best practices and relevant patterns from the project context are being applied.';
+      case 'testcases':
+        return '🧪 Writing test cases...\nWe\'re creating test cases that align with your code and business logic. These help ensure every scenario is accounted for before automation.';
+      case 'tests':
+        return '🎭 Generating Playwright tests...\nNow turning your test cases into end-to-end Playwright tests. These will simulate real user interactions and validate your application from the browser.';
+      default:
+        return 'Generating content...';
+    }
+  };
+  
   const handleGenerate = async (type: ContentType) => {
     try {
-      // Check dependencies for generation process
-      if (type === 'code' && !combinedContent.lldContent) {
-        toast({
-          title: "Missing LLD",
-          description: "Please generate an LLD first before generating code.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (type === 'tests' && !combinedContent.codeContent) {
-        toast({
-          title: "Missing Code",
-          description: "Please generate code first before generating tests.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
-      if (type === 'testcases' && !combinedContent.lldContent) {
-        toast({
-          title: "Missing LLD",
-          description: "Please generate an LLD first before generating test cases.",
-          variant: "destructive",
-        });
-        return;
-      }
-      
       // Set which content type is being generated
       setGeneratingContentType(type);
       
@@ -148,19 +136,18 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           };
         }
         
-        if (type === 'testcases') {
-          if (combinedContent.codeContent) {
-            request.additionalContext = {
-              ...request.additionalContext,
-              codeContent: combinedContent.codeContent
-            };
-          }
-          if (combinedContent.testContent) {
-            request.additionalContext = {
-              ...request.additionalContext,
-              testContent: combinedContent.testContent
-            };
-          }
+        if (type === 'testcases' && combinedContent.codeContent) {
+          request.additionalContext = {
+            ...request.additionalContext,
+            codeContent: combinedContent.codeContent
+          };
+        }
+        
+        if (type === 'tests' && combinedContent.testCasesContent) {
+          request.additionalContext = {
+            ...request.additionalContext,
+            testCasesContent: combinedContent.testCasesContent
+          };
         }
       }
       
@@ -190,6 +177,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       for (const type of types) {
         setGeneratingContentType(type);
+        
         const request: JiraGenerationRequest = {
           type,
           jiraTicket: ticket,
@@ -207,26 +195,20 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             };
           }
           
-          if (type === 'tests' && (combinedContent.codeContent || generatedContent?.codeContent)) {
+          if ((type === 'testcases' || type === 'tests') && 
+              (combinedContent.codeContent || generatedContent?.codeContent)) {
             request.additionalContext = {
               ...request.additionalContext,
               codeContent: combinedContent.codeContent || generatedContent?.codeContent
             };
           }
           
-          if (type === 'testcases') {
-            if (combinedContent.codeContent || generatedContent?.codeContent) {
-              request.additionalContext = {
-                ...request.additionalContext,
-                codeContent: combinedContent.codeContent || generatedContent?.codeContent
-              };
-            }
-            if (combinedContent.testContent || generatedContent?.testContent) {
-              request.additionalContext = {
-                ...request.additionalContext,
-                testContent: combinedContent.testContent || generatedContent?.testContent
-              };
-            }
+          if (type === 'tests' && 
+              (combinedContent.testCasesContent || generatedContent?.testCasesContent)) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              testCasesContent: combinedContent.testCasesContent || generatedContent?.testCasesContent
+            };
           }
         }
         
@@ -376,6 +358,28 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
 
   // Show information about existing content and generation sequence
   const renderStatusInfo = () => {
+    if (isGenerating || isGeneratingAll) {
+      return (
+        <Alert className="mb-4">
+          <div className="flex items-start">
+            <Loader2 className="h-4 w-4 mr-2 animate-spin mt-1" />
+            <div>
+              <AlertTitle>
+                {generatingContentType === 'lld' ? 'Step 1: Low-Level Design (LLD)' : 
+                 generatingContentType === 'code' ? 'Step 2: Code Generation' :
+                 generatingContentType === 'testcases' ? 'Step 3: Test Case Generation' :
+                 generatingContentType === 'tests' ? 'Step 4: Playwright Automation Tests' :
+                 'Generating Content'}
+              </AlertTitle>
+              <AlertDescription className="whitespace-pre-line">
+                {generatingContentType ? getStatusMessage(generatingContentType) : 'Generating content...'}
+              </AlertDescription>
+            </div>
+          </div>
+        </Alert>
+      );
+    }
+    
     if (!hasAnyContent) {
       return (
         <Alert className="mb-4">
