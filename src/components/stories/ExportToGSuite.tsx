@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Loader2, FileCloud } from "lucide-react";
+import { Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ContentType } from './ContentDisplay';
 import { exportToGoogleDocs } from '@/contexts/stories/api/gsuite';
@@ -67,7 +67,7 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
               {isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <FileCloud className="h-4 w-4" />
+                <FileText className="h-4 w-4" />
               )}
             </Button>
           </TooltipTrigger>
@@ -90,7 +90,7 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
       {isExporting ? (
         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
       ) : (
-        <FileCloud className="h-4 w-4 mr-1" />
+        <FileText className="h-4 w-4 mr-1" />
       )}
       Drive
     </Button>
