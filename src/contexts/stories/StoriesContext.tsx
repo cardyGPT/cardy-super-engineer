@@ -34,6 +34,9 @@ export interface StoriesContextState {
   // Generated content
   generatedContent: JiraGenerationResponse | null;
   
+  // Total tickets
+  totalTickets: number;
+  
   // Actions
   setCredentials: (creds: JiraCredentials | null) => void;
   setSelectedProject: (project: JiraProject | null) => void;
@@ -51,6 +54,9 @@ export interface StoriesContextState {
   
   // Utility
   refreshAll: () => Promise<void>;
+  fetchMoreTickets: () => Promise<void>;
+  hasMore: boolean;
+  loadingMore: boolean;
 }
 
 // Create context with undefined initial value

@@ -98,6 +98,7 @@ export const useStoriesState = (): StoriesContextState => {
   // Pagination state
   const [hasMore, setHasMore] = useState(true);
   const [startAt, setStartAt] = useState(0);
+  const [totalTickets, setTotalTickets] = useState(0);
   
   const { toast } = useToast();
 
@@ -175,13 +176,14 @@ export const useStoriesState = (): StoriesContextState => {
         sprintId, 
         selectedProject, 
         0, 
-        50, 
+        100, // Increased from 50 to 100 to load more tickets initially
         { 
           type: ticketTypeFilter, 
           status: ticketStatusFilter 
         }
       );
       setTickets(result.tickets);
+      setTotalTickets(result.total);
       setHasMore(result.tickets.length < result.total);
     } catch (err: any) {
       console.error('Error fetching Jira tickets:', err);
@@ -192,6 +194,7 @@ export const useStoriesState = (): StoriesContextState => {
         variant: "destructive",
       });
       setTickets([]);
+      setTotalTickets(0);
     } finally {
       setTicketsLoading(false);
     }
@@ -219,13 +222,14 @@ export const useStoriesState = (): StoriesContextState => {
         projectId, 
         selectedProject, 
         0, 
-        50, 
+        100, // Increased from 50 to 100 to load more tickets initially
         { 
           type: ticketTypeFilter, 
           status: ticketStatusFilter 
         }
       );
       setTickets(result.tickets);
+      setTotalTickets(result.total);
       setHasMore(result.tickets.length < result.total);
     } catch (err: any) {
       console.error('Error fetching Jira tickets:', err);
@@ -236,6 +240,7 @@ export const useStoriesState = (): StoriesContextState => {
         variant: "destructive",
       });
       setTickets([]);
+      setTotalTickets(0);
     } finally {
       setTicketsLoading(false);
     }
@@ -250,13 +255,13 @@ export const useStoriesState = (): StoriesContextState => {
     setError(null);
 
     try {
-      const newStartAt = startAt + 50;
+      const newStartAt = startAt + 100; // Increased from 50 to 100
       const result = await fetchJiraTickets(
         credentials, 
         selectedSprint.id, 
         selectedProject, 
         newStartAt, 
-        50, 
+        100, // Increased from 50 to 100
         { 
           type: ticketTypeFilter, 
           status: ticketStatusFilter 
@@ -376,7 +381,7 @@ export const useStoriesState = (): StoriesContextState => {
     searchTerm,
     
     // Extra data
-    totalTickets: tickets.length,
+    totalTickets,
     apiType,
     
     // Generated content

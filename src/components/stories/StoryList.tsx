@@ -18,9 +18,11 @@ const StoryList: React.FC = () => {
     searchTerm, 
     setSearchTerm,
     ticketTypeFilter,
+    ticketStatusFilter,
     fetchMoreTickets,
     hasMore,
-    loadingMore
+    loadingMore,
+    totalTickets
   } = useStories();
   
   const observerTarget = useRef<HTMLDivElement>(null);
@@ -34,7 +36,10 @@ const StoryList: React.FC = () => {
     const matchesType = !ticketTypeFilter || 
       (ticket.issuetype?.name.toLowerCase() === ticketTypeFilter.toLowerCase());
     
-    return matchesSearch && matchesType;
+    const matchesStatus = !ticketStatusFilter || 
+      (ticket.status?.toLowerCase() === ticketStatusFilter.toLowerCase());
+    
+    return matchesSearch && matchesType && matchesStatus;
   });
 
   // Setup intersection observer for infinite scroll
@@ -48,8 +53,8 @@ const StoryList: React.FC = () => {
   useEffect(() => {
     const observer = new IntersectionObserver(handleObserver, {
       root: null,
-      rootMargin: '0px',
-      threshold: 1.0
+      rootMargin: '20px',
+      threshold: 0.1
     });
     
     if (observerTarget.current) {
@@ -63,13 +68,29 @@ const StoryList: React.FC = () => {
     };
   }, [handleObserver]);
 
+  // Calculate the display count message
+  const getCountMessage = () => {
+    if (filteredTickets.length === 0) return '';
+    
+    if (searchTerm || ticketTypeFilter || ticketStatusFilter) {
+      return `${filteredTickets.length} filtered ${filteredTickets.length === 1 ? 'ticket' : 'tickets'}`;
+    }
+    
+    // If we're showing all tickets without filters
+    if (totalTickets && totalTickets > tickets.length) {
+      return `${tickets.length} of ${totalTickets} ${totalTickets === 1 ? 'ticket' : 'tickets'}`;
+    }
+    
+    return `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`;
+  };
+
   return (
     <Card className="shadow-sm h-[calc(100vh-13rem)]">
       <CardHeader className="pb-3">
         <div className="flex justify-between items-center">
           <CardTitle className="text-lg">Tickets</CardTitle>
           <div className="text-sm text-muted-foreground">
-            {filteredTickets.length > 0 && `${filteredTickets.length} ${filteredTickets.length === 1 ? 'ticket' : 'tickets'}`}
+            {getCountMessage()}
           </div>
         </div>
         <div className="relative">
@@ -97,9 +118,11 @@ const StoryList: React.FC = () => {
               <p className="mt-1 text-sm text-muted-foreground">
                 {ticketTypeFilter 
                   ? `No ${ticketTypeFilter} tickets found. Try changing the filter.` 
-                  : searchTerm 
-                    ? 'Try a different search term.' 
-                    : 'Select a project and sprint to load tickets.'}
+                  : ticketStatusFilter
+                    ? `No tickets with status "${ticketStatusFilter}" found. Try changing the filter.`
+                    : searchTerm 
+                      ? 'Try a different search term.' 
+                      : 'Select a project and sprint to load tickets.'}
               </p>
             </div>
           ) : (

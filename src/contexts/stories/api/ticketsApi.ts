@@ -1,4 +1,3 @@
-
 import { JiraCredentials, JiraProject, JiraTicket } from '@/types/jira';
 import { callJiraApi, DEV_MODE } from './apiUtils';
 
@@ -22,7 +21,8 @@ export const fetchJiraTickets = async (
     if (sprintIdString.startsWith && sprintIdString.startsWith('test-')) {
       if (DEV_MODE) {
         console.log('[DEV MODE] Returning test tickets for development sprint');
-        const testData = generateTestTickets(sprintIdString, selectedProject, credentials, 50);
+        // Generate more test tickets (150 instead of 50) to simulate pagination
+        const testData = generateTestTickets(sprintIdString, selectedProject, credentials, 150);
         
         // Apply filters to test data
         let filteredTestData = [...testData];
@@ -37,6 +37,7 @@ export const fetchJiraTickets = async (
           );
         }
         
+        // Return a paginated subset but with the total count of all available tickets
         return { 
           tickets: filteredTestData.slice(startAt, startAt + maxResults), 
           total: filteredTestData.length 
@@ -81,7 +82,7 @@ export const fetchJiraTickets = async (
         // When sprint has no tickets in production, return test data in DEV_MODE
         if (DEV_MODE && selectedProject) {
           console.log('[DEV MODE] Returning test tickets for empty sprint');
-          const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 20);
+          const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 100);
           return { tickets: testData, total: testData.length };
         }
         
@@ -91,6 +92,7 @@ export const fetchJiraTickets = async (
       // Transform the response into our JiraTicket format
       const tickets = data.issues.map((issue: any) => transformJiraIssue(issue, credentials, selectedProject, String(sprintId)));
       
+      // Make sure to return the total from the API response
       return { tickets, total: data.total || tickets.length };
     } catch (apiError) {
       console.error('Error in API call for sprint tickets, trying alternate endpoint:', apiError);
@@ -120,18 +122,21 @@ export const fetchJiraTickets = async (
           );
         }
         
-        return { tickets: filteredTickets, total: filteredTickets.length };
+        // Get total count from the API response or use the filtered length
+        const totalCount = cloudData.total || filteredTickets.length;
+        
+        return { tickets: filteredTickets, total: totalCount };
       } catch (altError) {
         console.error('Both API methods failed for fetching sprint tickets:', altError);
         
         // Fallback to fetching all project tickets as a last resort
         console.log('Falling back to fetching all project tickets with sprint filtering');
-        const { tickets: allTickets } = await fetchJiraTicketsByProject(credentials, selectedProject, 0, 100, filters);
+        const { tickets: allTickets, total } = await fetchJiraTicketsByProject(credentials, selectedProject, 0, 200, filters);
         
         // Filter by sprint manually
         const sprintTickets = allTickets.filter(ticket => ticket.sprintId === String(sprintId));
         
-        return { tickets: sprintTickets, total: sprintTickets.length };
+        return { tickets: sprintTickets, total: total };
       }
     }
   } catch (error) {
@@ -140,7 +145,7 @@ export const fetchJiraTickets = async (
     // Return test data in dev mode if there's an error
     if (DEV_MODE && selectedProject) {
       console.log('[DEV MODE] Returning test tickets due to error');
-      const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 50);
+      const testData = generateTestTickets(String(sprintId), selectedProject, credentials, 150);
       return { tickets: testData, total: testData.length };
     }
     
@@ -275,7 +280,7 @@ const transformJiraIssue = (issue: any, credentials: JiraCredentials, project: J
   };
 };
 
-// Generate 50 test tickets instead of 20
+// Generate more test tickets (150 instead of 50)
 const generateTestTickets = (
   sprintId: string, 
   project: JiraProject, 
