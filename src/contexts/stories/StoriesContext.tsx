@@ -60,6 +60,7 @@ export interface StoriesContextState {
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   saveContentToDatabase: (contentType: ContentType, content: string) => Promise<boolean>;
+  saveAllContent: () => Promise<boolean>;
   
   // Utility
   refreshAll: () => Promise<void>;

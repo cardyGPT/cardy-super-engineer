@@ -14,7 +14,7 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { storyId, projectId, sprintId, contentType, content, contextProjectId, gsuiteId } = await req.json();
+    const { storyId, projectId, sprintId, contentType, content } = await req.json();
 
     if (!storyId) {
       return new Response(
@@ -29,6 +29,8 @@ serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
     }
+
+    console.log(`Saving ${contentType} content for story: ${storyId}`);
 
     // Check if an artifact record already exists for this story
     const { data: existingArtifact, error: lookupError } = await supabase
@@ -55,16 +57,12 @@ serve(async (req) => {
     // Set the content field based on the contentType
     if (contentType === 'lld') {
       updateData.lld_content = content;
-      if (gsuiteId) updateData.lld_gsuite_id = gsuiteId;
     } else if (contentType === 'code') {
       updateData.code_content = content;
-      if (gsuiteId) updateData.code_gsuite_id = gsuiteId;
     } else if (contentType === 'tests') {
       updateData.test_content = content;
-      if (gsuiteId) updateData.test_gsuite_id = gsuiteId;
     } else if (contentType === 'testcases') {
       updateData.testcases_content = content;
-      if (gsuiteId) updateData.testcases_gsuite_id = gsuiteId;
     }
 
     let result;
@@ -90,13 +88,13 @@ serve(async (req) => {
       // Create new record
       const { data, error } = await supabase
         .from('ticket_artifacts')
-        .insert(updateData)
+        .insert([updateData])
         .select();
 
       if (error) {
         console.error('Error creating artifact:', error);
         return new Response(
-          JSON.stringify({ error: 'Failed to create artifact' }),
+          JSON.stringify({ error: 'Failed to create artifact', details: error.message }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
         );
       }

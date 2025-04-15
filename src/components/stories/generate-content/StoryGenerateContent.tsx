@@ -49,12 +49,13 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isAllSaving, setIsAllSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingContentType, setGeneratingContentType] = useState<ContentType | null>(null);
   const { toast } = useToast();
   
   const contentRef = useRef<HTMLDivElement>(null);
-  const { saveContentToDatabase } = useStories();
+  const { saveContentToDatabase, saveAllContent } = useStories();
   
   // Effect to update the content when ticket changes or when artifacts are loaded
   useEffect(() => {
@@ -151,13 +152,21 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         }
       }
       
-      await onGenerate(request);
+      const result = await onGenerate(request);
       setActiveTab(type);
       
-      toast({
-        title: "Content Generated",
-        description: `${type.toUpperCase()} content has been generated successfully.`,
-      });
+      // Automatically prompt to save the content
+      if (result) {
+        const content = getContentByType(result, type);
+        if (content) {
+          // Toast to prompt user to save
+          toast({
+            title: "Content Generated",
+            description: `${type.toUpperCase()} content has been generated. Don't forget to save it to the database.`,
+            variant: "success",
+          });
+        }
+      }
     } catch (err: any) {
       toast({
         title: "Error",
@@ -213,13 +222,16 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         }
         
         await onGenerate(request);
+
+        // Wait a bit between generations to avoid overwhelming the API
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
       setActiveTab('lld');
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, Test Cases, and Tests content has been generated successfully.",
+        description: "LLD, Code, Test Cases, and Tests content has been generated successfully. Don't forget to save them to the database.",
         variant: "success",
       });
     } catch (err: any) {
@@ -268,6 +280,31 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
     } finally {
       setIsSaving(false);
+    }
+  };
+  
+  const handleSaveAllToDatabase = async () => {
+    setIsAllSaving(true);
+    try {
+      const success = await saveAllContent();
+      
+      if (success) {
+        toast({
+          title: "All Content Saved",
+          description: "All generated content has been saved to database.",
+          variant: "success",
+        });
+      } else {
+        throw new Error("Failed to save all content to database.");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save all content to database.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsAllSaving(false);
     }
   };
   
@@ -457,9 +494,11 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 content={getContentByType(combinedContent, activeTab) || ''}
                 isExporting={isExporting}
                 isSaving={isSaving}
+                isAllSaving={isAllSaving}
                 isPushingToJira={isPushingToJira}
                 onExportPDF={exportToPDF}
                 onSaveToDatabase={handleSaveToDatabase}
+                onSaveAllToDatabase={handleSaveAllToDatabase}
                 onPushToJira={handlePushToJira}
                 storyId={ticket.id}
                 storyKey={ticket.key}

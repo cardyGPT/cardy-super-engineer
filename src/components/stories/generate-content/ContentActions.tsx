@@ -1,10 +1,9 @@
 
 import React from 'react';
-import { ContentType } from '../ContentDisplay';
 import { Button } from "@/components/ui/button";
-import { Loader2, FileDown, Send, Github, Save } from "lucide-react";
+import { FileDown, Save, Send, Github, Loader2 } from "lucide-react";
+import { ContentType } from '../ContentDisplay';
 import ExportToGSuite from '../ExportToGSuite';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ContentActionsProps {
   activeTab: ContentType;
@@ -12,8 +11,10 @@ interface ContentActionsProps {
   isExporting: boolean;
   isSaving: boolean;
   isPushingToJira: boolean;
+  isAllSaving?: boolean;
   onExportPDF: () => void;
   onSaveToDatabase: () => void;
+  onSaveAllToDatabase?: () => void;
   onPushToJira: () => void;
   storyId: string;
   storyKey: string;
@@ -25,99 +26,95 @@ const ContentActions: React.FC<ContentActionsProps> = ({
   isExporting,
   isSaving,
   isPushingToJira,
+  isAllSaving,
   onExportPDF,
   onSaveToDatabase,
+  onSaveAllToDatabase,
   onPushToJira,
   storyId,
   storyKey
 }) => {
   return (
-    <TooltipProvider>
-      <div className="flex space-x-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onSaveToDatabase}
-              disabled={isSaving || !content}
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Save to Database</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onExportPDF}
-              disabled={isExporting || !content}
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Export PDF</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <ExportToGSuite
-          storyId={storyId}
-          storyKey={storyKey}
-          content={content}
-          contentType={activeTab}
-          iconOnly={true}
-        />
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onPushToJira}
-              disabled={isPushingToJira || !content}
-            >
-              {isPushingToJira ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Push to Jira</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={true}
-            >
-              <Github className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Push to Bitbucket (Coming Soon)</p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-    </TooltipProvider>
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onExportPDF}
+        disabled={isExporting || !content}
+        className="h-9"
+      >
+        {isExporting ? (
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        ) : (
+          <FileDown className="h-4 w-4 mr-1" />
+        )}
+        PDF
+      </Button>
+      
+      <ExportToGSuite
+        storyId={storyId}
+        storyKey={storyKey}
+        content={content}
+        contentType={activeTab}
+      />
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onSaveToDatabase}
+        disabled={isSaving || !content}
+        className="h-9"
+      >
+        {isSaving ? (
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4 mr-1" />
+        )}
+        Save
+      </Button>
+
+      {onSaveAllToDatabase && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onSaveAllToDatabase}
+          disabled={isAllSaving || !content}
+          className="h-9"
+        >
+          {isAllSaving ? (
+            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+          ) : (
+            <Save className="h-4 w-4 mr-1" />
+          )}
+          Save All
+        </Button>
+      )}
+      
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onPushToJira}
+        disabled={isPushingToJira || !content}
+        className="h-9"
+      >
+        {isPushingToJira ? (
+          <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+        ) : (
+          <Send className="h-4 w-4 mr-1" />
+        )}
+        Jira
+      </Button>
+      
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={true}
+        className="h-9"
+      >
+        <Github className="h-4 w-4 mr-1" />
+        Bitbucket
+      </Button>
+    </div>
   );
 };
 

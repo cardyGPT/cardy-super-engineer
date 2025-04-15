@@ -29,7 +29,8 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
     generatedContent, 
     generateContent, 
     pushToJira, 
-    contentLoading 
+    contentLoading,
+    saveContentToDatabase
   } = useStories();
   
   const { 
@@ -202,7 +203,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="px-4 pt-2">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Story Details</TabsTrigger>
+              <TabsTrigger value="details">Ticket Details</TabsTrigger>
               <TabsTrigger value="generate">Generate Content</TabsTrigger>
             </TabsList>
           </div>

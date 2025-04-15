@@ -65,6 +65,7 @@ Description: ${safeStringify(jiraTicket.description) || 'No description provided
 Status: ${safeStringify(jiraTicket.status) || 'Unknown'}
 Priority: ${safeStringify(jiraTicket.priority) || 'Unknown'}
 Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
+Reference: This document relates to Jira ticket ${jiraTicket.key} - ${safeStringify(jiraTicket.summary) || 'No summary provided'}
 `;
 
     if (jiraTicket.acceptance_criteria) {
@@ -148,15 +149,43 @@ Include component breakdowns, data models, API endpoints, sequence diagrams, err
 Format everything properly in markdown with clear headings, code blocks, and diagrams.
 Your response should be detailed, structured, and directly usable in a technical documentation system.
 
+Begin the document with:
+- A clear title referring to the Jira ticket
+- Document metadata (Ticket Reference, Created Date, Version)
+- Table of Contents
+- Scope and Objectives section that clearly defines what this design covers
+
 Format your response with these sections:
 1. Overview
+   - Purpose
+   - Scope and Objectives
+   - References (including Jira ticket ID)
 2. Component Breakdown
+   - Frontend components
+   - Backend services
+   - Interactions
 3. Data Models
+   - Entity definitions
+   - Relationships
+   - Database schema
 4. API Endpoints
+   - RESTful endpoints
+   - Request/response formats
+   - Error codes
 5. Sequence Diagrams
+   - User flows
+   - System interactions
 6. Error Handling
+   - Error scenarios
+   - Recovery mechanisms
 7. Security Considerations
-8. Implementation Notes`;
+   - Authentication
+   - Authorization
+   - Data protection
+8. Implementation Notes
+   - Technical recommendations
+   - Potential issues
+   - Dependencies`;
     } 
     else if (type === 'code') {
       systemPrompt = `You are an expert software developer specializing in AngularJS (frontend), NodeJS (backend), and PostgreSQL.
@@ -168,11 +197,24 @@ Your code should be complete, well-structured, and ready for review.
 
 Format your response with these sections:
 1. Implementation Overview
+   - Purpose
+   - Related Ticket: ${jiraTicket.key}
+   - Components implemented
 2. Component Code
+   - Frontend components
+   - Templates/Views
 3. Service Code
+   - Backend services
+   - API implementations
 4. Utility Functions
+   - Helper functions
+   - Common utilities
 5. Database Queries
-6. Integration Points`;
+   - SQL queries
+   - Data access methods
+6. Integration Points
+   - External system connections
+   - Third-party libraries`;
     } 
     else if (type === 'tests') {
       systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
@@ -183,11 +225,26 @@ Your tests should be thorough, covering all aspects of the functionality describ
 
 Format your response with these sections:
 1. Testing Strategy
+   - Scope and Objectives
+   - Reference Ticket: ${jiraTicket.key}
+   - Testing approach
+   - Test environment requirements
 2. Unit Tests
+   - Component tests
+   - Service tests
+   - Utility function tests
 3. Integration Tests
+   - API endpoint tests
+   - Service interaction tests
 4. End-to-End Tests
+   - User flow tests
+   - Playwright scripts
 5. Edge Cases
-6. Performance Tests`;
+   - Boundary conditions
+   - Error scenarios
+6. Performance Tests
+   - Load testing
+   - Stress testing`;
     } 
     else if (type === 'testcases') {
       systemPrompt = `You are an expert in software testing with experience in quality assurance and test case design.
@@ -196,12 +253,30 @@ Include positive tests, negative tests, edge cases, and user experience tests.
 Format everything properly in markdown with clear test steps, expected results, and preconditions.
 Your test cases should be thorough, covering all aspects of the functionality described in the ticket.
 
+Begin the document with:
+- A clear title referring to the test cases for the Jira ticket
+- Document metadata (Ticket Reference: ${jiraTicket.key}, Created Date, Version)
+- Table of Contents
+- Scope and Purpose section defining testing objectives
+
 Format your response with these sections:
 1. Test Strategy
+   - Testing scope
+   - References (including Jira ticket ID)
+   - Test environment requirements
+   - Entry and exit criteria
 2. Positive Test Cases
+   - Normal flow test cases
+   - Acceptance criteria verification
 3. Negative Test Cases
+   - Error handling
+   - Invalid input handling
 4. Edge Cases
-5. User Experience Test Cases`;
+   - Boundary conditions
+   - Unusual scenarios
+5. User Experience Test Cases
+   - Usability testing
+   - Accessibility testing`;
     }
     else {
       systemPrompt = `You are an expert software development assistant.
