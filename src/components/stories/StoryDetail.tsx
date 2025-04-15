@@ -1,15 +1,18 @@
 
 import React from 'react';
-import { JiraTicket } from '@/types/jira';
+import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
-interface StoryDetailProps {
+export interface StoryDetailProps {
   ticket: JiraTicket;
+  projectContext?: string | null;
+  selectedDocuments?: string[];
+  projectContextData?: ProjectContextData | null;
 }
 
-const StoryDetail: React.FC<StoryDetailProps> = ({ ticket }) => {
+const StoryDetail: React.FC<StoryDetailProps> = ({ ticket, projectContext, selectedDocuments, projectContextData }) => {
   if (!ticket) {
     return (
       <Alert variant="destructive">

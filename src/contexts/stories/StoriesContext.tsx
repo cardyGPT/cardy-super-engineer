@@ -4,73 +4,7 @@ import { useStoriesState } from './useStoriesState';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { ContentType } from '@/components/stories/ContentDisplay';
 
-// Type definitions for the context
-export interface StoriesContextState {
-  // Authentication
-  credentials: JiraCredentials | null;
-  isAuthenticated: boolean;
-  error: string | null;
-  
-  // Data
-  projects: JiraProject[];
-  sprints: Record<string, JiraSprint[]>;
-  tickets: JiraTicket[];
-  
-  // Loading states
-  loading: boolean;
-  projectsLoading: boolean;
-  sprintsLoading: boolean;
-  ticketsLoading: boolean;
-  contentLoading: boolean;
-  
-  // Selection states
-  selectedProject: JiraProject | null;
-  selectedSprint: JiraSprint | null;
-  selectedTicket: JiraTicket | null;
-  
-  // Filters
-  ticketTypeFilter: string | null;
-  ticketStatusFilter: string | null;
-  searchTerm: string;
-  
-  // API type
-  apiType: 'agile' | 'classic' | 'cloud';
-  
-  // Generated content
-  generatedContent: JiraGenerationResponse | null;
-  
-  // Total tickets
-  totalTickets: number;
-  
-  // Actions
-  setCredentials: (creds: JiraCredentials | null) => void;
-  setSelectedProject: (project: JiraProject | null) => void;
-  setSelectedSprint: (sprint: JiraSprint | null) => void;
-  setSelectedTicket: (ticket: JiraTicket | null) => void;
-  setTicketTypeFilter: (type: string | null) => void;
-  setTicketStatusFilter: (status: string | null) => void;
-  setSearchTerm: (term: string) => void;
-  setApiType: (type: 'agile' | 'classic' | 'cloud') => void;
-  
-  // API calls
-  fetchProjects: () => Promise<void>;
-  fetchSprints: (projectId: string) => Promise<void>;
-  fetchTickets: (sprintId: string) => Promise<void>;
-  fetchTicketsByProject: (projectId: string) => Promise<void>;
-  generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
-  pushToJira: (ticketId: string, content: string) => Promise<boolean>;
-  saveContentToDatabase: (contentType: ContentType, content: string) => Promise<boolean>;
-  saveAllContent: () => Promise<boolean>;
-  
-  // Utility
-  refreshAll: () => Promise<void>;
-  fetchMoreTickets: () => Promise<void>;
-  hasMore: boolean;
-  loadingMore: boolean;
-}
-
-// Create context with undefined initial value
-const StoriesContext = createContext<StoriesContextState | undefined>(undefined);
+const StoriesContext = createContext<ReturnType<typeof useStoriesState> | undefined>(undefined);
 
 // Custom hook for accessing the context
 export const useStories = () => {

@@ -200,7 +200,10 @@ export const useStoriesState = () => {
     
     // Utility
     refreshAll,
-    fetchMoreTickets
+    fetchMoreTickets,
+    
+    // Saving state
+    isSaving
   };
 };
 
