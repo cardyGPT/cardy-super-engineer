@@ -190,7 +190,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   {/* Show active sprints first with special indicator */}
                   {activeSprints.length > 0 && (
                     <>
-                      <SelectItem value="active-header" disabled className="font-semibold text-green-600 py-1">
+                      <SelectItem value="active-header-group" disabled className="font-semibold text-green-600 py-1">
                         ACTIVE SPRINTS
                       </SelectItem>
                       {activeSprints.map(sprint => (
@@ -204,7 +204,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                         </SelectItem>
                       ))}
                       {sortedSprints.length > activeSprints.length && (
-                        <SelectItem value="divider" disabled className="py-1 my-1 border-t border-gray-200">
+                        <SelectItem value="other-sprints-divider" disabled className="py-1 my-1 border-t border-gray-200">
                           OTHER SPRINTS
                         </SelectItem>
                       )}
