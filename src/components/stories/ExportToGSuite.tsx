@@ -1,9 +1,10 @@
+
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
-import { Loader2, GoogleDrive } from "lucide-react";
+import { Loader2, FileCloud } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ContentType } from './ContentDisplay';
-import { exportToGSuite } from '@/contexts/stories/api';
+import { exportToGoogleDocs } from '@/contexts/stories/api/gsuite';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ExportToGSuiteProps {
@@ -36,19 +37,11 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
 
     setIsExporting(true);
     try {
-      const success = await exportToGSuite(storyKey, content, contentType);
-      if (success) {
-        toast({
-          title: "Exported to Google Drive",
-          description: "Content has been successfully exported to Google Drive.",
-        });
-      } else {
-        toast({
-          title: "Failed to export",
-          description: "Failed to export content to Google Drive.",
-          variant: "destructive",
-        });
-      }
+      const result = await exportToGoogleDocs(storyId, storyKey, content, contentType);
+      toast({
+        title: "Exported to Google Drive",
+        description: "Content has been successfully exported to Google Drive.",
+      });
     } catch (error: any) {
       toast({
         title: "Error",
@@ -74,7 +67,7 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
               {isExporting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <GoogleDrive className="h-4 w-4" />
+                <FileCloud className="h-4 w-4" />
               )}
             </Button>
           </TooltipTrigger>
@@ -97,7 +90,7 @@ const ExportToGSuite: React.FC<ExportToGSuiteProps> = ({
       {isExporting ? (
         <Loader2 className="h-4 w-4 mr-1 animate-spin" />
       ) : (
-        <GoogleDrive className="h-4 w-4 mr-1" />
+        <FileCloud className="h-4 w-4 mr-1" />
       )}
       Drive
     </Button>

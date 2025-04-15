@@ -18,3 +18,4 @@ export {
 export { fetchJiraSprints } from './sprintsApi';
 export { fetchJiraTickets, fetchJiraTicketsByProject } from './ticketsApi';
 export { generateJiraContent, pushContentToJira } from './contentApi';
+export { exportToGoogleDocs } from './gsuite';
