@@ -1,9 +1,10 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuthState } from '@/contexts/stories/hooks/useAuthState';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets, generateJiraContent, pushContentToJira } from './api';
+import { supabase } from '@/lib/supabase';
+import { ContentType } from '@/components/stories/ContentDisplay';
 
 // Type definition for the state
 export interface StoriesContextState {
@@ -58,6 +59,7 @@ export interface StoriesContextState {
   fetchTicketsByProject: (projectId: string) => Promise<void>;
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
+  saveContentToDatabase: (contentType: ContentType, content: string) => Promise<boolean>;
   
   // Utility
   refreshAll: () => Promise<void>;
@@ -315,29 +317,116 @@ export const useStoriesState = (): StoriesContextState => {
     }
   }, [credentials, selectedTicket, toast]);
 
+  // Save Content to Database
+  const saveContentToDatabase = useCallback(async (contentType: ContentType, content: string): Promise<boolean> => {
+    if (!selectedTicket) {
+      setError('No ticket selected');
+      toast({
+        title: "Error",
+        description: "No ticket selected to save content for",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    try {
+      // Prepare the data for saving
+      const columnMapping: Record<ContentType, string> = {
+        lld: 'lld_content',
+        code: 'code_content',
+        tests: 'test_content',
+        testcases: 'testcases_content'
+      };
+      
+      const column = columnMapping[contentType];
+      
+      // Check if there's already an entry for this ticket
+      const { data: existingArtifact, error: fetchError } = await supabase
+        .from('ticket_artifacts')
+        .select('*')
+        .eq('story_id', selectedTicket.key)
+        .maybeSingle();
+      
+      if (fetchError) {
+        throw new Error(fetchError.message);
+      }
+      
+      let result;
+      
+      if (existingArtifact) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .update({ 
+            [column]: content,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingArtifact.id)
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
+      } else {
+        // Create new record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .insert({ 
+            story_id: selectedTicket.key, 
+            project_id: selectedTicket.projectId || '', 
+            sprint_id: selectedTicket.sprintId || '',
+            [column]: content 
+          })
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
+      }
+      
+      toast({
+        title: "Content Saved",
+        description: `${contentType.toUpperCase()} content has been saved to database`,
+        variant: "success",
+      });
+      
+      return true;
+    } catch (err: any) {
+      console.error('Error saving content to database:', err);
+      setError(err.message || 'Failed to save content to database');
+      toast({
+        title: "Error",
+        description: err.message || 'Failed to save content to database',
+        variant: "destructive",
+      });
+      return false;
+    }
+  }, [selectedTicket, toast]);
+
   // Push to Jira
-  const pushToJira = useCallback(async (ticketId: string, content: string) => {
+  const pushToJira = useCallback(async (ticketId: string, content: string): Promise<boolean> => {
     if (!credentials) {
       setError('No Jira credentials provided');
       return false;
     }
 
-    setContentLoading(true);
-    setError(null);
-
     try {
-      return await pushContentToJira(credentials, ticketId, content);
+      const success = await pushContentToJira(credentials, ticketId, content);
+      
+      toast({
+        title: "Success",
+        description: "Content has been pushed to Jira",
+        variant: "success",
+      });
+
+      return success;
     } catch (err: any) {
-      console.error('Error pushing content to Jira:', err);
-      setError(err.message || 'Failed to push content to Jira');
+      console.error('Error pushing to Jira:', err);
+      setError(err.message || 'Failed to push to Jira');
       toast({
         title: "Error",
-        description: err.message || 'Failed to push content to Jira',
+        description: err.message || 'Failed to push to Jira',
         variant: "destructive",
       });
       return false;
-    } finally {
-      setContentLoading(false);
     }
   }, [credentials, toast]);
 
@@ -404,6 +493,7 @@ export const useStoriesState = (): StoriesContextState => {
     fetchTicketsByProject,
     generateContent,
     pushToJira,
+    saveContentToDatabase,
     
     // Utility
     refreshAll,

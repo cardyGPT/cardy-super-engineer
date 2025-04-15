@@ -2,6 +2,7 @@
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useStoriesState } from './useStoriesState';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
+import { ContentType } from '@/components/stories/ContentDisplay';
 
 // Type definitions for the context
 export interface StoriesContextState {
@@ -58,7 +59,7 @@ export interface StoriesContextState {
   fetchTicketsByProject: (projectId: string) => Promise<void>;
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
-  saveContentToDatabase: (contentType: 'lld' | 'code' | 'tests' | 'testcases', content: string) => Promise<boolean>;
+  saveContentToDatabase: (contentType: ContentType, content: string) => Promise<boolean>;
   
   // Utility
   refreshAll: () => Promise<void>;
