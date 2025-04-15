@@ -32,6 +32,9 @@ export interface StoriesContextState {
   ticketStatusFilter: string | null;
   searchTerm: string;
   
+  // API type
+  apiType: 'agile' | 'classic' | 'cloud';
+  
   // Generated content
   generatedContent: JiraGenerationResponse | null;
   
@@ -46,11 +49,13 @@ export interface StoriesContextState {
   setTicketTypeFilter: (type: string | null) => void;
   setTicketStatusFilter: (status: string | null) => void;
   setSearchTerm: (term: string) => void;
+  setApiType: (type: 'agile' | 'classic' | 'cloud') => void;
   
   // API calls
   fetchProjects: () => Promise<void>;
   fetchSprints: (projectId: string) => Promise<void>;
   fetchTickets: (sprintId: string) => Promise<void>;
+  fetchTicketsByProject: (projectId: string) => Promise<void>;
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
   
