@@ -8,22 +8,16 @@ import {
   JiraSprint, 
   JiraTicket
 } from '@/types/jira';
-import { 
-  fetchJiraProjects, 
-  fetchJiraSprints, 
-  fetchJiraTickets, 
-  fetchJiraTicketsByProject,
-} from './api';
+import { ContentType } from '@/components/stories/ContentDisplay';
 import { useAuthState } from './hooks/useAuthState';
 import { useProjectsAndSprints } from './hooks/useProjectsAndSprints';
 import { useTickets } from './hooks/useTickets';
 import { useContentGeneration } from './hooks/useContentGeneration';
-import { ContentType } from '@/components/stories/ContentDisplay';
 
 export const useStoriesState = () => {
   const [error, setError] = useState<string | null>(null);
   
-  // Auth state
+  // Auth state with correct typing
   const { 
     credentials, 
     isAuthenticated, 
@@ -89,7 +83,7 @@ export const useStoriesState = () => {
         
         if (selectedSprint) {
           await fetchTickets(selectedSprint.id);
-        } else {
+        } else if (selectedProject) {
           await fetchTicketsByProject(selectedProject.id);
         }
       }
@@ -192,6 +186,7 @@ export const useStoriesState = () => {
     setTicketTypeFilter,
     setTicketStatusFilter,
     setSearchTerm,
+    setApiType,
     
     // API calls
     fetchProjects,
