@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { useAuthState } from '@/contexts/stories/hooks/useAuthState';
@@ -325,7 +326,7 @@ export const useStoriesState = (): StoriesContextState => {
     setError(null);
 
     try {
-      return await pushContentToJira(ticketId, content);
+      return await pushContentToJira(credentials, ticketId, content);
     } catch (err: any) {
       console.error('Error pushing content to Jira:', err);
       setError(err.message || 'Failed to push content to Jira');

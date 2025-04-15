@@ -29,16 +29,12 @@ export const generateJiraContent = async (
     }
     
     // Make API call to generate content
-    // Update: Use fetch directly since callJiraApi requires credentials
-    const response = await fetch('/api/generate-content', {
+    const response = await callJiraApi('/generate-content', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         ticketId: ticket.id,
         ticketKey: ticket.key,
-        ticketTitle: ticket.summary,
+        ticketTitle: ticket.title,
         ticketDescription: ticket.description,
         contentType: request.type,
         projectContext: request.projectContext,
@@ -80,16 +76,14 @@ export const generateJiraContent = async (
  * Pushes content to Jira as a comment
  */
 export const pushContentToJira = async (
+  credentials: any,
   ticketId: string,
   content: string
 ): Promise<boolean> => {
   try {
-    // Update: Use fetch directly instead of callJiraApi
-    const response = await fetch(`/api/jira-api/issue/${ticketId}/comment`, {
+    // Make API call to push content to Jira
+    const response = await callJiraApi(`/jira-api/issue/${ticketId}/comment`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify({
         body: content
       })
@@ -248,7 +242,8 @@ The system will use a centralized error handling mechanism...
 ## Testing Strategy
 1. Unit tests for each component
 2. Integration tests for API endpoints
-3. End-to-end tests for critical user flows`;
+3. End-to-end tests for critical user flows
+`;
   } else if (type === 'code') {
     return `# Implementation Code
 
@@ -408,7 +403,8 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
   return bcrypt.compare(plainPassword, hashedPassword);
 }
-\`\`\``;
+\`\`\`
+`;
   } else if (type === 'testcases') {
     return `# Test Cases
 
@@ -613,7 +609,8 @@ export async function verifyPassword(plainPassword: string, hashedPassword: stri
 - User no longer appears in the user list
 
 **Post-conditions**:
-- User "testdelete" is removed from the database`;
+- User "testdelete" is removed from the database
+`;
   } else if (type === 'tests') {
     return `# Automated Tests
 
@@ -638,8 +635,8 @@ test.describe('User Registration', () => {
   test('should register a new user successfully', async ({ page }) => {
     // Generate a unique username and email using timestamp
     const timestamp = new Date().getTime();
-    const username = "testuser" + timestamp;
-    const email = "testuser" + timestamp + "@example.com";
+    const username = `testuser${timestamp}`;
+    const email = `testuser${timestamp}@example.com`;
     
     // Fill registration form
     await page.fill('[data-testid="username-input"]', username);
@@ -651,7 +648,7 @@ test.describe('User Registration', () => {
     await page.click('[data-testid="register-button"]');
     
     // Verify registration success
-    await expect(page).toHaveURL(/\\/login/);
+    await expect(page).toHaveURL(/\/login/);
     await expect(page.locator('[data-testid="success-message"]')).toBeVisible();
     await expect(page.locator('[data-testid="success-message"]')).toContainText('Registration successful');
   });
@@ -739,8 +736,8 @@ test.describe('User Authentication', () => {
   test.beforeEach(async ({ page, request }) => {
     // Create a test user via API before each test
     const timestamp = new Date().getTime();
-    const username = "testuser" + timestamp;
-    const email = "testuser" + timestamp + "@example.com";
+    const username = `testuser${timestamp}`;
+    const email = `testuser${timestamp}@example.com`;
     const password = 'Test@123';
     
     const response = await request.post('/api/users', {
@@ -776,7 +773,7 @@ test.describe('User Authentication', () => {
     await page.click('[data-testid="login-button"]');
     
     // Verify successful login
-    await expect(page).toHaveURL(/\\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Verify user is logged in
     await expect(page.locator('[data-testid="user-greeting"]')).toBeVisible();
@@ -800,7 +797,7 @@ test.describe('User Authentication', () => {
     await expect(page.locator('[data-testid="error-message"]')).toContainText('Invalid credentials');
     
     // Verify user remains on login page
-    await expect(page).toHaveURL(/\\/login/);
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test('should show error with non-existent username', async ({ page }) => {
@@ -816,7 +813,7 @@ test.describe('User Authentication', () => {
     await expect(page.locator('[data-testid="error-message"]')).toContainText('Invalid credentials');
     
     // Verify user remains on login page
-    await expect(page).toHaveURL(/\\/login/);
+    await expect(page).toHaveURL(/\/login/);
   });
 
   test('should redirect to requested page after login', async ({ page, context }) => {
@@ -828,7 +825,7 @@ test.describe('User Authentication', () => {
     await page.goto('/profile');
     
     // Verify redirect to login page with return URL
-    await expect(page).toHaveURL(/\\/login\\?returnUrl=%2Fprofile/);
+    await expect(page).toHaveURL(/\/login\?returnUrl=%2Fprofile/);
     
     // Fill login form
     await page.fill('[data-testid="username-input"]', username);
@@ -838,7 +835,7 @@ test.describe('User Authentication', () => {
     await page.click('[data-testid="login-button"]');
     
     // Verify redirect to originally requested page
-    await expect(page).toHaveURL(/\\/profile/);
+    await expect(page).toHaveURL(/\/profile/);
   });
 
   test('should logout successfully', async ({ page }) => {
@@ -851,18 +848,18 @@ test.describe('User Authentication', () => {
     await page.click('[data-testid="login-button"]');
     
     // Verify login successful
-    await expect(page).toHaveURL(/\\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard/);
     
     // Logout
     await page.click('[data-testid="user-menu"]');
     await page.click('[data-testid="logout-button"]');
     
     // Verify logout successful
-    await expect(page).toHaveURL(/\\/login/);
+    await expect(page).toHaveURL(/\/login/);
     
     // Verify cannot access protected page anymore
     await page.goto('/dashboard');
-    await expect(page).toHaveURL(/\\/login/);
+    await expect(page).toHaveURL(/\/login/);
   });
 });
 \`\`\`
@@ -878,8 +875,8 @@ test.describe('User Profile', () => {
   test.beforeEach(async ({ page, request }) => {
     // Create a test user via API
     const timestamp = new Date().getTime();
-    const username = "testuser" + timestamp;
-    const email = "testuser" + timestamp + "@example.com";
+    const username = `testuser${timestamp}`;
+    const email = `testuser${timestamp}@example.com`;
     const password = 'Test@123';
     
     const response = await request.post('/api/users', {
@@ -911,7 +908,7 @@ test.describe('User Profile', () => {
     await page.click('[data-testid="login-button"]');
     
     // Verify login successful
-    await expect(page).toHaveURL(/\\/dashboard/);
+    await expect(page).toHaveURL(/\/dashboard/);
   });
 
   test('should display user profile information correctly', async ({ page }) => {
@@ -1018,11 +1015,11 @@ test.describe('Admin User Management', () => {
     
     // Create regular test user
     const timestamp = new Date().getTime();
-    const testUsername = "testuser" + timestamp;
+    const testUsername = `testuser${timestamp}`;
     const testResponse = await request.post('/api/users', {
       data: {
         username: testUsername,
-        email: "testuser" + timestamp + "@example.com",
+        email: `testuser${timestamp}@example.com`,
         password: 'Test@123',
         role: 'USER'
       }
@@ -1061,7 +1058,7 @@ test.describe('Admin User Management', () => {
     const testUserAnnotation = test.info().annotations.find(a => a.type === 'testUser');
     const { username } = JSON.parse(testUserAnnotation?.description || '{}');
     
-    await expect(page.locator('[data-testid="user-row"]:has-text("' + username + '")')).toBeVisible();
+    await expect(page.locator(\`[data-testid="user-row"]:has-text("${username}")\`)).toBeVisible();
   });
 
   test('should be able to view user details', async ({ page }) => {
@@ -1073,7 +1070,7 @@ test.describe('Admin User Management', () => {
     await page.click('[data-testid="user-management-link"]');
     
     // Click view button for test user
-    await page.click('[data-testid="view-user-' + id + '"]');
+    await page.click(\`[data-testid="view-user-\${id}"]\`);
     
     // Verify user details are displayed
     await expect(page.locator('[data-testid="user-details-title"]')).toContainText(username);
@@ -1090,7 +1087,7 @@ test.describe('Admin User Management', () => {
     await page.click('[data-testid="user-management-link"]');
     
     // Disable the test user
-    await page.click('[data-testid="disable-user-' + id + '"]');
+    await page.click(\`[data-testid="disable-user-\${id}"]\`);
     
     // Confirm action in dialog
     await page.click('[data-testid="confirm-action-button"]');
@@ -1100,10 +1097,10 @@ test.describe('Admin User Management', () => {
     await expect(page.locator('[data-testid="success-message"]')).toContainText('User disabled');
     
     // Verify user status changed
-    await expect(page.locator('[data-testid="user-status-' + id + '"]')).toContainText('Disabled');
+    await expect(page.locator(\`[data-testid="user-status-\${id}"]\`)).toContainText('Disabled');
     
     // Enable the user again
-    await page.click('[data-testid="enable-user-' + id + '"]');
+    await page.click(\`[data-testid="enable-user-\${id}"]\`);
     
     // Confirm action in dialog
     await page.click('[data-testid="confirm-action-button"]');
@@ -1113,7 +1110,7 @@ test.describe('Admin User Management', () => {
     await expect(page.locator('[data-testid="success-message"]')).toContainText('User enabled');
     
     // Verify user status changed
-    await expect(page.locator('[data-testid="user-status-' + id + '"]')).toContainText('Active');
+    await expect(page.locator(\`[data-testid="user-status-\${id}"]\`)).toContainText('Active');
   });
 
   test('should be able to change user role', async ({ page }) => {
@@ -1125,7 +1122,7 @@ test.describe('Admin User Management', () => {
     await page.click('[data-testid="user-management-link"]');
     
     // Click edit button for test user
-    await page.click('[data-testid="edit-user-' + id + '"]');
+    await page.click(\`[data-testid="edit-user-\${id}"]\`);
     
     // Change role to ADMIN
     await page.selectOption('[data-testid="role-select"]', 'ADMIN');
@@ -1138,7 +1135,7 @@ test.describe('Admin User Management', () => {
     await expect(page.locator('[data-testid="success-message"]')).toContainText('User updated');
     
     // Verify role changed
-    await expect(page.locator('[data-testid="user-role-' + id + '"]')).toContainText('ADMIN');
+    await expect(page.locator(\`[data-testid="user-role-\${id}"]\`)).toContainText('ADMIN');
   });
 
   test('should be able to delete a user', async ({ page }) => {
@@ -1150,7 +1147,7 @@ test.describe('Admin User Management', () => {
     await page.click('[data-testid="user-management-link"]');
     
     // Click delete button for test user
-    await page.click('[data-testid="delete-user-' + id + '"]');
+    await page.click(\`[data-testid="delete-user-\${id}"]\`);
     
     // Confirm deletion in dialog
     await page.click('[data-testid="confirm-action-button"]');
@@ -1160,7 +1157,7 @@ test.describe('Admin User Management', () => {
     await expect(page.locator('[data-testid="success-message"]')).toContainText('User deleted');
     
     // Verify user no longer in list
-    await expect(page.locator('[data-testid="user-row"]:has-text("' + username + '")')).not.toBeVisible();
+    await expect(page.locator(\`[data-testid="user-row"]:has-text("${username}")\`)).not.toBeVisible();
   });
 });
 \`\`\`

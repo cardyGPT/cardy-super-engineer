@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import StoryDetailEmpty from './StoryDetailEmpty';
 import StoryDetail from './StoryDetail';
-import { Tabs, TabsList, TabsContent, TabsTrigger } from "@/components/ui/tabs";
+import { Tab, TabList, TabPanel, Tabs, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectContextData } from '@/types/jira';
 import StoryTabContent from './StoryTabContent';
 import StoryGenerateContent from './generate-content/StoryGenerateContent';
@@ -87,21 +87,21 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
     <div className="bg-white rounded-lg border shadow-sm">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <div className="border-b px-2">
-          <TabsList className="flex">
+          <TabList className="flex">
             <TabsTrigger value="overview" className="flex-1 py-3">
               Overview
             </TabsTrigger>
             <TabsTrigger value="generate" className="flex-1 py-3">
               Generate
             </TabsTrigger>
-          </TabsList>
+          </TabList>
         </div>
         
-        <TabsContent value="overview" className="p-4">
+        <TabPanel value="overview" className="p-4">
           <StoryDetail ticket={selectedTicket} />
-        </TabsContent>
+        </TabPanel>
         
-        <TabsContent value="generate" className="p-4">
+        <TabPanel value="generate" className="p-4">
           <StoryGenerateContent 
             ticket={selectedTicket}
             projectContext={projectContext}
@@ -113,7 +113,7 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
             isGenerating={contentLoading}
             existingArtifacts={existingArtifacts}
           />
-        </TabsContent>
+        </TabPanel>
       </Tabs>
     </div>
   );

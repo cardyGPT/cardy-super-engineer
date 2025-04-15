@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -18,6 +19,7 @@ export const useContentGeneration = (
   const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse | null>(null);
   const { toast } = useToast();
 
+  // Load saved content from the database when ticket changes
   useEffect(() => {
     const loadSavedContent = async () => {
       if (!selectedTicket?.key) {
@@ -67,6 +69,7 @@ export const useContentGeneration = (
     try {
       const responseData = await generateJiraContent(selectedTicket, request);
       
+      // Update the generatedContent state with new data, preserving other content types
       setGeneratedContent(prevContent => ({
         ...prevContent,
         ...responseData
@@ -99,7 +102,7 @@ export const useContentGeneration = (
     }
 
     try {
-      const success = await pushContentToJira(ticketId, content);
+      const success = await pushContentToJira(credentials, ticketId, content);
       
       toast({
         title: "Success",
