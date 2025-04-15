@@ -154,14 +154,14 @@ const StoryList: React.FC = () => {
                 <div className="space-y-2">
                   <h5 className="text-sm font-medium">Type</h5>
                   <Select
-                    value={ticketTypeFilter || ""}
-                    onValueChange={(value) => setTicketTypeFilter(value || null)}
+                    value={ticketTypeFilter || "all-types"}
+                    onValueChange={(value) => setTicketTypeFilter(value === "all-types" ? null : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
+                      <SelectItem value="all-types">All Types</SelectItem>
                       {ticketTypes.map((type) => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                       ))}
@@ -172,14 +172,14 @@ const StoryList: React.FC = () => {
                 <div className="space-y-2">
                   <h5 className="text-sm font-medium">Status</h5>
                   <Select
-                    value={ticketStatusFilter || ""}
-                    onValueChange={(value) => setTicketStatusFilter(value || null)}
+                    value={ticketStatusFilter || "all-statuses"}
+                    onValueChange={(value) => setTicketStatusFilter(value === "all-statuses" ? null : value)}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Statuses</SelectItem>
+                      <SelectItem value="all-statuses">All Statuses</SelectItem>
                       {ticketStatuses.map((status) => (
                         <SelectItem key={status} value={status}>{status}</SelectItem>
                       ))}
