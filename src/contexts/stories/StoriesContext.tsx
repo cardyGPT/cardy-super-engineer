@@ -4,6 +4,7 @@ import { useStoriesState } from './useStoriesState';
 import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { ContentType } from '@/components/stories/ContentDisplay';
 
+// Create the context with appropriate typing
 const StoriesContext = createContext<ReturnType<typeof useStoriesState> | undefined>(undefined);
 
 // Custom hook for accessing the context

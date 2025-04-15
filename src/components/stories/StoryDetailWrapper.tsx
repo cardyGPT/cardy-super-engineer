@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useStories } from '@/contexts/StoriesContext';
+import { useStories } from '@/contexts/stories';
 import StoryDetail from './StoryDetail';
 import { ProjectContextData } from '@/types/jira';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";

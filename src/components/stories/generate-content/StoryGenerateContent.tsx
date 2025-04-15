@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -13,7 +12,7 @@ import ContentActions from './ContentActions';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { AlertCircle, CheckCircle, Info, Loader2 } from "lucide-react";
-import { useStories } from '@/contexts/StoriesContext';
+import { useStories } from '@/contexts/stories';
 
 interface ExistingArtifacts {
   lldContent: string | null;
@@ -57,15 +56,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const { saveContentToDatabase, saveAllContent } = useStories();
   
-  // Effect to update the content when ticket changes or when artifacts are loaded
   useEffect(() => {
-    // Reset any in-memory content when the ticket changes
     if (existingArtifacts && 
         (existingArtifacts.lldContent || 
          existingArtifacts.codeContent || 
          existingArtifacts.testContent || 
          existingArtifacts.testCasesContent)) {
-      // If we have stored content, set the active tab to the first available content
       if (existingArtifacts.lldContent) {
         setActiveTab('lld');
       } else if (existingArtifacts.codeContent) {
@@ -78,13 +74,11 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   }, [ticket.key, existingArtifacts]);
 
-  // Combine generatedContent with existingArtifacts
   const combinedContent: JiraGenerationResponse = {
     ...(existingArtifacts || {}),
     ...(generatedContent || {})
   };
   
-  // Determine if we have any existing content
   const hasAnyContent = Boolean(
     combinedContent.lldContent || 
     combinedContent.codeContent || 
@@ -92,7 +86,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     combinedContent.testCasesContent
   );
   
-  // Get the status message based on the content type being generated
   const getStatusMessage = (type: ContentType): string => {
     switch (type) {
       case 'lld':
@@ -110,7 +103,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const handleGenerate = async (type: ContentType) => {
     try {
-      // Set which content type is being generated
       setGeneratingContentType(type);
       
       const request: JiraGenerationRequest = {
@@ -121,7 +113,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         additionalContext: {}
       };
       
-      // Add previous artifacts to context for subsequent generations
       if (type !== 'lld') {
         if (combinedContent.lldContent) {
           request.additionalContext = {
@@ -155,11 +146,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       const result = await onGenerate(request);
       setActiveTab(type);
       
-      // Automatically prompt to save the content
       if (result) {
         const content = getContentByType(result, type);
         if (content) {
-          // Toast to prompt user to save
           toast({
             title: "Content Generated",
             description: `${type.toUpperCase()} content has been generated. Don't forget to save it to the database.`,
@@ -181,7 +170,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
     try {
-      // Generate in specific sequence: LLD -> Code -> TestCases -> Tests
       const types: ContentType[] = ['lld', 'code', 'testcases', 'tests'];
       
       for (const type of types) {
@@ -195,7 +183,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           additionalContext: {}
         };
         
-        // Add previous artifacts to context for subsequent generations
         if (type !== 'lld') {
           if (combinedContent.lldContent || generatedContent?.lldContent) {
             request.additionalContext = {
@@ -223,7 +210,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         
         await onGenerate(request);
 
-        // Wait a bit between generations to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       
@@ -260,7 +246,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     
     setIsSaving(true);
     try {
-      // Save the content to the database
       const success = await saveContentToDatabase(activeTab, content);
       
       if (success) {
@@ -379,12 +364,10 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   };
 
-  // Determine if a specific type of content is already generated
   const hasContentType = (type: ContentType): boolean => {
     return Boolean(getContentByType(combinedContent, type));
   };
   
-  // Determine which content type is next in the sequence
   const getNextContentType = (): ContentType | null => {
     if (!hasContentType('lld')) return 'lld';
     if (!hasContentType('code')) return 'code';
@@ -393,7 +376,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     return null;
   };
 
-  // Show information about existing content and generation sequence
   const renderStatusInfo = () => {
     if (isGenerating || isGeneratingAll) {
       return (

@@ -186,7 +186,6 @@ export const useStoriesState = () => {
     setTicketTypeFilter,
     setTicketStatusFilter,
     setSearchTerm,
-    setApiType,
     
     // API calls
     fetchProjects,

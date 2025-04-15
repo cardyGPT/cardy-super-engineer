@@ -1,11 +1,10 @@
-
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, Filter, List, RefreshCw } from "lucide-react";
-import { useStories } from "@/contexts/StoriesContext";
+import { useStories } from '@/contexts/stories';
 import LoadingContent from "./LoadingContent";
+import { ExternalLink, Filter, List, RefreshCw } from "lucide-react";
 
 interface ProjectSelectorProps {
   lastRefreshTime: Date | null;
@@ -29,7 +28,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     setTicketTypeFilter
   } = useStories();
 
-  // Load tickets automatically when sprint changes
   useEffect(() => {
     if (selectedSprint) {
       fetchTickets(selectedSprint.id);
@@ -57,7 +55,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     
     if (sprint) {
       setSelectedSprint(sprint);
-      // Ticket loading is now handled by the useEffect
     }
   };
 
@@ -78,16 +75,13 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
   const isLoadingSprints = sprintsLoading && selectedProject && (!sprints[selectedProject?.id] || sprints[selectedProject?.id].length === 0);
   const availableSprints = selectedProject ? (sprints[selectedProject.id] || []) : [];
   
-  // Sort sprints by state: active sprints first, then future, then closed
   const sortedSprints = [...availableSprints].sort((a, b) => {
     const stateOrder: Record<string, number> = { 'active': 0, 'future': 1, 'closed': 2 };
-    // Make sure to compare states in lowercase for consistency
     const stateA = (a.state || '').toLowerCase();
     const stateB = (b.state || '').toLowerCase();
     return (stateOrder[stateA] || 3) - (stateOrder[stateB] || 3);
   });
 
-  // Get only active sprints for quick access
   const activeSprints = sortedSprints.filter(sprint => 
     (sprint.state || '').toLowerCase() === 'active'
   );
@@ -187,7 +181,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   <SelectValue placeholder="Select a sprint" />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* Show active sprints first with special indicator */}
                   {activeSprints.length > 0 && (
                     <>
                       <SelectItem value="active-header-group" disabled className="font-semibold text-green-600 py-1">
@@ -211,7 +204,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                     </>
                   )}
                   
-                  {/* Show non-active sprints */}
                   {sortedSprints
                     .filter(sprint => (sprint.state || '').toLowerCase() !== 'active')
                     .map(sprint => {

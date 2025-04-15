@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from "react";
-import { useStories } from "@/contexts/StoriesContext";
+import { useStories } from "@/contexts/stories";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

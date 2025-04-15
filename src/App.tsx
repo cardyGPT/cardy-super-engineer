@@ -2,7 +2,7 @@
 import React from 'react';
 import { RouterProvider } from 'react-router-dom';
 import { Toaster } from "@/components/ui/toaster";
-import { StoriesProvider } from '@/contexts/stories/StoriesContext';
+import { StoriesProvider } from '@/contexts/stories';
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { routes } from './routes';
