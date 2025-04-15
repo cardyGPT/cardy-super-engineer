@@ -5,7 +5,9 @@ import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StoryGenerateContent from './generate-content/StoryGenerateContent';
+import StoryDetail from './StoryDetail';
 
 interface StoryDetailsProps {
   projectContext?: string | null;
@@ -45,51 +47,12 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
   }
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between">
-            <span>
-              {selectedTicket.key}: {selectedTicket.summary}
-            </span>
-            {selectedTicket.issuetype && (
-              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                {selectedTicket.issuetype.name}
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <h3 className="font-medium mb-2">Description</h3>
-              <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
-                {selectedTicket.description || 'No description available'}
-              </div>
-            </div>
-
-            {selectedTicket.acceptance_criteria && (
-              <div>
-                <h3 className="font-medium mb-2">Acceptance Criteria</h3>
-                <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
-                  {selectedTicket.acceptance_criteria}
-                </div>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <StoryGenerateContent
-        ticket={selectedTicket}
-        projectContext={projectContext}
-        selectedDocuments={selectedDocuments}
-        onGenerate={generateContent}
-        onPushToJira={pushToJira}
-        generatedContent={generatedContent}
-        isGenerating={contentLoading}
-      />
-    </div>
+    <StoryDetail 
+      ticket={selectedTicket}
+      projectContext={projectContext} 
+      selectedDocuments={selectedDocuments}
+      projectContextData={projectContextData}
+    />
   );
 };
 

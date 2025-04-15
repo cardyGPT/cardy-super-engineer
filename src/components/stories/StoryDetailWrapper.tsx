@@ -3,6 +3,9 @@ import React from 'react';
 import { useStories } from '@/contexts/StoriesContext';
 import StoryDetail from './StoryDetail';
 import { ProjectContextData } from '@/types/jira';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface StoryDetailWrapperProps {
   projectContext?: string | null;
@@ -17,9 +20,22 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
 }) => {
   const { selectedTicket } = useStories();
 
-  // If no ticket is selected, render nothing to prevent errors
   if (!selectedTicket) {
-    return null;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Story Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Select a story to view details
+            </AlertDescription>
+          </Alert>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

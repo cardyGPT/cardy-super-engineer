@@ -11,7 +11,7 @@ import { ProjectContextData } from "@/types/jira";
 
 // Components
 import StoryList from "@/components/stories/StoryList";
-import StoryDetails from "@/components/stories/StoryDetails";
+import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
 import ContextBanner from "@/components/stories/ContextBanner";
 import ContextDialog from "@/components/stories/ContextDialog";
@@ -220,7 +220,7 @@ const StoriesPage: React.FC = () => {
             </div>
             
             <div className="space-y-4">
-              <StoryDetails 
+              <StoryDetailWrapper 
                 projectContext={selectedProjectContext} 
                 selectedDocuments={selectedDocuments}
                 projectContextData={projectContextData}
