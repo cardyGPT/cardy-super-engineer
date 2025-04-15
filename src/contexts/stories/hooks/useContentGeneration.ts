@@ -8,6 +8,7 @@ import {
   JiraGenerationResponse
 } from '@/types/jira';
 import { generateJiraContent, pushContentToJira } from '../api';
+import { supabase } from '@/lib/supabase';
 
 export const useContentGeneration = (
   credentials: JiraCredentials | null, 
@@ -16,6 +17,7 @@ export const useContentGeneration = (
 ) => {
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
 
   const generateContent = async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
@@ -33,7 +35,7 @@ export const useContentGeneration = (
       
       toast({
         title: "Content Generated",
-        description: "Content has been generated and saved successfully",
+        description: "Content has been generated successfully",
         variant: "success",
       });
       
@@ -48,6 +50,91 @@ export const useContentGeneration = (
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const saveContentToDatabase = async (
+    contentType: 'lld' | 'code' | 'tests' | 'testcases',
+    content: string
+  ): Promise<boolean> => {
+    if (!selectedTicket || !content) {
+      setError('No ticket or content to save');
+      return false;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      // Prepare the data for saving
+      const columnMapping = {
+        lld: 'lld_content',
+        code: 'code_content',
+        tests: 'test_content',
+        testcases: 'testcases_content'
+      };
+      
+      const column = columnMapping[contentType];
+      
+      // Check if there's already an entry for this ticket
+      const { data: existingArtifact, error: fetchError } = await supabase
+        .from('ticket_artifacts')
+        .select('*')
+        .eq('story_id', selectedTicket.key)
+        .maybeSingle();
+      
+      if (fetchError) {
+        throw new Error(fetchError.message);
+      }
+      
+      let result;
+      
+      if (existingArtifact) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .update({ 
+            [column]: content,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingArtifact.id)
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
+      } else {
+        // Create new record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .insert({ 
+            story_id: selectedTicket.key, 
+            project_id: selectedTicket.projectId || '', 
+            sprint_id: selectedTicket.sprintId || '',
+            [column]: content 
+          })
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
+      }
+      
+      toast({
+        title: "Content Saved",
+        description: `${contentType.toUpperCase()} content has been saved to database`,
+        variant: "success",
+      });
+      
+      return true;
+    } catch (err: any) {
+      console.error('Error saving content to database:', err);
+      setError(err.message || 'Failed to save content to database');
+      toast({
+        title: "Error",
+        description: err.message || 'Failed to save content to database',
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -81,8 +168,10 @@ export const useContentGeneration = (
 
   return {
     loading,
+    isSaving,
     generatedContent,
     generateContent,
+    saveContentToDatabase,
     pushToJira
   };
 };

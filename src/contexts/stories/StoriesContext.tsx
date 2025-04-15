@@ -58,6 +58,7 @@ export interface StoriesContextState {
   fetchTicketsByProject: (projectId: string) => Promise<void>;
   generateContent: (request: JiraGenerationRequest) => Promise<JiraGenerationResponse | void>;
   pushToJira: (ticketId: string, content: string) => Promise<boolean>;
+  saveContentToDatabase: (contentType: 'lld' | 'code' | 'tests' | 'testcases', content: string) => Promise<boolean>;
   
   // Utility
   refreshAll: () => Promise<void>;

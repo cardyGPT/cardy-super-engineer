@@ -2,19 +2,19 @@
 import { JiraGenerationResponse } from '@/types/jira';
 import { ContentType } from '../ContentDisplay';
 
-export const getContentByType = (generatedContent: JiraGenerationResponse | null, type: ContentType): string => {
-  if (!generatedContent) return '';
+export const getContentByType = (content: JiraGenerationResponse | null, type: ContentType): string | null => {
+  if (!content) return null;
   
   switch (type) {
     case 'lld':
-      return generatedContent.lldContent || generatedContent.lld || '';
+      return content.lldContent || content.lld || null;
     case 'code':
-      return generatedContent.codeContent || generatedContent.code || '';
+      return content.codeContent || content.code || null;
     case 'tests':
-      return generatedContent.testContent || generatedContent.tests || '';
+      return content.testContent || content.tests || null;
     case 'testcases':
-      return generatedContent.testCasesContent || '';
+      return content.testCasesContent || null;
     default:
-      return '';
+      return null;
   }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import ContentActions from './ContentActions';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { AlertCircle, CheckCircle, Info } from "lucide-react";
+import { useStories } from '@/contexts/StoriesContext';
 
 interface ExistingArtifacts {
   lldContent: string | null;
@@ -46,11 +48,13 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [activeTab, setActiveTab] = useState<ContentType>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingContentType, setGeneratingContentType] = useState<ContentType | null>(null);
   const { toast } = useToast();
   
   const contentRef = useRef<HTMLDivElement>(null);
+  const { saveContentToDatabase } = useStories();
   
   // Effect to update the content when ticket changes or when artifacts are loaded
   useEffect(() => {
@@ -248,6 +252,43 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     }
   };
   
+  const handleSaveToDatabase = async () => {
+    const content = getContentByType(combinedContent, activeTab);
+    
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to save.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setIsSaving(true);
+    try {
+      // Save the content to the database
+      const success = await saveContentToDatabase(activeTab, content);
+      
+      if (success) {
+        toast({
+          title: "Content Saved",
+          description: `${activeTab.toUpperCase()} content has been saved to database.`,
+          variant: "success",
+        });
+      } else {
+        throw new Error("Failed to save content to database.");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save content to database.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   const handlePushToJira = async () => {
     const content = getContentByType(combinedContent, activeTab);
     
@@ -328,8 +369,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const getNextContentType = (): ContentType | null => {
     if (!hasContentType('lld')) return 'lld';
     if (!hasContentType('code')) return 'code';
-    if (!hasContentType('tests')) return 'tests';
     if (!hasContentType('testcases')) return 'testcases';
+    if (!hasContentType('tests')) return 'tests';
     return null;
   };
 
@@ -409,10 +450,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               
               <ContentActions 
                 activeTab={activeTab}
-                content={getContentByType(combinedContent, activeTab)}
+                content={getContentByType(combinedContent, activeTab) || ''}
                 isExporting={isExporting}
+                isSaving={isSaving}
                 isPushingToJira={isPushingToJira}
                 onExportPDF={exportToPDF}
+                onSaveToDatabase={handleSaveToDatabase}
                 onPushToJira={handlePushToJira}
                 storyId={ticket.id}
                 storyKey={ticket.key}

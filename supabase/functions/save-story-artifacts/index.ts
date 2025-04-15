@@ -32,7 +32,7 @@ serve(async (req) => {
 
     // Check if an artifact record already exists for this story
     const { data: existingArtifact, error: lookupError } = await supabase
-      .from('story_artifacts')
+      .from('ticket_artifacts')
       .select('*')
       .eq('story_id', storyId)
       .maybeSingle();
@@ -72,7 +72,7 @@ serve(async (req) => {
     if (existingArtifact) {
       // Update existing record
       const { data, error } = await supabase
-        .from('story_artifacts')
+        .from('ticket_artifacts')
         .update(updateData)
         .eq('id', existingArtifact.id)
         .select();
@@ -89,7 +89,7 @@ serve(async (req) => {
     } else {
       // Create new record
       const { data, error } = await supabase
-        .from('story_artifacts')
+        .from('ticket_artifacts')
         .insert(updateData)
         .select();
 
