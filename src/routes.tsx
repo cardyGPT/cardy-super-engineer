@@ -1,29 +1,28 @@
 
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import StoriesPage from './pages/StoriesPage';
-import Index from './pages/Index';
-import SettingsPage from './pages/SettingsPage';
+import LoginPage from './pages/LoginPage';
 import NotFound from './pages/NotFound';
+import SettingsPage from './pages/SettingsPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import CardyMindPage from './pages/CardyMindPage';
 import DataModelPage from './pages/DataModelPage';
 import DocumentsPage from './pages/DocumentsPage';
 import GSuiteSettingsPage from './pages/GSuiteSettingsPage';
-import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 export const routes = createBrowserRouter([
   {
     path: '/',
-    element: <Index />,
-  },
-  {
-    path: '/login',
     element: <LoginPage />,
   },
   {
-    path: '/stories',
+    path: '/login',
+    element: <Navigate to="/" replace />,
+  },
+  {
+    path: '/dashboard',
     element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
   },
   {

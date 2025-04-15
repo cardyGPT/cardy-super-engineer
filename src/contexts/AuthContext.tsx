@@ -17,6 +17,8 @@ interface AuthContextType {
   loginWithGitHub: () => Promise<boolean>;
   signUp: (email: string, password: string, name?: string) => Promise<boolean>;
   logout: () => void;
+  forgotPassword: (email: string) => Promise<boolean>;
+  resetPassword: (token: string, newPassword: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -186,6 +188,66 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // New method for forgot password
+  const forgotPassword = async (email: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      if (!email) {
+        throw new Error('Email is required');
+      }
+      
+      // Simulate password reset email being sent
+      console.log(`Password reset email would be sent to ${email}`);
+      
+      toast({
+        title: "Password reset email sent",
+        description: "Check your inbox for instructions to reset your password",
+      });
+      
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Failed to send reset email",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // New method for resetting password
+  const resetPassword = async (token: string, newPassword: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      if (!token || !newPassword) {
+        throw new Error('Token and new password are required');
+      }
+      
+      // Simulate password reset
+      console.log(`Password would be reset with token: ${token}`);
+      
+      toast({
+        title: "Password reset successful",
+        description: "Your password has been updated. You can now log in with your new password.",
+      });
+      
+      return true;
+    } catch (error: any) {
+      toast({
+        title: "Failed to reset password",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+      return false;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     localStorage.removeItem('cardyUser');
@@ -206,6 +268,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         loginWithGitHub,
         signUp,
         logout,
+        forgotPassword,
+        resetPassword
       }}
     >
       {children}
