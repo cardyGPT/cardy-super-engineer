@@ -1,3 +1,4 @@
+
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { DEV_MODE, callJiraApi, saveGeneratedContent, sanitizeContentForReact } from './apiUtils';
 import { supabase } from '@/lib/supabase';
@@ -28,8 +29,12 @@ export const generateJiraContent = async (
     }
     
     // Make API call to generate content
-    const response = await callJiraApi('/generate-content', {
+    // Update: Use fetch directly since callJiraApi requires credentials
+    const response = await fetch('/api/generate-content', {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         ticketId: ticket.id,
         ticketKey: ticket.key,
@@ -75,14 +80,16 @@ export const generateJiraContent = async (
  * Pushes content to Jira as a comment
  */
 export const pushContentToJira = async (
-  credentials: any,
   ticketId: string,
   content: string
 ): Promise<boolean> => {
   try {
-    // Make API call to push content to Jira
-    const response = await callJiraApi(`/jira-api/issue/${ticketId}/comment`, {
+    // Update: Use fetch directly instead of callJiraApi
+    const response = await fetch(`/api/jira-api/issue/${ticketId}/comment`, {
       method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         body: content
       })
