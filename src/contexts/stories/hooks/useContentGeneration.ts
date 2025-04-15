@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { 
   JiraCredentials, 
@@ -8,6 +8,7 @@ import {
   JiraGenerationResponse
 } from '@/types/jira';
 import { generateJiraContent, pushContentToJira } from '../api';
+import { supabase } from '@/lib/supabase';
 
 export const useContentGeneration = (
   credentials: JiraCredentials | null, 
@@ -17,6 +18,44 @@ export const useContentGeneration = (
   const [loading, setLoading] = useState(false);
   const [generatedContent, setGeneratedContent] = useState<JiraGenerationResponse | null>(null);
   const { toast } = useToast();
+
+  // Load saved content from the database when ticket changes
+  useEffect(() => {
+    const loadSavedContent = async () => {
+      if (!selectedTicket?.key) {
+        setGeneratedContent(null);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .select('*')
+          .eq('story_id', selectedTicket.key)
+          .maybeSingle();
+          
+        if (error) {
+          console.error('Error loading saved content:', error);
+          return;
+        }
+        
+        if (data) {
+          setGeneratedContent({
+            lldContent: data.lld_content || null,
+            codeContent: data.code_content || null,
+            testContent: data.test_content || null,
+            testCasesContent: data.testcases_content || null
+          });
+        } else {
+          setGeneratedContent(null);
+        }
+      } catch (err) {
+        console.error('Error loading saved content:', err);
+      }
+    };
+    
+    loadSavedContent();
+  }, [selectedTicket?.key]);
 
   const generateContent = async (request: JiraGenerationRequest): Promise<JiraGenerationResponse | void> => {
     if (!selectedTicket) {
@@ -29,7 +68,12 @@ export const useContentGeneration = (
 
     try {
       const responseData = await generateJiraContent(selectedTicket, request);
-      setGeneratedContent(responseData);
+      
+      // Update the generatedContent state with new data, preserving other content types
+      setGeneratedContent(prevContent => ({
+        ...prevContent,
+        ...responseData
+      }));
       
       toast({
         title: "Content Generated",

@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -65,10 +66,10 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         setActiveTab('lld');
       } else if (existingArtifacts.codeContent) {
         setActiveTab('code');
-      } else if (existingArtifacts.testContent) {
-        setActiveTab('tests');
       } else if (existingArtifacts.testCasesContent) {
         setActiveTab('testcases');
+      } else if (existingArtifacts.testContent) {
+        setActiveTab('tests');
       }
     }
   }, [ticket.key, existingArtifacts]);
@@ -89,7 +90,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const handleGenerate = async (type: ContentType) => {
     try {
-      // Check dependencies for generation process
+      // Check dependencies for generation process - strictly enforce LLD → Code → Test Cases → Tests
       if (type === 'code' && !combinedContent.lldContent) {
         toast({
           title: "Missing LLD",
@@ -99,19 +100,19 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         return;
       }
       
-      if (type === 'tests' && !combinedContent.codeContent) {
+      if (type === 'testcases' && !combinedContent.lldContent) {
         toast({
-          title: "Missing Code",
-          description: "Please generate code first before generating tests.",
+          title: "Missing LLD",
+          description: "Please generate an LLD first before generating test cases.",
           variant: "destructive",
         });
         return;
       }
       
-      if (type === 'testcases' && !combinedContent.lldContent) {
+      if (type === 'tests' && !combinedContent.codeContent) {
         toast({
-          title: "Missing LLD",
-          description: "Please generate an LLD first before generating test cases.",
+          title: "Missing Code",
+          description: "Please generate code first before generating tests.",
           variant: "destructive",
         });
         return;
@@ -151,12 +152,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               codeContent: combinedContent.codeContent
             };
           }
-          if (combinedContent.testContent) {
-            request.additionalContext = {
-              ...request.additionalContext,
-              testContent: combinedContent.testContent
-            };
-          }
         }
       }
       
@@ -181,7 +176,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
     try {
-      // Generate in specific sequence: LLD -> Code -> TestCases -> Tests
+      // Generate in specific sequence: LLD → Code → TestCases → Tests
       const types: ContentType[] = ['lld', 'code', 'testcases', 'tests'];
       
       for (const type of types) {
@@ -215,12 +210,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               request.additionalContext = {
                 ...request.additionalContext,
                 codeContent: combinedContent.codeContent || generatedContent?.codeContent
-              };
-            }
-            if (combinedContent.testContent || generatedContent?.testContent) {
-              request.additionalContext = {
-                ...request.additionalContext,
-                testContent: combinedContent.testContent || generatedContent?.testContent
               };
             }
           }
@@ -328,8 +317,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const getNextContentType = (): ContentType | null => {
     if (!hasContentType('lld')) return 'lld';
     if (!hasContentType('code')) return 'code';
-    if (!hasContentType('tests')) return 'tests';
     if (!hasContentType('testcases')) return 'testcases';
+    if (!hasContentType('tests')) return 'tests';
     return null;
   };
 
@@ -352,7 +341,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     if (nextType) {
       const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
                             nextType === 'code' ? 'Implementation Code' :
-                            nextType === 'testcases' ? 'Test Cases' : 'Unit Tests';
+                            nextType === 'testcases' ? 'Test Cases' : 'Playwright Tests';
       
       return (
         <Alert className="mb-4">

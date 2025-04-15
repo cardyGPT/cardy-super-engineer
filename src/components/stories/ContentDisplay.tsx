@@ -1,101 +1,129 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
+import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
-import { formatContentForDisplay } from '@/utils/contentFormatters';
+import { Skeleton } from "@/components/ui/skeleton";
+import { sanitizeHtml } from '@/contexts/stories/api';
 
 export type ContentType = 'lld' | 'code' | 'tests' | 'testcases';
 
 interface ContentDisplayProps {
-  content: string | undefined | null;
+  content: string | null | undefined;
   contentType: ContentType;
+  isLoading?: boolean;
 }
 
-const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType }) => {
-  if (!content) {
+// Function to add table of contents if it doesn't exist (for LLD)
+const ensureTableOfContents = (content: string): string => {
+  // Only process LLD content
+  if (!content.trim().startsWith('# Low-Level Design') && 
+      !content.trim().startsWith('# LLD') &&
+      !content.trim().startsWith('#Low-Level Design') &&
+      !content.trim().startsWith('#LLD')) {
+    return content;
+  }
+  
+  // Check if TOC already exists
+  if (content.includes('## Table of Contents') || 
+      content.includes('## Contents') || 
+      content.includes('## TOC')) {
+    return content;
+  }
+  
+  // Extract headings for TOC
+  const headingRegex = /^##\s+(.+)$/gm;
+  const headings: {level: number, text: string}[] = [];
+  let match;
+  
+  // Find all h2 headings
+  const lines = content.split('\n');
+  let inCodeBlock = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    
+    // Skip headings in code blocks
+    if (line.trim().startsWith('```')) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+    
+    if (!inCodeBlock && line.trim().startsWith('## ')) {
+      const headingText = line.trim().replace(/^##\s+/, '');
+      const anchor = headingText.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+      headings.push({ level: 2, text: headingText });
+    }
+  }
+  
+  // Build TOC
+  let toc = '## Table of Contents\n';
+  headings.forEach((heading, index) => {
+    const anchor = heading.text.toLowerCase().replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+    toc += `${index + 1}. [${heading.text}](#${anchor})\n`;
+  });
+  
+  // Find insertion point (after first heading)
+  const firstHeadingEnd = content.indexOf('\n', content.indexOf('#'));
+  if (firstHeadingEnd === -1) {
+    return content + '\n\n' + toc + '\n';
+  }
+  
+  // Insert TOC after first heading
+  return content.substring(0, firstHeadingEnd + 1) + 
+         '\n' + toc + '\n' + 
+         content.substring(firstHeadingEnd + 1);
+};
+
+const ContentDisplay: React.FC<ContentDisplayProps> = ({ 
+  content, 
+  contentType,
+  isLoading = false
+}) => {
+  if (isLoading) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        <p className="mb-2">No {contentType.toUpperCase()} content available</p>
-        <p className="text-sm">Use the generate button above to create content</p>
+      <div className="space-y-3">
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-6 w-full" />
+        <Skeleton className="h-6 w-5/6" />
+        <Skeleton className="h-6 w-2/3" />
+        <Skeleton className="h-6 w-full" />
       </div>
     );
   }
-
-  const formattedContent = formatContentForDisplay(content);
-
+  
+  if (!content) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        No content available. Generate content first.
+      </div>
+    );
+  }
+  
+  // Process content based on type
+  let processedContent = content;
+  
+  // For LLD, ensure there's a table of contents
+  if (contentType === 'lld') {
+    processedContent = ensureTableOfContents(processedContent);
+  }
+  
+  // If it's HTML content, sanitize it
+  if (processedContent.includes('<html>') || 
+      processedContent.includes('<body>') || 
+      processedContent.includes('<div>')) {
+    return <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(processedContent) }} />;
+  }
+  
   return (
-    <div className="markdown-content">
+    <div className="markdown-content prose prose-sm max-w-none">
       <ReactMarkdown
-        children={formattedContent}
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeRaw, [rehypeHighlight, { ignoreMissing: true }]]}
-        components={{
-          // Override components for better styling
-          h1: ({ node, ...props }) => <h1 className="text-2xl font-bold border-b pb-2 mb-4" {...props} />,
-          h2: ({ node, ...props }) => <h2 className="text-xl font-bold border-b pb-2 mt-6 mb-4" {...props} />,
-          h3: ({ node, ...props }) => <h3 className="text-lg font-semibold mt-5 mb-3" {...props} />,
-          h4: ({ node, ...props }) => <h4 className="text-base font-semibold mt-4 mb-2" {...props} />,
-          
-          p: ({ node, ...props }) => <p className="mb-4" {...props} />,
-          
-          a: ({ node, ...props }) => (
-            <a 
-              className="text-blue-600 hover:underline" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              {...props} 
-            />
-          ),
-          
-          ul: ({ node, ...props }) => <ul className="list-disc pl-6 mb-4" {...props} />,
-          ol: ({ node, ...props }) => <ol className="list-decimal pl-6 mb-4" {...props} />,
-          li: ({ node, ...props }) => <li className="mb-1" {...props} />,
-          
-          blockquote: ({ node, ...props }) => (
-            <blockquote className="border-l-4 border-gray-300 pl-4 py-1 my-4 text-gray-700" {...props} />
-          ),
-          
-          pre: ({ node, ...props }) => <pre className="bg-gray-50 p-4 rounded-md overflow-x-auto mb-4" {...props} />,
-          
-          code: ({ node, className, children, ...props }) => {
-            const match = /language-(\w+)/.exec(className || '');
-            return (
-              <code
-                className={match ? className : 'text-gray-800 bg-gray-100 px-1 py-0.5 rounded text-sm'}
-                {...props}
-              >
-                {children}
-              </code>
-            );
-          },
-          
-          table: ({ node, ...props }) => (
-            <div className="overflow-x-auto mb-4">
-              <table className="min-w-full border border-gray-300 divide-y divide-gray-300" {...props} />
-            </div>
-          ),
-          
-          thead: ({ node, ...props }) => <thead className="bg-gray-50" {...props} />,
-          
-          th: ({ node, ...props }) => (
-            <th className="py-3 px-4 text-sm font-semibold text-left text-gray-900 border-r last:border-r-0" {...props} />
-          ),
-          
-          td: ({ node, ...props }) => (
-            <td className="py-2 px-4 text-sm text-gray-900 border-r last:border-r-0" {...props} />
-          ),
-          
-          tr: ({ node, ...props }) => <tr className="border-b last:border-b-0" {...props} />,
-          
-          img: ({ node, ...props }) => (
-            <img className="max-w-full h-auto my-4 rounded-md" {...props} alt={props.alt || 'Image'} />
-          ),
-          
-          hr: ({ node, ...props }) => <hr className="my-6 border-t border-gray-300" {...props} />,
-        }}
-      />
+      >
+        {processedContent}
+      </ReactMarkdown>
     </div>
   );
 };
