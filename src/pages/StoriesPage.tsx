@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -189,7 +190,7 @@ const StoriesPage: React.FC = () => {
                 disabled={loading || isRefreshing}
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${(loading || isRefreshing) ? 'animate-spin' : ''}`} />
-                {(loading || isRefreshing) ? 'Loading...' : 'Refresh'}
+                {(loading || isRefreshing) ? 'Loading...' : 'Refresh All'}
               </Button>
             )}
             

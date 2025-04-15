@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,13 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     setTicketTypeFilter
   } = useStories();
 
+  // Load tickets automatically when sprint changes
+  useEffect(() => {
+    if (selectedSprint) {
+      fetchTickets(selectedSprint.id);
+    }
+  }, [selectedSprint, fetchTickets]);
+
   const handleProjectChange = async (projectId: string) => {
     const project = projects.find(p => p.id === projectId);
     
@@ -50,7 +57,7 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
     
     if (sprint) {
       setSelectedSprint(sprint);
-      fetchTickets(sprint.id);
+      // Ticket loading is now handled by the useEffect
     }
   };
 
@@ -84,21 +91,6 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
   const activeSprints = sortedSprints.filter(sprint => 
     (sprint.state || '').toLowerCase() === 'active'
   );
-
-  // Log sprint information for debugging
-  if (selectedProject && availableSprints.length > 0) {
-    console.log('All available sprints:', availableSprints.map(s => ({ 
-      id: s.id, 
-      name: s.name, 
-      state: s.state,
-      stateType: typeof s.state
-    })));
-    
-    console.log('Active sprints found:', activeSprints.length);
-    if (activeSprints.length > 0) {
-      console.log('Active sprints:', activeSprints.map(s => ({ id: s.id, name: s.name })));
-    }
-  }
 
   return (
     <Card className="shadow-sm">
@@ -242,6 +234,13 @@ const ProjectSelector: React.FC<ProjectSelectorProps> = ({ lastRefreshTime }) =>
                   }
                 </SelectContent>
               </Select>
+              
+              {ticketsLoading && (
+                <div className="mt-2 text-xs text-center text-muted-foreground animate-pulse">
+                  Loading tickets from sprint...
+                </div>
+              )}
+              
               <div className="flex justify-between mt-1">
                 <Button 
                   variant="outline" 

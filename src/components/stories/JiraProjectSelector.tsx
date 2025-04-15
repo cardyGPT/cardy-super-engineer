@@ -25,12 +25,14 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     sprints, 
     sprintsLoading, 
     projectsLoading,
+    ticketsLoading,
     error,
     apiType,
     setApiType,
     totalTickets,
     fetchProjects,
-    fetchSprints
+    fetchSprints,
+    fetchTickets
   } = useStories();
   
   // Refresh projects when API type changes
@@ -63,6 +65,9 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
     const sprint = sprints[selectedProject.id]?.find(s => s.id === sprintId);
     if (sprint) {
       setSelectedSprint(sprint);
+      
+      // Automatically fetch tickets when a sprint is selected
+      fetchTickets(sprint.id);
     }
   };
   
@@ -213,6 +218,14 @@ const JiraProjectSelector: React.FC<JiraProjectSelectorProps> = ({ lastRefreshTi
                   <AlertDescription>No sprints found for this project</AlertDescription>
                 </Alert>
               )}
+            </div>
+          )}
+
+          {selectedProject && selectedSprint && ticketsLoading && (
+            <div className="mt-2 text-xs text-center text-muted-foreground">
+              <Skeleton className="h-4 w-full mt-1" />
+              <Skeleton className="h-4 w-3/4 mx-auto mt-1" />
+              <p className="mt-1 animate-pulse">Loading tickets from Jira...</p>
             </div>
           )}
         </CardContent>
