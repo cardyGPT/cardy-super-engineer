@@ -1,5 +1,5 @@
 
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import StoriesPage from './pages/StoriesPage';
 import Index from './pages/Index';
 import SettingsPage from './pages/SettingsPage';
@@ -10,6 +10,8 @@ import CardyMindPage from './pages/CardyMindPage';
 import DataModelPage from './pages/DataModelPage';
 import DocumentsPage from './pages/DocumentsPage';
 import GSuiteSettingsPage from './pages/GSuiteSettingsPage';
+import LoginPage from './pages/LoginPage';
+import ProtectedRoute from './components/auth/ProtectedRoute';
 
 export const routes = createBrowserRouter([
   {
@@ -17,64 +19,68 @@ export const routes = createBrowserRouter([
     element: <Index />,
   },
   {
+    path: '/login',
+    element: <LoginPage />,
+  },
+  {
     path: '/stories',
-    element: <StoriesPage />,
+    element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
   },
   {
     path: '/settings',
-    element: <SettingsPage />,
+    element: <ProtectedRoute><SettingsPage /></ProtectedRoute>,
   },
   {
     path: '/projects',
-    element: <ProjectsPage />,
+    element: <ProtectedRoute><ProjectsPage /></ProtectedRoute>,
   },
   {
     path: '/projects/:id',
-    element: <ProjectDetailPage />,
+    element: <ProtectedRoute><ProjectDetailPage /></ProtectedRoute>,
   },
   {
     path: '/cardy-mind',
-    element: <CardyMindPage />,
+    element: <ProtectedRoute><CardyMindPage /></ProtectedRoute>,
   },
   {
     path: '/data-model',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/data-models',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/er-diagram',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/smart-er',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/smart-er-diagram',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/docs-model',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/docs-&-data-model',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/docs-and-data-model',
-    element: <DataModelPage />,
+    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
   },
   {
     path: '/documents',
-    element: <DocumentsPage />,
+    element: <ProtectedRoute><DocumentsPage /></ProtectedRoute>,
   },
   {
     path: '/gsuite-settings',
-    element: <GSuiteSettingsPage />,
+    element: <ProtectedRoute><GSuiteSettingsPage /></ProtectedRoute>,
   },
   {
     path: '*',
