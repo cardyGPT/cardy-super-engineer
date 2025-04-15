@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -48,6 +47,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [generatingContentType, setGeneratingContentType] = useState<ContentType | null>(null);
   const { toast } = useToast();
   
   const contentRef = useRef<HTMLDivElement>(null);
@@ -117,6 +117,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         return;
       }
       
+      // Set which content type is being generated
+      setGeneratingContentType(type);
+      
       const request: JiraGenerationRequest = {
         type,
         jiraTicket: ticket,
@@ -170,15 +173,19 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         description: err.message || `Failed to generate ${type.toUpperCase()} content.`,
         variant: "destructive",
       });
+    } finally {
+      setGeneratingContentType(null);
     }
   };
   
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
     try {
-      const types: ContentType[] = ['lld', 'code', 'tests', 'testcases'];
+      // Generate in specific sequence: LLD -> Code -> TestCases -> Tests
+      const types: ContentType[] = ['lld', 'code', 'testcases', 'tests'];
       
       for (const type of types) {
+        setGeneratingContentType(type);
         const request: JiraGenerationRequest = {
           type,
           jiraTicket: ticket,
@@ -226,7 +233,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, Tests, and Test Cases content has been generated successfully.",
+        description: "LLD, Code, Test Cases, and Tests content has been generated successfully.",
+        variant: "success",
       });
     } catch (err: any) {
       toast({
@@ -236,6 +244,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
     } finally {
       setIsGeneratingAll(false);
+      setGeneratingContentType(null);
     }
   };
   
@@ -333,7 +342,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           <AlertTitle>Getting Started</AlertTitle>
           <AlertDescription>
             Start by generating the Low-Level Design (LLD) for this ticket. Once the LLD is created, you can proceed 
-            to generate implementation code, tests, and test cases in sequence.
+            to generate implementation code, test cases, and tests in sequence.
           </AlertDescription>
         </Alert>
       );
@@ -343,7 +352,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     if (nextType) {
       const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
                             nextType === 'code' ? 'Implementation Code' :
-                            nextType === 'tests' ? 'Unit Tests' : 'Test Cases';
+                            nextType === 'testcases' ? 'Test Cases' : 'Unit Tests';
       
       return (
         <Alert className="mb-4">
@@ -378,6 +387,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         isGenerating={isGenerating}
         isGeneratingAll={isGeneratingAll}
         activeTab={activeTab}
+        generatingContentType={generatingContentType}
         hasLldContent={hasContentType('lld')}
         hasCodeContent={hasContentType('code')}
         hasTestsContent={hasContentType('tests')}
