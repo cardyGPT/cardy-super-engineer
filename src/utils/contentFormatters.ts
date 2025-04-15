@@ -21,8 +21,37 @@ export const formatContentForDisplay = (content: string): string => {
 export const formatCodeBlocks = (content: string): string => {
   if (!content) return '';
   
+  // Pre-process markdown to handle edge cases
+  let processedContent = content;
+  
+  // Replace any triple-backtick code blocks with proper language annotations if missing
+  processedContent = processedContent.replace(/```\s*\n([\s\S]*?)```/g, (match, code) => {
+    // Try to detect language
+    const firstLine = code.trim().split('\n')[0];
+    let detectedLang = 'plaintext';
+    
+    if (firstLine.includes('function') || firstLine.includes('const') || 
+        firstLine.includes('let') || firstLine.includes('var') || 
+        firstLine.includes('class') || firstLine.includes('import') || 
+        firstLine.includes('export')) {
+      detectedLang = firstLine.includes('tsx') ? 'tsx' : 
+                     firstLine.includes('jsx') ? 'jsx' : 'javascript';
+    } else if (firstLine.includes('<html') || firstLine.includes('<!DOCTYPE') || 
+              firstLine.includes('<div') || firstLine.includes('<p')) {
+      detectedLang = 'html';
+    } else if (firstLine.includes('SELECT') || firstLine.includes('INSERT') || 
+              firstLine.includes('UPDATE') || firstLine.includes('DELETE')) {
+      detectedLang = 'sql';
+    } else if (firstLine.includes('public class') || firstLine.includes('private class') || 
+              firstLine.includes('@Test')) {
+      detectedLang = 'java';
+    }
+    
+    return `\`\`\`${detectedLang}\n${code}\`\`\``;
+  });
+  
   // Find all code blocks and add syntax highlighting
-  return content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
+  processedContent = processedContent.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, language, code) => {
     const lang = language || 'plaintext';
     try {
       const highlighted = hljs.highlight(code, { language: lang }).value;
@@ -32,6 +61,41 @@ export const formatCodeBlocks = (content: string): string => {
       return `<pre class="code-block"><code class="language-${lang}">${code}</code></pre>`;
     }
   });
+  
+  // Handle inline code blocks
+  processedContent = processedContent.replace(/`([^`]+)`/g, (match, code) => {
+    return `<code class="inline-code">${code}</code>`;
+  });
+  
+  // Replace markdown headings
+  processedContent = processedContent.replace(/^# (.*$)/gm, '<h1>$1</h1>');
+  processedContent = processedContent.replace(/^## (.*$)/gm, '<h2>$1</h2>');
+  processedContent = processedContent.replace(/^### (.*$)/gm, '<h3>$1</h3>');
+  processedContent = processedContent.replace(/^#### (.*$)/gm, '<h4>$1</h4>');
+  processedContent = processedContent.replace(/^##### (.*$)/gm, '<h5>$1</h5>');
+  
+  // Replace markdown lists
+  processedContent = processedContent.replace(/^\* (.*$)/gm, '<ul><li>$1</li></ul>');
+  processedContent = processedContent.replace(/^\- (.*$)/gm, '<ul><li>$1</li></ul>');
+  processedContent = processedContent.replace(/^\d+\. (.*$)/gm, '<ol><li>$1</li></ol>');
+  
+  // Simplify multiple list elements
+  processedContent = processedContent.replace(/<\/ul>\s*<ul>/g, '');
+  processedContent = processedContent.replace(/<\/ol>\s*<ol>/g, '');
+  
+  // Replace markdown tables (basic support)
+  processedContent = processedContent.replace(/^\|(.+)\|$/gm, '<table><tr><td>$1</td></tr></table>');
+  processedContent = processedContent.replace(/^([^<].*)\|([^<].*)$/gm, '<tr><td>$1</td><td>$2</td></tr>');
+  processedContent = processedContent.replace(/<\/table>\s*<table>/g, '');
+  
+  // Handle bold and italic text
+  processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  processedContent = processedContent.replace(/\*(.*?)\*/g, '<em>$1</em>');
+  
+  // Handle links
+  processedContent = processedContent.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2">$1</a>');
+
+  return processedContent;
 };
 
 export const downloadContent = (content: string, filename: string): void => {
@@ -80,6 +144,7 @@ export const downloadFormattedHTML = (content: string, filename: string): void =
     pre { padding: 16px; overflow: auto; background-color: #f6f8fa; border-radius: 3px; }
     pre code { padding: 0; border: none; background-color: transparent; }
     .code-block { background-color: #f6f8fa; padding: 1em; border-radius: 5px; overflow-x: auto; }
+    .inline-code { background-color: rgba(27,31,35,0.05); padding: 0.2em 0.4em; border-radius: 3px; font-size: 85%; }
     table { border-collapse: collapse; width: 100%; }
     table, th, td { border: 1px solid #dfe2e5; }
     th, td { padding: 6px 13px; }

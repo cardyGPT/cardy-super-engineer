@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { useToast } from "@/hooks/use-toast";
 import ContentDisplay, { ContentType } from '../ContentDisplay';
 import { getContentByType } from './utils';
@@ -11,6 +12,14 @@ import ContentTabs from './ContentTabs';
 import ContentActions from './ContentActions';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
+import { AlertCircle, CheckCircle, Info } from "lucide-react";
+
+interface ExistingArtifacts {
+  lldContent: string | null;
+  codeContent: string | null;
+  testContent: string | null;
+  testCasesContent: string | null;
+}
 
 interface StoryGenerateContentProps {
   ticket: JiraTicket;
@@ -21,6 +30,7 @@ interface StoryGenerateContentProps {
   onPushToJira: (ticketId: string, content: string) => Promise<boolean>;
   generatedContent: JiraGenerationResponse | null;
   isGenerating: boolean;
+  existingArtifacts?: ExistingArtifacts;
 }
 
 const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
@@ -31,7 +41,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   onGenerate,
   onPushToJira,
   generatedContent,
-  isGenerating
+  isGenerating,
+  existingArtifacts
 }) => {
   const [activeTab, setActiveTab] = useState<ContentType>('lld');
   const [isPushingToJira, setIsPushingToJira] = useState(false);
@@ -41,14 +52,110 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const contentRef = useRef<HTMLDivElement>(null);
   
+  // Effect to update the content when ticket changes or when artifacts are loaded
+  useEffect(() => {
+    // Reset any in-memory content when the ticket changes
+    if (existingArtifacts && 
+        (existingArtifacts.lldContent || 
+         existingArtifacts.codeContent || 
+         existingArtifacts.testContent || 
+         existingArtifacts.testCasesContent)) {
+      // If we have stored content, set the active tab to the first available content
+      if (existingArtifacts.lldContent) {
+        setActiveTab('lld');
+      } else if (existingArtifacts.codeContent) {
+        setActiveTab('code');
+      } else if (existingArtifacts.testContent) {
+        setActiveTab('tests');
+      } else if (existingArtifacts.testCasesContent) {
+        setActiveTab('testcases');
+      }
+    }
+  }, [ticket.key, existingArtifacts]);
+
+  // Combine generatedContent with existingArtifacts
+  const combinedContent: JiraGenerationResponse = {
+    ...(existingArtifacts || {}),
+    ...(generatedContent || {})
+  };
+  
+  // Determine if we have any existing content
+  const hasAnyContent = Boolean(
+    combinedContent.lldContent || 
+    combinedContent.codeContent || 
+    combinedContent.testContent || 
+    combinedContent.testCasesContent
+  );
+  
   const handleGenerate = async (type: ContentType) => {
     try {
+      // Check dependencies for generation process
+      if (type === 'code' && !combinedContent.lldContent) {
+        toast({
+          title: "Missing LLD",
+          description: "Please generate an LLD first before generating code.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (type === 'tests' && !combinedContent.codeContent) {
+        toast({
+          title: "Missing Code",
+          description: "Please generate code first before generating tests.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      if (type === 'testcases' && !combinedContent.lldContent) {
+        toast({
+          title: "Missing LLD",
+          description: "Please generate an LLD first before generating test cases.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
       const request: JiraGenerationRequest = {
         type,
         jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
+        additionalContext: {}
       };
+      
+      // Add previous artifacts to context for subsequent generations
+      if (type !== 'lld') {
+        if (combinedContent.lldContent) {
+          request.additionalContext = {
+            ...request.additionalContext,
+            lldContent: combinedContent.lldContent
+          };
+        }
+        
+        if (type === 'tests' && combinedContent.codeContent) {
+          request.additionalContext = {
+            ...request.additionalContext,
+            codeContent: combinedContent.codeContent
+          };
+        }
+        
+        if (type === 'testcases') {
+          if (combinedContent.codeContent) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              codeContent: combinedContent.codeContent
+            };
+          }
+          if (combinedContent.testContent) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              testContent: combinedContent.testContent
+            };
+          }
+        }
+      }
       
       await onGenerate(request);
       setActiveTab(type);
@@ -77,7 +184,41 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           jiraTicket: ticket,
           projectContext: projectContext || undefined,
           selectedDocuments: selectedDocuments || [],
+          additionalContext: {}
         };
+        
+        // Add previous artifacts to context for subsequent generations
+        if (type !== 'lld') {
+          if (combinedContent.lldContent || generatedContent?.lldContent) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              lldContent: combinedContent.lldContent || generatedContent?.lldContent
+            };
+          }
+          
+          if (type === 'tests' && (combinedContent.codeContent || generatedContent?.codeContent)) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              codeContent: combinedContent.codeContent || generatedContent?.codeContent
+            };
+          }
+          
+          if (type === 'testcases') {
+            if (combinedContent.codeContent || generatedContent?.codeContent) {
+              request.additionalContext = {
+                ...request.additionalContext,
+                codeContent: combinedContent.codeContent || generatedContent?.codeContent
+              };
+            }
+            if (combinedContent.testContent || generatedContent?.testContent) {
+              request.additionalContext = {
+                ...request.additionalContext,
+                testContent: combinedContent.testContent || generatedContent?.testContent
+              };
+            }
+          }
+        }
+        
         await onGenerate(request);
       }
       
@@ -99,7 +240,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   };
   
   const handlePushToJira = async () => {
-    const content = getContentByType(generatedContent, activeTab);
+    const content = getContentByType(combinedContent, activeTab);
     
     if (!content) {
       toast({
@@ -168,33 +309,97 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setIsExporting(false);
     }
   };
+
+  // Determine if a specific type of content is already generated
+  const hasContentType = (type: ContentType): boolean => {
+    return Boolean(getContentByType(combinedContent, type));
+  };
+  
+  // Determine which content type is next in the sequence
+  const getNextContentType = (): ContentType | null => {
+    if (!hasContentType('lld')) return 'lld';
+    if (!hasContentType('code')) return 'code';
+    if (!hasContentType('tests')) return 'tests';
+    if (!hasContentType('testcases')) return 'testcases';
+    return null;
+  };
+
+  // Show information about existing content and generation sequence
+  const renderStatusInfo = () => {
+    if (!hasAnyContent) {
+      return (
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Getting Started</AlertTitle>
+          <AlertDescription>
+            Start by generating the Low-Level Design (LLD) for this ticket. Once the LLD is created, you can proceed 
+            to generate implementation code, tests, and test cases in sequence.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    const nextType = getNextContentType();
+    if (nextType) {
+      const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
+                            nextType === 'code' ? 'Implementation Code' :
+                            nextType === 'tests' ? 'Unit Tests' : 'Test Cases';
+      
+      return (
+        <Alert className="mb-4">
+          <Info className="h-4 w-4" />
+          <AlertTitle>Next Step</AlertTitle>
+          <AlertDescription>
+            Your next step is to generate {nextTypeLabel}. The system will automatically use previously generated
+            content to provide better context.
+          </AlertDescription>
+        </Alert>
+      );
+    }
+    
+    return (
+      <Alert className="mb-4" variant="success">
+        <CheckCircle className="h-4 w-4" />
+        <AlertTitle>All Content Generated</AlertTitle>
+        <AlertDescription>
+          You have generated all content types for this ticket. You can view, export, or push this content to Jira.
+        </AlertDescription>
+      </Alert>
+    );
+  };
   
   return (
     <div className="space-y-4">
+      {renderStatusInfo()}
+      
       <GenerateButtons 
         onGenerate={handleGenerate}
         onGenerateAll={handleGenerateAll}
         isGenerating={isGenerating}
         isGeneratingAll={isGeneratingAll}
         activeTab={activeTab}
+        hasLldContent={hasContentType('lld')}
+        hasCodeContent={hasContentType('code')}
+        hasTestsContent={hasContentType('tests')}
+        hasTestCasesContent={hasContentType('testcases')}
       />
       
-      {generatedContent && (
+      {hasAnyContent && (
         <Card className="overflow-hidden">
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ContentType)}>
             <div className="flex justify-between items-center border-b px-4 py-2">
               <ContentTabs 
                 activeTab={activeTab}
                 onChange={(value) => setActiveTab(value)}
-                hasLldContent={!!getContentByType(generatedContent, 'lld')}
-                hasCodeContent={!!getContentByType(generatedContent, 'code')}
-                hasTestsContent={!!getContentByType(generatedContent, 'tests')}
-                hasTestCasesContent={!!getContentByType(generatedContent, 'testcases')}
+                hasLldContent={hasContentType('lld')}
+                hasCodeContent={hasContentType('code')}
+                hasTestsContent={hasContentType('tests')}
+                hasTestCasesContent={hasContentType('testcases')}
               />
               
               <ContentActions 
                 activeTab={activeTab}
-                content={getContentByType(generatedContent, activeTab)}
+                content={getContentByType(combinedContent, activeTab)}
                 isExporting={isExporting}
                 isPushingToJira={isPushingToJira}
                 onExportPDF={exportToPDF}
@@ -206,16 +411,28 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             
             <div className="p-4" ref={contentRef}>
               <TabsContent value="lld" className="mt-0">
-                <ContentDisplay content={getContentByType(generatedContent, 'lld')} contentType="lld" />
+                <ContentDisplay 
+                  content={getContentByType(combinedContent, 'lld')} 
+                  contentType="lld" 
+                />
               </TabsContent>
               <TabsContent value="code" className="mt-0">
-                <ContentDisplay content={getContentByType(generatedContent, 'code')} contentType="code" />
+                <ContentDisplay 
+                  content={getContentByType(combinedContent, 'code')} 
+                  contentType="code" 
+                />
               </TabsContent>
               <TabsContent value="tests" className="mt-0">
-                <ContentDisplay content={getContentByType(generatedContent, 'tests')} contentType="tests" />
+                <ContentDisplay 
+                  content={getContentByType(combinedContent, 'tests')} 
+                  contentType="tests" 
+                />
               </TabsContent>
               <TabsContent value="testcases" className="mt-0">
-                <ContentDisplay content={getContentByType(generatedContent, 'testcases')} contentType="testcases" />
+                <ContentDisplay 
+                  content={getContentByType(combinedContent, 'testcases')} 
+                  contentType="testcases" 
+                />
               </TabsContent>
             </div>
           </Tabs>

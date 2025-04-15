@@ -88,6 +88,19 @@ Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
     if (additionalContext?.epic) {
       ticketContext += `\nEpic Information:\n${safeStringify(additionalContext.epic)}`;
     }
+    
+    // Add previously generated content as context
+    if (additionalContext?.lldContent && (type === 'code' || type === 'tests' || type === 'testcases')) {
+      ticketContext += `\n\nPreviously Generated LLD:\n${safeStringify(additionalContext.lldContent)}`;
+    }
+    
+    if (additionalContext?.codeContent && (type === 'tests' || type === 'testcases')) {
+      ticketContext += `\n\nPreviously Generated Code:\n${safeStringify(additionalContext.codeContent)}`;
+    }
+    
+    if (additionalContext?.testContent && type === 'testcases') {
+      ticketContext += `\n\nPreviously Generated Tests:\n${safeStringify(additionalContext.testContent)}`;
+    }
 
     // If projectContext is provided, fetch the project and documents info
     if (projectContext) {
@@ -137,7 +150,7 @@ Your response should be detailed, structured, and directly usable in a technical
     } 
     else if (type === 'code') {
       systemPrompt = `You are an expert software developer specializing in AngularJS (frontend), NodeJS (backend), and PostgreSQL.
-Based on the Jira ticket information, create implementation code that addresses the requirements.
+Based on the Jira ticket information and the Low-Level Design document provided, create implementation code that addresses the requirements.
 Include all necessary components, services, and utility functions.
 Structure your code following best practices, with clear comments and error handling.
 Format everything properly in markdown with appropriate syntax highlighting.
@@ -145,14 +158,14 @@ Your code should be complete, well-structured, and ready for review.`;
     } 
     else if (type === 'tests') {
       systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
-Based on the Jira ticket information, create comprehensive test code using Playwright.
+Based on the Jira ticket information, previously generated Low-Level Design, and implementation code, create comprehensive test code using Playwright.
 Include unit tests, integration tests, end-to-end tests, edge cases, and performance test considerations.
 Format everything properly in markdown with clear test scenarios and expected results.
-Your tests should be thorough, covering all aspects of the functionality described in the ticket.`;
+Your tests should be thorough, covering all aspects of the functionality described in the ticket and implementation.`;
     } 
     else if (type === 'testcases') {
       systemPrompt = `You are an expert in software testing with experience in quality assurance and test case design.
-Based on the Jira ticket information, create a comprehensive set of test cases that could be executed manually.
+Based on the Jira ticket information, Low-Level Design document, and other available context, create a comprehensive set of test cases that could be executed manually.
 Include positive tests, negative tests, edge cases, and user experience tests.
 Format everything properly in markdown with clear test steps, expected results, and preconditions.
 Your test cases should be thorough, covering all aspects of the functionality described in the ticket.`;
@@ -166,6 +179,8 @@ Your response should be detailed, structured and directly usable by the developm
 
     // Call OpenAI API
     try {
+      console.log(`Generating ${type} content for ticket ${jiraTicket.key}`);
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -187,7 +202,9 @@ Your response should be detailed, structured and directly usable by the developm
                 type === 'tests' ? 'test code using Playwright' : 
                 type === 'testcases' ? 'manual test cases' : 
                 'response'
-              } based on this Jira ticket information.`
+              } based on this Jira ticket information.${
+                type !== 'lld' ? ' Make sure to utilize the previously generated artifacts in your response.' : ''
+              }`
             }
           ],
           temperature: 0.5,
@@ -202,6 +219,60 @@ Your response should be detailed, structured and directly usable by the developm
 
       const data = await response.json();
       const responseContent = data.choices[0].message.content;
+      
+      // Save the content to the database if ticket key is provided
+      try {
+        if (jiraTicket.key) {
+          console.log(`Saving ${type} content for ticket ${jiraTicket.key}`);
+          
+          const { data: existingData, error: checkError } = await supabase
+            .from('story_artifacts')
+            .select('*')
+            .eq('story_id', jiraTicket.key)
+            .maybeSingle();
+          
+          let updateData: Record<string, any> = {
+            story_id: jiraTicket.key,
+            project_id: jiraTicket.projectId || null,
+            sprint_id: jiraTicket.sprintId || null,
+          };
+          
+          // Set the content based on type
+          if (type === 'lld') {
+            updateData.lld_content = responseContent;
+          } else if (type === 'code') {
+            updateData.code_content = responseContent;
+          } else if (type === 'tests') {
+            updateData.test_content = responseContent;
+          } else if (type === 'testcases') {
+            updateData.testcases_content = responseContent;
+          }
+          
+          if (existingData) {
+            // Update existing record
+            const { error: updateError } = await supabase
+              .from('story_artifacts')
+              .update(updateData)
+              .eq('id', existingData.id);
+              
+            if (updateError) {
+              console.error("Error updating story artifact:", updateError);
+            }
+          } else {
+            // Insert new record
+            const { error: insertError } = await supabase
+              .from('story_artifacts')
+              .insert(updateData);
+              
+            if (insertError) {
+              console.error("Error inserting story artifact:", insertError);
+            }
+          }
+        }
+      } catch (saveError) {
+        console.error("Error saving generated content:", saveError);
+        // Continue even if saving fails
+      }
 
       // Return the generated content
       return new Response(
