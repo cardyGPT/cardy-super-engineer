@@ -6,9 +6,12 @@ import { fetchJiraProjects, fetchJiraSprints } from '../api';
 
 export const useProjectsAndSprints = (
   credentials: JiraCredentials | null,
+  apiType: 'agile' | 'classic' | 'cloud',
   setError: (error: string | null) => void
 ) => {
   const [loading, setLoading] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [sprintsLoading, setSprintsLoading] = useState(false);
   const [projects, setProjects] = useState<JiraProject[]>([]);
   const [sprints, setSprints] = useState<Record<string, JiraSprint[]>>({});
   const [selectedProject, setSelectedProject] = useState<JiraProject | null>(null);
@@ -39,6 +42,7 @@ export const useProjectsAndSprints = (
       return;
     }
 
+    setProjectsLoading(true);
     setLoading(true);
     setError(null);
 
@@ -62,6 +66,7 @@ export const useProjectsAndSprints = (
         variant: "destructive",
       });
     } finally {
+      setProjectsLoading(false);
       setLoading(false);
     }
   };
@@ -79,6 +84,7 @@ export const useProjectsAndSprints = (
       return;
     }
 
+    setSprintsLoading(true);
     setLoading(true);
     setError(null);
 
@@ -117,12 +123,15 @@ export const useProjectsAndSprints = (
       // Set an empty array for sprints to prevent continual loading state
       setSprints(prev => ({ ...prev, [projectToUse]: [] }));
     } finally {
+      setSprintsLoading(false);
       setLoading(false);
     }
   };
 
   return {
     loading,
+    projectsLoading,
+    sprintsLoading,
     projects,
     sprints,
     selectedProject,

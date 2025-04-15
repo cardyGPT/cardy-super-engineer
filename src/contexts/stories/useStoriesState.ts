@@ -34,6 +34,7 @@ export const useStoriesState = () => {
     selectedSprint,
     projectsLoading,
     sprintsLoading,
+    loading: projectsAndSprintsLoading,
     setSelectedProject,
     setSelectedSprint,
     fetchProjects,
@@ -158,7 +159,7 @@ export const useStoriesState = () => {
     totalTickets,
     
     // Loading state
-    loading: projectsLoading || sprintsLoading || ticketsLoading || contentLoading,
+    loading: projectsAndSprintsLoading || ticketsLoading || contentLoading,
     projectsLoading,
     sprintsLoading,
     ticketsLoading,
