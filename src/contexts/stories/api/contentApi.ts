@@ -1,4 +1,3 @@
-
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
 import { DEV_MODE, callJiraApi, saveGeneratedContent, sanitizeContentForReact } from './apiUtils';
 import { supabase } from '@/lib/supabase';
@@ -34,7 +33,7 @@ export const generateJiraContent = async (
       body: JSON.stringify({
         ticketId: ticket.id,
         ticketKey: ticket.key,
-        ticketTitle: ticket.title,
+        ticketTitle: ticket.summary,
         ticketDescription: ticket.description,
         contentType: request.type,
         projectContext: request.projectContext,
@@ -242,8 +241,7 @@ The system will use a centralized error handling mechanism...
 ## Testing Strategy
 1. Unit tests for each component
 2. Integration tests for API endpoints
-3. End-to-end tests for critical user flows
-`;
+3. End-to-end tests for critical user flows`;
   } else if (type === 'code') {
     return `# Implementation Code
 
@@ -403,8 +401,7 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(plainPassword: string, hashedPassword: string): Promise<boolean> {
   return bcrypt.compare(plainPassword, hashedPassword);
 }
-\`\`\`
-`;
+\`\`\``;
   } else if (type === 'testcases') {
     return `# Test Cases
 
@@ -609,8 +606,7 @@ export async function verifyPassword(plainPassword: string, hashedPassword: stri
 - User no longer appears in the user list
 
 **Post-conditions**:
-- User "testdelete" is removed from the database
-`;
+- User "testdelete" is removed from the database`;
   } else if (type === 'tests') {
     return `# Automated Tests
 
