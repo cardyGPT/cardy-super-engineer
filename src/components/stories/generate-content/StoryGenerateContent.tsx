@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -328,8 +329,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const getNextContentType = (): ContentType | null => {
     if (!hasContentType('lld')) return 'lld';
     if (!hasContentType('code')) return 'code';
-    if (!hasContentType('tests')) return 'tests';
     if (!hasContentType('testcases')) return 'testcases';
+    if (!hasContentType('tests')) return 'tests';
     return null;
   };
 
@@ -352,7 +353,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     if (nextType) {
       const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
                             nextType === 'code' ? 'Implementation Code' :
-                            nextType === 'testcases' ? 'Test Cases' : 'Unit Tests';
+                            nextType === 'testcases' ? 'Test Cases' : 'Automation Tests';
       
       return (
         <Alert className="mb-4">
