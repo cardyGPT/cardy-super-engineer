@@ -4,48 +4,85 @@ import { JiraCredentials } from '@/types/jira';
 
 export const useAuthState = () => {
   const [credentials, setCredentials] = useState<JiraCredentials | null>(null);
-  const [apiType, setApiType] = useState<'agile' | 'classic' | 'cloud'>('agile');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load credentials from localStorage on initial mount
+  // Load credentials from localStorage on mount
   useEffect(() => {
-    const savedCredentials = localStorage.getItem('jira_credentials');
-    const savedApiType = localStorage.getItem('jira_api_type');
-    
-    if (savedCredentials) {
+    const loadCredentials = () => {
       try {
-        setCredentials(JSON.parse(savedCredentials));
+        const savedCreds = localStorage.getItem('jira_credentials');
+        if (savedCreds) {
+          const parsedCreds = JSON.parse(savedCreds) as JiraCredentials;
+          
+          // Validate the credentials format
+          if (parsedCreds.domain && parsedCreds.email && parsedCreds.apiToken) {
+            // Clean up domain - ensure it has no trailing slashes and is properly formatted
+            const cleanDomain = parsedCreds.domain.replace(/\/+$/, '');
+            
+            // Save the cleaned credentials
+            const cleanedCreds = {
+              ...parsedCreds,
+              domain: cleanDomain
+            };
+            
+            setCredentials(cleanedCreds);
+            setIsAuthenticated(true);
+            console.log("Loaded valid Jira credentials from localStorage");
+            
+            // Log the detected auth type based on token format (for debugging purposes)
+            if (parsedCreds.apiToken.length > 50) {
+              console.log("Detected PAT token format (long token)");
+            } else {
+              console.log("Detected Classic API token format (shorter token)");
+            }
+          } else {
+            console.log("Invalid credentials format in localStorage, removing");
+            localStorage.removeItem('jira_credentials');
+            setError("Invalid credentials format");
+          }
+        } else {
+          console.log("No Jira credentials found in localStorage");
+        }
       } catch (err) {
-        console.error('Failed to parse saved credentials:', err);
+        console.error('Error loading Jira credentials:', err);
+        localStorage.removeItem('jira_credentials');
+        setError("Error loading credentials");
       }
-    }
-    
-    if (savedApiType && (savedApiType === 'agile' || savedApiType === 'classic' || savedApiType === 'cloud')) {
-      setApiType(savedApiType as 'agile' | 'classic' | 'cloud');
-    }
+    };
+
+    loadCredentials();
   }, []);
 
-  // Save credentials to localStorage whenever they change
+  // Update localStorage when credentials change
   useEffect(() => {
     if (credentials) {
-      localStorage.setItem('jira_credentials', JSON.stringify(credentials));
+      try {
+        // Ensure domain doesn't have trailing slashes and is properly formatted
+        const cleanCredentials = {
+          ...credentials,
+          domain: credentials.domain.replace(/\/+$/, '')
+        };
+        
+        localStorage.setItem('jira_credentials', JSON.stringify(cleanCredentials));
+        setIsAuthenticated(true);
+        setError(null);
+        console.log("Saved Jira credentials to localStorage");
+      } catch (err) {
+        console.error('Error saving credentials to localStorage:', err);
+        setError("Error saving credentials");
+      }
     } else {
       localStorage.removeItem('jira_credentials');
+      setIsAuthenticated(false);
+      console.log("Removed Jira credentials from localStorage");
     }
   }, [credentials]);
-
-  // Save API type to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('jira_api_type', apiType);
-  }, [apiType]);
 
   return {
     credentials,
     setCredentials,
-    isAuthenticated: !!credentials,
-    apiType,
-    setApiType,
-    error,
-    setError
+    isAuthenticated,
+    error
   };
 };

@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { JiraTicket } from '@/types/jira';
-import { useStories } from '@/contexts/stories';
+import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import ContentDisplay, { ContentType } from './ContentDisplay';

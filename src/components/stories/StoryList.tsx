@@ -1,192 +1,274 @@
-import React, { useState } from 'react';
-import { useStories } from '@/contexts/stories';
-import { JiraTicket } from '@/types/jira';
-import { Card, CardContent } from "@/components/ui/card";
+
+import React, { useEffect, useRef, useCallback } from 'react';
+import { useStories } from '@/contexts/StoriesContext';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, Circle, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { JiraTicket } from '@/types/jira';
+import { SearchIcon, List, Filter } from "lucide-react";
+import LoadingContent from './LoadingContent';
+import StoryHeader from './StoryHeader';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 const StoryList: React.FC = () => {
   const { 
     tickets, 
+    ticketsLoading, 
     selectedTicket, 
     setSelectedTicket, 
-    loading, 
-    loadingMore,
-    hasMore,
-    ticketTypeFilter, 
+    searchTerm, 
+    setSearchTerm,
+    ticketTypeFilter,
     setTicketTypeFilter,
     ticketStatusFilter,
     setTicketStatusFilter,
-    searchTerm,
-    setSearchTerm,
-    fetchMoreTickets
+    fetchMoreTickets,
+    hasMore,
+    loadingMore,
+    totalTickets
   } = useStories();
   
-  const [isFetchingMore, setIsFetchingMore] = useState(false);
-  
-  const handleTicketClick = (ticket: JiraTicket) => {
-    setSelectedTicket(ticket);
-  };
-  
-  const handleLoadMore = async () => {
-    if (!hasMore || loadingMore || isFetchingMore) return;
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Get unique ticket types and statuses for filters
+  const ticketTypes = React.useMemo(() => {
+    const types = new Set<string>();
+    tickets.forEach(ticket => {
+      if (ticket.issuetype?.name) {
+        types.add(ticket.issuetype.name);
+      }
+    });
+    return Array.from(types).sort();
+  }, [tickets]);
+
+  const ticketStatuses = React.useMemo(() => {
+    const statuses = new Set<string>();
+    tickets.forEach(ticket => {
+      if (ticket.status) {
+        statuses.add(ticket.status);
+      }
+    });
+    return Array.from(statuses).sort();
+  }, [tickets]);
+
+  // Filter tickets by search term and type filter
+  const filteredTickets = tickets.filter(ticket => {
+    const matchesSearch = !searchTerm || 
+      ticket.key.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      ticket.summary.toLowerCase().includes(searchTerm.toLowerCase());
     
-    setIsFetchingMore(true);
-    try {
-      await fetchMoreTickets();
-    } finally {
-      setIsFetchingMore(false);
-    }
-  };
-  
-  const getStatusBadgeColor = (status: string) => {
-    status = (status || '').toLowerCase();
+    const matchesType = !ticketTypeFilter || 
+      (ticket.issuetype?.name.toLowerCase() === ticketTypeFilter.toLowerCase());
     
-    switch (status) {
-      case 'open':
-        return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300";
-      case 'in progress':
-        return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300";
-      case 'closed':
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-      case 'done':
-        return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300";
-      case 'resolved':
-        return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
-    }
-  };
-  
-  const getTypeBadgeColor = (type: string) => {
-    type = (type || '').toLowerCase();
+    const matchesStatus = !ticketStatusFilter || 
+      (ticket.status?.toLowerCase() === ticketStatusFilter.toLowerCase());
     
-    switch (type) {
-      case 'story':
-        return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300";
-      case 'task':
-        return "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-300";
-      case 'bug':
-        return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300";
-      case 'epic':
-        return "bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900 dark:text-fuchsia-300";
-      default:
-        return "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300";
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Setup intersection observer for infinite scroll
+  const handleObserver = useCallback((entries: IntersectionObserverEntry[]) => {
+    const [entry] = entries;
+    if (entry.isIntersecting && hasMore && !loadingMore && !ticketsLoading) {
+      fetchMoreTickets();
     }
+  }, [hasMore, loadingMore, ticketsLoading, fetchMoreTickets]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(handleObserver, {
+      root: null,
+      rootMargin: '20px',
+      threshold: 0.1
+    });
+    
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+    
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [handleObserver]);
+
+  // Calculate the display count message
+  const getCountMessage = () => {
+    if (filteredTickets.length === 0) return '';
+    
+    if (searchTerm || ticketTypeFilter || ticketStatusFilter) {
+      return `${filteredTickets.length} filtered ${filteredTickets.length === 1 ? 'ticket' : 'tickets'}`;
+    }
+    
+    // If we're showing all tickets without filters
+    if (totalTickets && totalTickets > tickets.length) {
+      return `${tickets.length} of ${totalTickets} ${totalTickets === 1 ? 'ticket' : 'tickets'}`;
+    }
+    
+    return `${tickets.length} ${tickets.length === 1 ? 'ticket' : 'tickets'}`;
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setTicketTypeFilter(null);
+    setTicketStatusFilter(null);
+    setSearchTerm('');
   };
 
   return (
-    <Card className="h-full">
-      <CardContent className="p-4 space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="search">Search Tickets</Label>
-          <Input 
-            id="search" 
-            placeholder="Search by ticket key or summary..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="type-filter">Filter by Type</Label>
-            <Select value={ticketTypeFilter || ''} onValueChange={setTicketTypeFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Types" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Types</SelectItem>
-                <SelectItem value="Story">Story</SelectItem>
-                <SelectItem value="Task">Task</SelectItem>
-                <SelectItem value="Bug">Bug</SelectItem>
-                <SelectItem value="Epic">Epic</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div>
-            <Label htmlFor="status-filter">Filter by Status</Label>
-            <Select value={ticketStatusFilter || ''} onValueChange={setTicketStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
-                <SelectItem value="Open">Open</SelectItem>
-                <SelectItem value="In Progress">In Progress</SelectItem>
-                <SelectItem value="Closed">Closed</SelectItem>
-                <SelectItem value="Done">Done</SelectItem>
-                <SelectItem value="Resolved">Resolved</SelectItem>
-              </SelectContent>
-            </Select>
+    <Card className="shadow-sm h-[calc(100vh-13rem)]">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-lg">Tickets</CardTitle>
+          <div className="text-sm text-muted-foreground">
+            {getCountMessage()}
           </div>
         </div>
-        
-        <ScrollArea className="h-[450px] w-full rounded-md border">
-          <div className="p-2 space-y-2">
-            {tickets.map((ticket) => (
-              <Button
-                key={ticket.id}
-                variant="ghost"
-                className={`w-full justify-start rounded-md hover:bg-secondary ${selectedTicket?.id === ticket.id ? 'bg-secondary text-secondary-foreground' : 'text-foreground'}`}
-                onClick={() => handleTicketClick(ticket)}
-                disabled={loading}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center">
-                    {selectedTicket?.id === ticket.id ? (
-                      <CheckCircle2 className="h-4 w-4 mr-2 text-green-500" />
-                    ) : (
-                      <Circle className="h-4 w-4 mr-2 text-muted-foreground" />
-                    )}
-                    <span>{ticket.key}: {ticket.summary}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {ticket.issuetype?.name && (
-                      <Badge className={getTypeBadgeColor(ticket.issuetype.name)}>
-                        {ticket.issuetype.name}
-                      </Badge>
-                    )}
-                    {ticket.status && (
-                      <Badge className={getStatusBadgeColor(ticket.status)}>
-                        {ticket.status}
-                      </Badge>
-                    )}
-                  </div>
+        <div className="flex gap-2 items-center">
+          <div className="relative flex-grow">
+            <SearchIcon className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search tickets..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="h-10 w-10">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div className="space-y-4">
+                <h4 className="font-medium">Filter Tickets</h4>
+                <Separator />
+                
+                <div className="space-y-2">
+                  <h5 className="text-sm font-medium">Type</h5>
+                  <Select
+                    value={ticketTypeFilter || "all-types"}
+                    onValueChange={(value) => setTicketTypeFilter(value === "all-types" ? null : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all-types">All Types</SelectItem>
+                      {ticketTypes.map((type) => (
+                        <SelectItem key={type} value={type}>{type}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </Button>
-            ))}
-            
-            {hasMore && (
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={handleLoadMore}
-                disabled={loadingMore || isFetchingMore}
-              >
-                {loadingMore || isFetchingMore ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Loading more...
-                  </>
-                ) : (
-                  "Load More"
+                
+                <div className="space-y-2">
+                  <h5 className="text-sm font-medium">Status</h5>
+                  <Select
+                    value={ticketStatusFilter || "all-statuses"}
+                    onValueChange={(value) => setTicketStatusFilter(value === "all-statuses" ? null : value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all-statuses">All Statuses</SelectItem>
+                      {ticketStatuses.map((status) => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="flex justify-between pt-2">
+                  <div className="flex flex-wrap gap-1">
+                    {ticketTypeFilter && (
+                      <Badge variant="outline" className="gap-1">
+                        {ticketTypeFilter}
+                        <button 
+                          className="ml-1 hover:text-destructive" 
+                          onClick={() => setTicketTypeFilter(null)}
+                        >×</button>
+                      </Badge>
+                    )}
+                    {ticketStatusFilter && (
+                      <Badge variant="outline" className="gap-1">
+                        {ticketStatusFilter}
+                        <button 
+                          className="ml-1 hover:text-destructive" 
+                          onClick={() => setTicketStatusFilter(null)}
+                        >×</button>
+                      </Badge>
+                    )}
+                  </div>
+                  {(ticketTypeFilter || ticketStatusFilter || searchTerm) && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearFilters}
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+      </CardHeader>
+      <CardContent className="p-0">
+        <ScrollArea className="h-[calc(100vh-18rem)]">
+          {ticketsLoading && filteredTickets.length === 0 ? (
+            <LoadingContent 
+              count={5}
+              isLoading={true}
+              message="Loading tickets..."
+            />
+          ) : filteredTickets.length === 0 ? (
+            <div className="px-6 py-8 text-center">
+              <List className="mx-auto h-8 w-8 text-muted-foreground" />
+              <h3 className="mt-2 text-sm font-medium">No tickets found</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {ticketTypeFilter 
+                  ? `No ${ticketTypeFilter} tickets found. Try changing the filter.` 
+                  : ticketStatusFilter
+                    ? `No tickets with status "${ticketStatusFilter}" found. Try changing the filter.`
+                    : searchTerm 
+                      ? 'Try a different search term.' 
+                      : 'Select a project and sprint to load tickets.'}
+              </p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {filteredTickets.map((ticket) => (
+                <div
+                  key={ticket.id}
+                  className={`px-4 py-3 cursor-pointer transition-colors hover:bg-gray-50 dark:hover:bg-gray-800 ${
+                    selectedTicket?.id === ticket.id ? 'bg-gray-100 dark:bg-gray-800' : ''
+                  }`}
+                  onClick={() => setSelectedTicket(ticket)}
+                >
+                  <StoryHeader ticket={ticket} />
+                </div>
+              ))}
+              
+              {/* Loading indicator for infinite scroll */}
+              <div ref={observerTarget} className="h-16 flex justify-center items-center">
+                {loadingMore && (
+                  <div className="text-sm text-muted-foreground animate-pulse">
+                    Loading more tickets...
+                  </div>
                 )}
-              </Button>
-            )}
-          </div>
+              </div>
+            </div>
+          )}
         </ScrollArea>
       </CardContent>
     </Card>

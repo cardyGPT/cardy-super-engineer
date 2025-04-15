@@ -66,23 +66,56 @@ export const useContentGeneration = (
     setIsSaving(true);
     
     try {
-      // Call the edge function to save the content
-      const { data, error } = await supabase.functions.invoke('save-story-artifacts', {
-        body: {
-          storyId: selectedTicket.key,
-          projectId: selectedTicket.projectId || '',
-          sprintId: selectedTicket.sprintId || '',
-          contentType: contentType,
-          content: content
-        }
-      });
+      // Prepare the data for saving
+      const columnMapping: Record<ContentType, string> = {
+        lld: 'lld_content',
+        code: 'code_content',
+        tests: 'test_content',
+        testcases: 'testcases_content'
+      };
       
-      if (error) {
-        throw new Error(error.message);
+      const column = columnMapping[contentType];
+      
+      // Check if there's already an entry for this ticket
+      const { data: existingArtifact, error: fetchError } = await supabase
+        .from('ticket_artifacts')
+        .select('*')
+        .eq('story_id', selectedTicket.key)
+        .maybeSingle();
+      
+      if (fetchError) {
+        throw new Error(fetchError.message);
       }
       
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to save content to database');
+      let result;
+      
+      if (existingArtifact) {
+        // Update existing record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .update({ 
+            [column]: content,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingArtifact.id)
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
+      } else {
+        // Create new record
+        const { data, error } = await supabase
+          .from('ticket_artifacts')
+          .insert({ 
+            story_id: selectedTicket.key, 
+            project_id: selectedTicket.projectId || '', 
+            sprint_id: selectedTicket.sprintId || '',
+            [column]: content 
+          })
+          .select();
+          
+        if (error) throw new Error(error.message);
+        result = data;
       }
       
       toast({
@@ -98,66 +131,6 @@ export const useContentGeneration = (
       toast({
         title: "Error",
         description: err.message || 'Failed to save content to database',
-        variant: "destructive",
-      });
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const saveAllContent = async (): Promise<boolean> => {
-    if (!selectedTicket || !generatedContent) {
-      setError('No ticket or content to save');
-      return false;
-    }
-
-    setIsSaving(true);
-    
-    try {
-      let success = true;
-      
-      // Save LLD content if available
-      if (generatedContent.lldContent) {
-        const lldResult = await saveContentToDatabase('lld', generatedContent.lldContent);
-        if (!lldResult) success = false;
-      }
-      
-      // Save Code content if available
-      if (generatedContent.codeContent) {
-        const codeResult = await saveContentToDatabase('code', generatedContent.codeContent);
-        if (!codeResult) success = false;
-      }
-      
-      // Save Test Cases content if available
-      if (generatedContent.testCasesContent) {
-        const testCasesResult = await saveContentToDatabase('testcases', generatedContent.testCasesContent);
-        if (!testCasesResult) success = false;
-      }
-      
-      // Save Tests content if available
-      if (generatedContent.testContent) {
-        const testsResult = await saveContentToDatabase('tests', generatedContent.testContent);
-        if (!testsResult) success = false;
-      }
-      
-      if (success) {
-        toast({
-          title: "All Content Saved",
-          description: "All generated content has been saved to database",
-          variant: "success",
-        });
-      } else {
-        throw new Error('Some content failed to save');
-      }
-      
-      return success;
-    } catch (err: any) {
-      console.error('Error saving all content to database:', err);
-      setError(err.message || 'Failed to save all content to database');
-      toast({
-        title: "Error",
-        description: err.message || 'Failed to save all content to database',
         variant: "destructive",
       });
       return false;
@@ -200,7 +173,6 @@ export const useContentGeneration = (
     generatedContent,
     generateContent,
     saveContentToDatabase,
-    saveAllContent,
     pushToJira
   };
 };

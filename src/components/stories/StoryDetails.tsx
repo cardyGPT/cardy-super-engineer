@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { JiraTicket } from '@/types/jira';
-import { useStories } from '@/contexts/stories';
+import { useStories } from '@/contexts/StoriesContext';
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
