@@ -26,6 +26,10 @@ export const routes = createBrowserRouter([
     element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
   },
   {
+    path: '/stories',
+    element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
+  },
+  {
     path: '/settings',
     element: <ProtectedRoute><SettingsPage /></ProtectedRoute>,
   },
@@ -34,7 +38,7 @@ export const routes = createBrowserRouter([
     element: <ProtectedRoute><ProjectsPage /></ProtectedRoute>,
   },
   {
-    path: '/projects/:id',
+    path: '/projects/:projectId',
     element: <ProtectedRoute><ProjectDetailPage /></ProtectedRoute>,
   },
   {

@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from "react";
 import { Project, ProjectDocument, DataModel } from "@/types";
 import { useToast } from "@/hooks/use-toast"; 
@@ -107,19 +106,26 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         
         // Fetch projects
         const projects = await projectOps.fetchProjects();
-        if (projects) {
+        console.log("Fetched projects:", projects?.length || 0);
+        
+        if (projects && projects.length > 0) {
           setProjectList(projects);
           
           // Fetch documents for all projects
           const allDocuments: ProjectDocument[] = [];
           for (const project of projects) {
+            console.log(`Fetching documents for project: ${project.id}`);
             const documents = await documentOps.fetchDocuments(project.id);
-            if (documents) {
+            if (documents && documents.length > 0) {
+              console.log(`Found ${documents.length} documents for project ${project.id}`);
               allDocuments.push(...documents);
             }
           }
           
           setDocumentList(allDocuments);
+          console.log("Total documents loaded:", allDocuments.length);
+        } else {
+          console.log("No projects found");
         }
       } catch (error) {
         console.error("Error loading initial data:", error);

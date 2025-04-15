@@ -47,6 +47,7 @@ const ProjectDetailPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
+  // Fix: Use projectId from URL parameter instead of id
   const project = projects.find((p) => p.id === projectId);
   const projectDocuments = documents.filter((d) => d.projectId === projectId);
   

@@ -21,15 +21,18 @@ export const useProjectOperations = () => {
     setError(null);
     
     try {
+      console.log('Fetching projects from Supabase...');
       const { data, error } = await supabase
         .from("projects")
         .select("*")
         .order("created_at", { ascending: false });
       
       if (error) {
+        console.error("Supabase error fetching projects:", error);
         throw error;
       }
       
+      console.log('Projects fetched successfully:', data?.length || 0);
       return data || [];
     } catch (err: any) {
       console.error("Error fetching projects:", err);
