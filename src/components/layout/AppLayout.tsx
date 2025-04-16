@@ -18,7 +18,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
     <SidebarProvider>
       <div className="min-h-screen bg-background flex flex-col">
-        {/* Header */}
+        {/* Header - Only show logo on mobile */}
         <header className="border-b bg-card z-10">
           <div className="container flex h-16 items-center px-4 sm:px-6">
             <button
@@ -31,7 +31,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 <MenuIcon className="h-6 w-6" />
               )}
             </button>
-            <div className="flex items-center">
+            <div className="flex items-center md:hidden">
               <CardyLogo />
             </div>
             <div className="ml-auto flex items-center space-x-4">
@@ -61,7 +61,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           )}
 
           {/* Main content */}
-          <main className="flex-1 overflow-auto">
+          <main className="flex-1 overflow-y-auto">
             {children}
           </main>
         </div>

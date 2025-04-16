@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, FileText, ExternalLink, Trash2, ShieldCheck } from "lucide-react";
+import { Loader2, FileText, ExternalLink, Trash2, ShieldCheck, Key } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import SettingsCard from './common/SettingsCard';
 import { SettingsProps } from '@/types/settings';
@@ -14,6 +14,7 @@ import { SettingsProps } from '@/types/settings';
 const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
   const [clientId, setClientId] = useState('');
   const [clientSecret, setClientSecret] = useState('');
+  const [apiKey, setApiKey] = useState('');
   const [redirectUri, setRedirectUri] = useState('');
   const [syncEnabled, setSyncEnabled] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -65,13 +66,14 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         throw new Error('Client ID and Client Secret are required');
       }
       
-      // First, if we have Client ID and Secret, save them
-      if (clientId && clientSecret) {
+      // First, if we have Client ID, Secret or API Key, save them
+      if (clientId || clientSecret || apiKey) {
         const { error: keyError } = await supabase.functions.invoke('store-api-keys', {
           body: {
             provider: 'gsuite',
             clientId,
-            clientSecret
+            clientSecret,
+            apiKey
           }
         });
         
@@ -85,7 +87,7 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
         body: {
           redirectUri,
           autoSyncEnabled: syncEnabled,
-          skipApiKeyCheck: !clientId || !clientSecret, // Skip API key check if we're not providing them
+          skipApiKeyCheck: !clientId && !clientSecret && !apiKey, // Skip API key check if we're not providing them
           metadata: {
             lastUpdated: new Date().toISOString(),
             version: "1.0",
@@ -160,6 +162,7 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
       setIsConnected(false);
       setClientId('');
       setClientSecret('');
+      setApiKey('');
       setRedirectUri('');
       setSyncEnabled(false);
       if (onConfigChange) onConfigChange(false);
@@ -284,6 +287,22 @@ const GSuiteSettings: React.FC<SettingsProps> = ({ onConfigChange }) => {
             onChange={(e) => setClientSecret(e.target.value)}
             disabled={isLoading}
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="api-key">API Key</Label>
+          <Input
+            id="api-key"
+            type="password"
+            placeholder="Your Google API Key"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            disabled={isLoading}
+          />
+          <p className="text-xs text-muted-foreground flex items-center">
+            <Key className="h-3 w-3 mr-1" />
+            API key for accessing Google APIs that don't require user authorization
+          </p>
         </div>
         
         <div className="space-y-2">

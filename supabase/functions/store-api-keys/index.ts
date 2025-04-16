@@ -16,15 +16,15 @@ serve(async (req) => {
   }
 
   try {
-    const { provider, apiKey, clientSecret } = await req.json();
+    const { provider, apiKey, clientId, clientSecret } = await req.json();
     
     console.log(`Received request to store API key for ${provider}`);
     
     // Validate request
-    if (!provider || !apiKey) {
-      console.error("Invalid request: provider or API key missing");
+    if (!provider || (!apiKey && !clientId && !clientSecret)) {
+      console.error("Invalid request: provider and at least one credential are required");
       return new Response(
-        JSON.stringify({ error: "Provider and API key are required" }),
+        JSON.stringify({ error: "Provider and at least one credential (API key, Client ID, or Client Secret) are required" }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 400 
@@ -32,71 +32,67 @@ serve(async (req) => {
       );
     }
     
-    // Store API key in environment variable
-    let envName: string;
-    let secretKey: string = apiKey;
+    // Store credentials in environment variables
+    const credentials = [];
     
-    switch (provider.toLowerCase()) {
-      case 'openai':
-        envName = 'OPENAI_API_KEY';
-        break;
-      case 'gsuite':
-        envName = 'GSUITE_API_KEY';
-        // Store client secret too if provided
-        if (clientSecret) {
-          try {
-            Deno.env.set('GSUITE_CLIENT_SECRET', clientSecret);
-            console.log("Stored GSuite client secret");
-          } catch (secretErr) {
-            console.error("Error storing GSuite client secret:", secretErr);
-            // Continue with API key storage even if client secret fails
-          }
-        }
-        break;
-      case 'stripe':
-        envName = 'STRIPE_SECRET_KEY';
-        break;
-      case 'twilio':
-        envName = 'TWILIO_AUTH_TOKEN';
-        break;
-      default:
-        envName = `${provider.toUpperCase()}_API_KEY`;
+    if (apiKey) {
+      try {
+        const apiKeyEnvName = `${provider.toUpperCase()}_API_KEY`;
+        Deno.env.set(apiKeyEnvName, apiKey);
+        console.log(`Stored ${provider} API key as ${apiKeyEnvName}`);
+        credentials.push('API key');
+      } catch (apiKeyErr) {
+        console.error(`Error storing ${provider} API key:`, apiKeyErr);
+      }
     }
     
-    try {
-      // Store the API key as environment variable
-      Deno.env.set(envName, secretKey);
-      console.log(`API key for ${provider} stored successfully as ${envName}`);
-      
+    if (clientId) {
+      try {
+        const clientIdEnvName = `${provider.toUpperCase()}_CLIENT_ID`;
+        Deno.env.set(clientIdEnvName, clientId);
+        console.log(`Stored ${provider} client ID as ${clientIdEnvName}`);
+        credentials.push('Client ID');
+      } catch (clientIdErr) {
+        console.error(`Error storing ${provider} client ID:`, clientIdErr);
+      }
+    }
+    
+    if (clientSecret) {
+      try {
+        const clientSecretEnvName = `${provider.toUpperCase()}_CLIENT_SECRET`;
+        Deno.env.set(clientSecretEnvName, clientSecret);
+        console.log(`Stored ${provider} client secret as ${clientSecretEnvName}`);
+        credentials.push('Client Secret');
+      } catch (clientSecretErr) {
+        console.error(`Error storing ${provider} client secret:`, clientSecretErr);
+      }
+    }
+    
+    if (credentials.length === 0) {
       return new Response(
         JSON.stringify({ 
-          success: true, 
-          message: `API key for ${provider} stored successfully` 
+          error: "Failed to store any credentials. This is likely a permissions issue in the Supabase platform." 
         }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200 
-        }
-      );
-    } catch (setEnvError) {
-      console.error(`Error setting environment variable ${envName}:`, setEnvError);
-      
-      // This is a workaround for testing locally or when env variables can't be set
-      // In production, this should be handled differently
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: `API key for ${provider} received but couldn't be stored as an environment variable. This is likely a permissions issue in the Supabase platform.`,
-          note: "This may be a temporary issue. Please check your Supabase settings or contact support if this persists."
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 200 
+          status: 500 
         }
       );
     }
+    
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: `Stored ${credentials.join(', ')} for ${provider} successfully`,
+        storedCredentials: credentials
+      }),
+      { 
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200 
+      }
+    );
   } catch (err) {
-    console.error("Error storing API key:", err);
+    console.error("Error storing credentials:", err);
     
     return new Response(
       JSON.stringify({ error: err.message }),
