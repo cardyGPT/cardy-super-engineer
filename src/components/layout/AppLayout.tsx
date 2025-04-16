@@ -1,7 +1,7 @@
 
 import React, { ReactNode, useState } from 'react';
-import AppSidebar from './AppSidebar';
-import CardyLogo from './CardyLogo';
+import { AppSidebar } from './AppSidebar';
+import { CardyLogo } from './CardyLogo';
 import { MenuIcon, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import UserDropdown from './UserDropdown';

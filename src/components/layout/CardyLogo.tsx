@@ -8,3 +8,5 @@ export const CardyLogo: React.FC = () => {
     </div>
   );
 };
+
+export default CardyLogo;
