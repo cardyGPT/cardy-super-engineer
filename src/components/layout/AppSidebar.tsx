@@ -8,7 +8,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { CardyLogo } from "./CardyLogo";
@@ -23,7 +22,11 @@ import {
   ClipboardList,
 } from "lucide-react";
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  onLinkClick?: () => void;
+}
+
+export function AppSidebar({ onLinkClick }: AppSidebarProps) {
   const { state } = useSidebar();
   const location = useLocation();
   
@@ -77,6 +80,7 @@ export function AppSidebar() {
                   <Link
                     to={item.href}
                     className={location.pathname === item.href ? "text-primary" : ""}
+                    onClick={onLinkClick}
                   >
                     {item.icon}
                     <span>{item.title}</span>
@@ -95,3 +99,5 @@ export function AppSidebar() {
     </>
   );
 }
+
+export default AppSidebar;
