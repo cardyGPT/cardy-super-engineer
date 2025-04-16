@@ -10,6 +10,8 @@ import CardyMindPage from './pages/CardyMindPage';
 import DataModelPage from './pages/DataModelPage';
 import DocumentsPage from './pages/DocumentsPage';
 import GSuiteSettingsPage from './pages/GSuiteSettingsPage';
+import ProfilePage from './pages/ProfilePage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 
 export const routes = createBrowserRouter([
@@ -22,6 +24,10 @@ export const routes = createBrowserRouter([
     element: <Navigate to="/" replace />,
   },
   {
+    path: '/reset-password',
+    element: <ResetPasswordPage />,
+  },
+  {
     path: '/dashboard',
     element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
   },
@@ -32,6 +38,10 @@ export const routes = createBrowserRouter([
   {
     path: '/settings',
     element: <ProtectedRoute><SettingsPage /></ProtectedRoute>,
+  },
+  {
+    path: '/profile',
+    element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
   },
   {
     path: '/projects',

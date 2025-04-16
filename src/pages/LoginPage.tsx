@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { motion } from 'framer-motion';
 import LoginForm from '@/components/auth/LoginForm';
@@ -11,13 +11,26 @@ export default function LoginPage() {
   const [view, setView] = useState<'login' | 'signup' | 'forgot-password'>('login');
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // If already authenticated, redirect to dashboard
+  // Check if there's a view parameter in the URL
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const viewParam = params.get('view');
+    if (viewParam === 'signup') {
+      setView('signup');
+    } else if (viewParam === 'forgot-password') {
+      setView('forgot-password');
+    }
+  }, [location]);
+
+  // If already authenticated, redirect to dashboard or the page they were trying to access
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      const from = (location.state as { from?: Location })?.from || { pathname: '/dashboard' };
+      navigate(from.pathname, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, location]);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
