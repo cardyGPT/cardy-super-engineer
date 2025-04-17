@@ -1,6 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 serve(async (req) => {
   // Add detailed logging
@@ -32,52 +36,75 @@ serve(async (req) => {
       );
     }
     
-    // Store credentials in environment variables
+    // Create a Supabase client with the service role key
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Store credentials in the api_keys table
     const credentials = [];
+    const updates = {};
     
     if (apiKey) {
-      try {
-        const apiKeyEnvName = `${provider.toUpperCase()}_API_KEY`;
-        Deno.env.set(apiKeyEnvName, apiKey);
-        console.log(`Stored ${provider} API key as ${apiKeyEnvName}`);
-        credentials.push('API key');
-      } catch (apiKeyErr) {
-        console.error(`Error storing ${provider} API key:`, apiKeyErr);
-      }
+      updates['api_key'] = apiKey;
+      credentials.push('API key');
     }
     
     if (clientId) {
-      try {
-        const clientIdEnvName = `${provider.toUpperCase()}_CLIENT_ID`;
-        Deno.env.set(clientIdEnvName, clientId);
-        console.log(`Stored ${provider} client ID as ${clientIdEnvName}`);
-        credentials.push('Client ID');
-      } catch (clientIdErr) {
-        console.error(`Error storing ${provider} client ID:`, clientIdErr);
-      }
+      updates['client_id'] = clientId;
+      credentials.push('Client ID');
     }
     
     if (clientSecret) {
-      try {
-        const clientSecretEnvName = `${provider.toUpperCase()}_CLIENT_SECRET`;
-        Deno.env.set(clientSecretEnvName, clientSecret);
-        console.log(`Stored ${provider} client secret as ${clientSecretEnvName}`);
-        credentials.push('Client Secret');
-      } catch (clientSecretErr) {
-        console.error(`Error storing ${provider} client secret:`, clientSecretErr);
-      }
+      updates['client_secret'] = clientSecret;
+      credentials.push('Client Secret');
     }
     
-    if (credentials.length === 0) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Failed to store any credentials. This is likely a permissions issue in the Supabase platform." 
-        }),
-        { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500 
-        }
-      );
+    // First check if there's already an entry for this provider
+    const { data: existingData, error: findError } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('service', provider)
+      .maybeSingle();
+      
+    if (findError) {
+      console.error(`Error checking for existing ${provider} credentials:`, findError);
+      throw new Error(`Failed to check for existing ${provider} credentials`);
+    }
+    
+    let result;
+    
+    if (existingData) {
+      // Update existing row
+      const { data, error } = await supabase
+        .from('api_keys')
+        .update(updates)
+        .eq('service', provider)
+        .select();
+        
+      if (error) {
+        console.error(`Error updating ${provider} credentials:`, error);
+        throw new Error(`Failed to update ${provider} credentials`);
+      }
+      
+      result = data;
+      console.log(`Updated credentials for ${provider}`);
+      
+    } else {
+      // Insert new row
+      const { data, error } = await supabase
+        .from('api_keys')
+        .insert({
+          service: provider,
+          ...updates
+        })
+        .select();
+        
+      if (error) {
+        console.error(`Error storing ${provider} credentials:`, error);
+        throw new Error(`Failed to store ${provider} credentials`);
+      }
+      
+      result = data;
+      console.log(`Stored new credentials for ${provider}`);
     }
     
     return new Response(

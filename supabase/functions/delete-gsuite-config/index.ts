@@ -1,14 +1,14 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 serve(async (req) => {
-  // Add detailed logging
-  console.log(`Delete GSuite Config function received ${req.method} request`);
-  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log("Handling CORS preflight request");
     return new Response(null, { 
       headers: corsHeaders,
       status: 204
@@ -16,18 +16,37 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Removing GSuite configuration...");
+    console.log("Received request to delete GSuite configuration");
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Remove GSuite environment variables
-    Deno.env.delete('GSUITE_API_KEY');
-    Deno.env.delete('GSUITE_SETTINGS');
+    // Delete the GSuite API keys
+    const { error: keysError } = await supabase
+      .from('api_keys')
+      .delete()
+      .eq('service', 'gsuite');
+      
+    if (keysError) {
+      console.error("Error deleting GSuite API keys:", keysError);
+      throw new Error("Failed to delete GSuite API keys");
+    }
     
-    console.log("GSuite configuration removed successfully");
+    // Delete the GSuite settings
+    const { error: settingsError } = await supabase
+      .from('settings')
+      .delete()
+      .eq('service', 'gsuite');
+      
+    if (settingsError) {
+      console.error("Error deleting GSuite settings:", settingsError);
+      throw new Error("Failed to delete GSuite settings");
+    }
+    
+    console.log("GSuite configuration deleted successfully");
     
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: "GSuite configuration removed successfully" 
+        message: "GSuite configuration deleted successfully"
       }),
       { 
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -35,7 +54,7 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error("Error removing GSuite configuration:", err);
+    console.error("Error deleting GSuite configuration:", err);
     
     return new Response(
       JSON.stringify({ error: err.message }),

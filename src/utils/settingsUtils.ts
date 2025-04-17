@@ -34,29 +34,37 @@ export const validateApiKey = async (
 export const saveApiKey = async (
   provider: string,
   apiKey: string,
+  clientId?: string,
   clientSecret?: string
 ): Promise<boolean> => {
   try {
-    if (!apiKey.trim()) {
-      throw new Error("API key cannot be empty");
+    // Validate input
+    if (!apiKey && !clientId && !clientSecret) {
+      throw new Error("At least one credential must be provided");
     }
+    
+    if (apiKey && apiKey.trim() === "") {
+      apiKey = ""; // Allow empty string to clear the API key
+    }
+
+    const payload: any = { provider };
+    
+    if (apiKey) payload.apiKey = apiKey;
+    if (clientId) payload.clientId = clientId;
+    if (clientSecret) payload.clientSecret = clientSecret;
 
     // Store the API key securely using Supabase edge function
     const { data, error } = await supabase.functions.invoke('store-api-keys', {
-      body: { 
-        provider,
-        apiKey,
-        ...(clientSecret && { clientSecret })
-      }
+      body: payload
     });
 
     if (error) {
-      throw new Error(error.message || `Failed to save ${provider} API key`);
+      throw new Error(error.message || `Failed to save ${provider} credentials`);
     }
 
     toast({
-      title: "API Key Saved",
-      description: `Your ${provider} API key has been securely saved`,
+      title: "Credentials Saved",
+      description: `Your ${provider} credentials have been securely saved`,
       variant: "success",
     });
     
@@ -64,7 +72,7 @@ export const saveApiKey = async (
   } catch (error: any) {
     toast({
       title: "Error",
-      description: error.message || `Failed to save ${provider} API key`,
+      description: error.message || `Failed to save ${provider} credentials`,
       variant: "destructive",
     });
     return false;

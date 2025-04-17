@@ -1,11 +1,11 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API_KEY');
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -14,8 +14,31 @@ serve(async (req) => {
   }
 
   try {
-    if (!GOOGLE_API_KEY) {
-      throw new Error('Google API key is not configured');
+    console.log("Received request to export to GSuite");
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get the GSuite credentials from the database
+    const { data: gsuiteCreds, error: credsError } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('service', 'gsuite')
+      .maybeSingle();
+      
+    if (credsError) {
+      console.error("Error fetching GSuite credentials:", credsError);
+      throw new Error("Failed to fetch GSuite credentials");
+    }
+    
+    if (!gsuiteCreds) {
+      throw new Error('Google API credentials are not configured');
+    }
+    
+    const googleApiKey = gsuiteCreds.api_key;
+    const clientId = gsuiteCreds.client_id;
+    const clientSecret = gsuiteCreds.client_secret;
+    
+    if (!googleApiKey && (!clientId || !clientSecret)) {
+      throw new Error('No valid Google API credentials found');
     }
 
     const { documentName, content, artifactType, storyId } = await req.json();
@@ -27,11 +50,8 @@ serve(async (req) => {
     // Validate and format the content for Google Docs
     const formattedContent = formatContentForDocs(content, artifactType);
     
-    // Create a new Google Docs document
-    const document = await createGoogleDoc(documentName, formattedContent);
-    
-    // Create Supabase client with service role key
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create a new Google Docs document using the appropriate credential
+    const document = await createGoogleDoc(documentName, formattedContent, googleApiKey, clientId, clientSecret);
     
     // Update the story artifact with the Google Doc ID for reference
     if (storyId) {
@@ -68,13 +88,18 @@ serve(async (req) => {
   }
 });
 
-async function createGoogleDoc(title: string, content: string) {
+async function createGoogleDoc(title, content, apiKey, clientId, clientSecret) {
   try {
+    // Determine which credential to use
+    const authHeader = apiKey 
+      ? `Bearer ${apiKey}` 
+      : `Bearer ${await getAccessToken(clientId, clientSecret)}`;
+    
     // Create a new Google Doc
     const createResponse = await fetch('https://docs.googleapis.com/v1/documents', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GOOGLE_API_KEY}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -94,7 +119,7 @@ async function createGoogleDoc(title: string, content: string) {
     const updateResponse = await fetch(`https://docs.googleapis.com/v1/documents/${doc.documentId}:batchUpdate`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${GOOGLE_API_KEY}`,
+        'Authorization': authHeader,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -123,7 +148,14 @@ async function createGoogleDoc(title: string, content: string) {
   }
 }
 
-function formatContentForDocs(content: string, artifactType: string): string {
+// Helper function to get access token when using client ID/secret
+async function getAccessToken(clientId, clientSecret) {
+  // This is a simplified implementation.
+  // In a real-world scenario, you would implement OAuth2 flow or use a token exchange
+  throw new Error("OAuth2 token exchange not implemented yet. Please use API key instead.");
+}
+
+function formatContentForDocs(content, artifactType) {
   // Format content based on artifact type
   let formattedContent = content;
   
@@ -139,7 +171,7 @@ function formatContentForDocs(content: string, artifactType: string): string {
   return formattedContent;
 }
 
-async function updateStoryArtifact(supabase, storyId: string, artifactType: string, docId: string) {
+async function updateStoryArtifact(supabase, storyId, artifactType, docId) {
   // Map artifact type to column name
   const columnMap = {
     'lld': 'lld_gsuite_id',
