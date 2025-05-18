@@ -40,6 +40,10 @@ class N8nService {
     };
   }
   
+  async getBaseUrl(): Promise<string | null> {
+    return this.baseUrl;
+  }
+  
   async isConfigured(): Promise<boolean> {
     return !!(this.baseUrl && this.apiKey);
   }

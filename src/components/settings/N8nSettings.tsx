@@ -10,8 +10,8 @@ import { Loader2, Save, CheckCircle, AlertCircle, Info } from "lucide-react";
 import StatusIndicator from './common/StatusIndicator';
 
 const N8nSettings: React.FC = () => {
-  const { isConfigured, configureN8n } = useN8n();
-  const [baseUrl, setBaseUrl] = useState<string>('');
+  const { isConfigured, configureN8n, baseUrl } = useN8n();
+  const [inputBaseUrl, setInputBaseUrl] = useState<string>(baseUrl || 'https://cardy-super-engineer.app.n8n.cloud');
   const [apiKey, setApiKey] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +22,7 @@ const N8nSettings: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      await configureN8n(baseUrl, apiKey);
+      await configureN8n(inputBaseUrl, apiKey);
     } catch (err: any) {
       setError(err.message || 'Failed to configure n8n');
     } finally {
@@ -55,17 +55,17 @@ const N8nSettings: React.FC = () => {
             <Input
               id="n8n-url"
               placeholder="https://your-n8n-instance.com"
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
+              value={inputBaseUrl}
+              onChange={(e) => setInputBaseUrl(e.target.value)}
               required
             />
             <p className="text-xs text-muted-foreground">
-              The base URL of your n8n instance (e.g., https://n8n.example.com)
+              The base URL of your n8n instance (e.g., https://cardy-super-engineer.app.n8n.cloud)
             </p>
           </div>
           
           <div className="space-y-2">
-            <Label htmlFor="api-key">API Key</Label>
+            <Label htmlFor="api-key">API Key <span className="text-red-500">*</span></Label>
             <Input
               id="api-key"
               type="password"
@@ -74,8 +74,9 @@ const N8nSettings: React.FC = () => {
               onChange={(e) => setApiKey(e.target.value)}
               required
             />
-            <p className="text-xs text-muted-foreground">
-              API key for authenticating with your n8n instance
+            <p className="text-xs text-muted-foreground flex items-center">
+              <Info className="h-3 w-3 mr-1" />
+              API key for authenticating with your n8n instance (required for secure communication)
             </p>
           </div>
           
@@ -114,12 +115,12 @@ const N8nSettings: React.FC = () => {
         <Alert className="mt-4">
           <Info className="h-4 w-4" />
           <AlertDescription>
-            <p>To set up n8n for agentic workflows:</p>
+            <p>To set up n8n for agentic workflows with Google Drive:</p>
             <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
-              <li>Install n8n on your server or sign up for n8n cloud</li>
-              <li>Create an API key in your n8n instance settings</li>
+              <li>Create an API key in your n8n cloud instance settings</li>
               <li>Configure the connection using the form above</li>
-              <li>Create workflows in n8n with HTTP triggers for Cardy Engineer to call</li>
+              <li>Ensure your workflow <code>O2LWN9jF5oERhCFZ</code> has HTTP triggers configured</li>
+              <li>The system will automatically process documents uploaded to Google Drive</li>
             </ol>
           </AlertDescription>
         </Alert>

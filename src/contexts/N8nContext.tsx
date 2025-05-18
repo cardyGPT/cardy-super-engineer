@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 
 interface N8nContextType {
   isConfigured: boolean;
+  baseUrl: string | null;
   configureN8n: (baseUrl: string, apiKey: string) => Promise<void>;
   workflows: N8nWorkflow[];
   loadingWorkflows: boolean;
@@ -27,6 +28,7 @@ export const useN8n = () => {
 
 export const N8nProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [isConfigured, setIsConfigured] = useState<boolean>(false);
+  const [baseUrl, setBaseUrl] = useState<string | null>(null);
   const [workflows, setWorkflows] = useState<N8nWorkflow[]>([]);
   const [loadingWorkflows, setLoadingWorkflows] = useState<boolean>(false);
   const [executionResults, setExecutionResults] = useState<Record<string, N8nExecutionResult>>({});
@@ -39,6 +41,8 @@ export const N8nProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setIsConfigured(configured);
         
         if (configured) {
+          const url = await n8nService.getBaseUrl();
+          setBaseUrl(url);
           refreshWorkflows();
         }
       } catch (error) {
@@ -53,6 +57,7 @@ export const N8nProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await n8nService.saveConfig(baseUrl, apiKey);
       setIsConfigured(true);
+      setBaseUrl(baseUrl);
       toast({
         title: "n8n Configuration Saved",
         description: "Successfully connected to n8n",
@@ -135,6 +140,7 @@ export const N8nProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <N8nContext.Provider value={{
       isConfigured,
+      baseUrl,
       configureN8n,
       workflows,
       loadingWorkflows,
