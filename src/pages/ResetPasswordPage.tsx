@@ -21,6 +21,10 @@ const ResetPasswordPage: React.FC = () => {
 
   // Get token from URL
   const token = searchParams.get('token') || '';
+  const type = searchParams.get('type') || '';
+  
+  console.log("Reset password token:", token);
+  console.log("Reset password type:", type);
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
@@ -64,10 +68,22 @@ const ResetPasswordPage: React.FC = () => {
     setIsSubmitting(true);
     
     try {
+      console.log("Attempting password reset with token:", token);
       const success = await resetPassword(token, password);
       if (success) {
+        toast({
+          title: "Password reset successful",
+          description: "Your password has been updated. You can now log in with your new password.",
+        });
         navigate('/');
       }
+    } catch (error: any) {
+      console.error("Password reset error:", error);
+      toast({
+        title: "Reset failed",
+        description: error.message || "Failed to reset password. The link may have expired.",
+        variant: "destructive",
+      });
     } finally {
       setIsSubmitting(false);
     }

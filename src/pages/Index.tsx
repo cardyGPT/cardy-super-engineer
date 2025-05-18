@@ -1,7 +1,7 @@
 
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { FolderKanban, FileUp, Database, PenTool, Code, Sparkles } from "lucide-react";
+import { FolderKanban, FileUp, Database, Code, Sparkles, FileText, Settings } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 
 const Index = () => {
@@ -13,39 +13,21 @@ const Index = () => {
         <div className="text-center mb-12 py-8">
           <h1 className="text-4xl font-bold text-cardy-blue mb-4">Cardy Super Engineer</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Accelerate your development lifecycle with AI-powered project planning,
-            documentation, code generation, and testing.
+            Cardy Super Engineer generates LLDs, code, and test scripts — instantly.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-start">
-              <FolderKanban className="w-10 h-10 text-cardy-blue mr-4" />
+              <FileText className="w-10 h-10 text-cardy-blue mr-4" />
               <div>
-                <h2 className="text-xl font-semibold mb-3">Project & Document Management</h2>
+                <h2 className="text-xl font-semibold mb-3">Low-level design generation</h2>
                 <p className="text-gray-600 mb-4">
-                  Organize requirements, guidelines, and designs for efficient knowledge management.
-                  Keep all your project assets centralized and easily accessible.
+                  Generate comprehensive, context-aware low-level design documents that align perfectly with requirements.
                 </p>
                 <Button onClick={() => navigate("/projects")} className="w-full">
-                  Manage Projects
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-md">
-            <div className="flex items-start">
-              <PenTool className="w-10 h-10 text-cardy-blue mr-4" />
-              <div>
-                <h2 className="text-xl font-semibold mb-3">Jira Integration</h2>
-                <p className="text-gray-600 mb-4">
-                  Connect directly with your Jira workflows. Import user stories and epics,
-                  generate detailed documentation, and push content back to Jira tickets.
-                </p>
-                <Button onClick={() => navigate("/stories")} className="w-full">
-                  Access Stories
+                  Generate LLD
                 </Button>
               </div>
             </div>
@@ -55,13 +37,12 @@ const Index = () => {
             <div className="flex items-start">
               <Code className="w-10 h-10 text-cardy-blue mr-4" />
               <div>
-                <h2 className="text-xl font-semibold mb-3">AI-Powered Development</h2>
+                <h2 className="text-xl font-semibold mb-3">Code snippets & unit tests</h2>
                 <p className="text-gray-600 mb-4">
-                  Generate comprehensive Low-Level Designs (LLDs), production-ready code, and test cases
-                  from your user stories. Speed up development with context-aware AI assistance.
+                  Create production-ready code with accompanying unit tests that follow project standards.
                 </p>
                 <Button onClick={() => navigate("/stories")} className="w-full">
-                  Generate Content
+                  Generate Code
                 </Button>
               </div>
             </div>
@@ -69,15 +50,29 @@ const Index = () => {
 
           <div className="bg-white p-6 rounded-lg shadow-md">
             <div className="flex items-start">
-              <Database className="w-10 h-10 text-cardy-blue mr-4" />
+              <FileUp className="w-10 h-10 text-cardy-blue mr-4" />
               <div>
-                <h2 className="text-xl font-semibold mb-3">Data Model Visualization</h2>
+                <h2 className="text-xl font-semibold mb-3">Test cases & automation scripts</h2>
                 <p className="text-gray-600 mb-4">
-                  Visualize and explore complex data relationships with interactive ER diagrams.
-                  Query your data models through natural language to understand complex schemas.
+                  Build comprehensive test plans and automation scripts based on requirements and specifications.
                 </p>
-                <Button onClick={() => navigate("/data-models")} className="w-full">
-                  Explore Data Models
+                <Button onClick={() => navigate("/stories")} className="w-full">
+                  Generate Tests
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-md">
+            <div className="flex items-start">
+              <Settings className="w-10 h-10 text-cardy-blue mr-4" />
+              <div>
+                <h2 className="text-xl font-semibold mb-3">Integrated with your tools</h2>
+                <p className="text-gray-600 mb-4">
+                  Seamlessly connect with Jira, G Suite, Bitbucket & Slack for streamlined workflows.
+                </p>
+                <Button onClick={() => navigate("/settings")} className="w-full">
+                  Configure Integrations
                 </Button>
               </div>
             </div>
