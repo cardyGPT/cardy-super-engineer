@@ -1,102 +1,115 @@
 
-import { createBrowserRouter, Navigate } from 'react-router-dom';
-import StoriesPage from './pages/StoriesPage';
-import LoginPage from './pages/LoginPage';
-import NotFound from './pages/NotFound';
-import SettingsPage from './pages/SettingsPage';
-import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import CardyMindPage from './pages/CardyMindPage';
-import DataModelPage from './pages/DataModelPage';
-import DocumentsPage from './pages/DocumentsPage';
-import GSuiteSettingsPage from './pages/GSuiteSettingsPage';
-import ProfilePage from './pages/ProfilePage';
-import ResetPasswordPage from './pages/ResetPasswordPage';
-import ProtectedRoute from './components/auth/ProtectedRoute';
+import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
-export const routes = createBrowserRouter([
-  {
-    path: '/',
-    element: <LoginPage />,
-  },
-  {
-    path: '/login',
-    element: <Navigate to="/" replace />,
-  },
-  {
-    path: '/reset-password',
-    element: <ResetPasswordPage />,
-  },
-  {
-    path: '/dashboard',
-    element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
-  },
-  {
-    path: '/stories',
-    element: <ProtectedRoute><StoriesPage /></ProtectedRoute>,
-  },
-  {
-    path: '/settings',
-    element: <ProtectedRoute><SettingsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/profile',
-    element: <ProtectedRoute><ProfilePage /></ProtectedRoute>,
-  },
-  {
-    path: '/projects',
-    element: <ProtectedRoute><ProjectsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/projects/:projectId',
-    element: <ProtectedRoute><ProjectDetailPage /></ProtectedRoute>,
-  },
-  {
-    path: '/cardy-mind',
-    element: <ProtectedRoute><CardyMindPage /></ProtectedRoute>,
-  },
-  {
-    path: '/data-model',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/data-models',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/er-diagram',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/smart-er',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/smart-er-diagram',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/docs-model',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/docs-&-data-model',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/docs-and-data-model',
-    element: <ProtectedRoute><DataModelPage /></ProtectedRoute>,
-  },
-  {
-    path: '/documents',
-    element: <ProtectedRoute><DocumentsPage /></ProtectedRoute>,
-  },
-  {
-    path: '/gsuite-settings',
-    element: <ProtectedRoute><GSuiteSettingsPage /></ProtectedRoute>,
-  },
-  {
-    path: '*',
-    element: <NotFound />,
-  },
-]);
+import Index from "@/pages/Index";
+import LoginPage from "@/pages/LoginPage";
+import ProjectsPage from "@/pages/ProjectsPage";
+import ProjectDetailPage from "@/pages/ProjectDetailPage";
+import DocumentsPage from "@/pages/DocumentsPage";
+import DataModelPage from "@/pages/DataModelPage";
+import CardyMindPage from "@/pages/CardyMindPage";
+import ProfilePage from "@/pages/ProfilePage";
+import SettingsPage from "@/pages/SettingsPage";
+import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import DocumentProcessingPage from "@/pages/DocumentProcessingPage";
+import StoriesPage from "@/pages/StoriesPage";
+import NotFound from "@/pages/NotFound";
+
+const AppRoutes = () => {
+  return (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      
+      {/* Protected Routes */}
+      <Route 
+        path="/" 
+        element={
+          <ProtectedRoute>
+            <Index />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/projects" 
+        element={
+          <ProtectedRoute>
+            <ProjectsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/projects/:id" 
+        element={
+          <ProtectedRoute>
+            <ProjectDetailPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/documents" 
+        element={
+          <ProtectedRoute>
+            <DocumentsPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route
+        path="/document-processing"
+        element={
+          <ProtectedRoute>
+            <DocumentProcessingPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route 
+        path="/data-models" 
+        element={
+          <ProtectedRoute>
+            <DataModelPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/cardy-mind" 
+        element={
+          <ProtectedRoute>
+            <CardyMindPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/stories" 
+        element={
+          <ProtectedRoute>
+            <StoriesPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/settings" 
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        } 
+      />
+      
+      {/* Fallback Routes */}
+      <Route path="/404" element={<NotFound />} />
+      <Route path="*" element={<Navigate to="/404" replace />} />
+    </Routes>
+  );
+};
+
+export default AppRoutes;

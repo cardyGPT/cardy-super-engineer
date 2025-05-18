@@ -36,6 +36,170 @@ export type Database = {
         }
         Relationships: []
       }
+      document_access: {
+        Row: {
+          access_type: string
+          created_at: string | null
+          document_id: string | null
+          id: string
+          query_text: string | null
+          user_id: string | null
+        }
+        Insert: {
+          access_type: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          query_text?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          access_type?: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          query_text?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_access_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document_metadata"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_content: {
+        Row: {
+          chunk_index: number
+          chunk_text: string
+          created_at: string | null
+          document_id: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          chunk_index: number
+          chunk_text: string
+          created_at?: string | null
+          document_id?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          chunk_index?: number
+          chunk_text?: string
+          created_at?: string | null
+          document_id?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_content_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document_metadata"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_metadata: {
+        Row: {
+          created_at: string | null
+          file_size: number | null
+          file_type: string
+          filename: string
+          id: string
+          last_processed_date: string | null
+          project_id: string | null
+          source_url: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          upload_date: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_size?: number | null
+          file_type: string
+          filename: string
+          id?: string
+          last_processed_date?: string | null
+          project_id?: string | null
+          source_url?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          upload_date?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_size?: number | null
+          file_type?: string
+          filename?: string
+          id?: string
+          last_processed_date?: string | null
+          project_id?: string | null
+          source_url?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          upload_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_metadata_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      document_processing_logs: {
+        Row: {
+          created_at: string | null
+          document_id: string | null
+          event_type: string
+          id: string
+          message: string | null
+          processing_time: number | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          document_id?: string | null
+          event_type: string
+          id?: string
+          message?: string | null
+          processing_time?: number | null
+          status: string
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string | null
+          event_type?: string
+          id?: string
+          message?: string | null
+          processing_time?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_processing_logs_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "document_metadata"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content: Json | null
@@ -337,6 +501,22 @@ export type Database = {
       l2_normalize: {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: unknown
+      }
+      match_document_chunks: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+          filter?: Json
+        }
+        Returns: {
+          id: string
+          document_id: string
+          chunk_text: string
+          chunk_index: number
+          document_title: string
+          similarity: number
+        }[]
       }
       match_documents: {
         Args: {

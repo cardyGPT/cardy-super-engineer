@@ -33,6 +33,46 @@ export interface ProjectDocument {
   content?: any;
 }
 
+export interface DocumentMetadata {
+  id: string;
+  projectId: string;
+  title: string;
+  filename: string;
+  fileType: string;
+  fileSize?: number;
+  sourceUrl?: string;
+  uploadDate: string;
+  lastProcessedDate?: string;
+  status: DocumentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type DocumentStatus = 
+  | "pending" 
+  | "processing" 
+  | "completed" 
+  | "failed" 
+  | "queued";
+
+export interface DocumentChunk {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  chunkText: string;
+  similarity?: number;
+}
+
+export interface ProcessingLog {
+  id: string;
+  documentId: string;
+  eventType: string;
+  status: string;
+  message?: string;
+  processingTime?: number;
+  createdAt: string;
+}
+
 export interface Entity {
   id: string;
   name: string;
