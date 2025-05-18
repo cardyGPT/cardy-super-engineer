@@ -10,25 +10,30 @@ import StoryGenerateContent from './generate-content/StoryGenerateContent';
 import StoryDetail from './StoryDetail';
 
 interface StoryDetailsProps {
+  ticket: JiraTicket;
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: any; // This might be used for other purposes
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
 const StoryDetails: React.FC<StoryDetailsProps> = ({ 
+  ticket,
   projectContext, 
   selectedDocuments,
-  projectContextData // Accepting but not using directly in props
+  projectContextData,
+  activeTab = "details",
+  setActiveTab = () => {}
 }) => {
   const { 
-    selectedTicket, 
     generatedContent,
     generateContent,
     pushToJira,
     contentLoading
   } = useStories();
 
-  if (!selectedTicket) {
+  if (!ticket) {
     return (
       <Card>
         <CardHeader>
@@ -48,10 +53,12 @@ const StoryDetails: React.FC<StoryDetailsProps> = ({
 
   return (
     <StoryDetail 
-      ticket={selectedTicket}
+      ticket={ticket}
       projectContext={projectContext} 
       selectedDocuments={selectedDocuments}
       projectContextData={projectContextData}
+      activeTab={activeTab}
+      setActiveTab={setActiveTab}
     />
   );
 };
