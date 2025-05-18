@@ -6,6 +6,7 @@ import { StoriesProvider } from '@/contexts/StoriesContext';
 import { ProjectProvider } from '@/contexts/ProjectContext';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { N8nProvider } from '@/contexts/N8nContext';
 import AppRoutes from './routes';
 
 function App() {
@@ -16,10 +17,12 @@ function App() {
     <AuthProvider>
       <ProjectProvider>
         <StoriesProvider>
-          <TooltipProvider>
-            <RouterProvider router={router} />
-            <Toaster />
-          </TooltipProvider>
+          <N8nProvider>
+            <TooltipProvider>
+              <RouterProvider router={router} />
+              <Toaster />
+            </TooltipProvider>
+          </N8nProvider>
         </StoriesProvider>
       </ProjectProvider>
     </AuthProvider>

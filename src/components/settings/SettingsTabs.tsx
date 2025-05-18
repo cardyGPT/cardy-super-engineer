@@ -1,91 +1,51 @@
 
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import BitbucketSettings from "./BitbucketSettings";
+import GSuiteSettings from "./GSuiteSettings";
 import JiraSettings from "./JiraSettings";
 import OpenAISettings from "./OpenAISettings";
-import GSuiteSettings from "./GSuiteSettings";
-import BitbucketSettings from "./BitbucketSettings";
-import { CheckCircle, AlertCircle } from "lucide-react";
+import N8nSettings from "./N8nSettings";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
-interface SettingsTabsProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
-  jiraConnected: boolean;
-  openAIConnected: boolean;
-  gsuiteConnected: boolean;
-  bitbucketConnected: boolean;
-  setJiraConnected: (connected: boolean) => void;
-  setOpenAIConnected: (connected: boolean) => void;
-  setGsuiteConnected: (connected: boolean) => void;
-  setBitbucketConnected: (connected: boolean) => void;
-}
+export const settingsTabs = [
+  {
+    id: "jira",
+    title: "Jira",
+    content: <JiraSettings />,
+  },
+  {
+    id: "gsuite",
+    title: "GSuite",
+    content: <GSuiteSettings />,
+  },
+  {
+    id: "bitbucket",
+    title: "Bitbucket",
+    content: <BitbucketSettings />,
+  },
+  {
+    id: "openai",
+    title: "OpenAI",
+    content: <OpenAISettings />,
+  },
+  {
+    id: "n8n",
+    title: "n8n",
+    content: <N8nSettings />,
+  },
+];
 
-const SettingsTabs: React.FC<SettingsTabsProps> = ({
-  activeTab,
-  setActiveTab,
-  jiraConnected,
-  openAIConnected,
-  gsuiteConnected,
-  bitbucketConnected,
-  setJiraConnected,
-  setOpenAIConnected,
-  setGsuiteConnected,
-  setBitbucketConnected
-}) => {
+export function SettingsTabs() {
   return (
-    <Tabs defaultValue="jira" value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-      <TabsList className="grid grid-cols-4 w-full max-w-md mb-4">
-        <TabsTrigger value="jira" className="flex items-center gap-1">
-          Jira
-          {jiraConnected ? (
-            <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
-          ) : (
-            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="openai" className="flex items-center gap-1">
-          OpenAI
-          {openAIConnected ? (
-            <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
-          ) : (
-            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="gsuite" className="flex items-center gap-1">
-          GSuite
-          {gsuiteConnected ? (
-            <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
-          ) : (
-            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
-          )}
-        </TabsTrigger>
-        <TabsTrigger value="bitbucket" className="flex items-center gap-1">
-          Bitbucket
-          {bitbucketConnected ? (
-            <CheckCircle className="h-3 w-3 text-green-500 ml-1" />
-          ) : (
-            <AlertCircle className="h-3 w-3 text-gray-400 ml-1" />
-          )}
-        </TabsTrigger>
+    <Tabs defaultValue="jira">
+      <TabsList className="grid grid-cols-5 mb-8">
+        {settingsTabs.map(tab => (
+          <TabsTrigger key={tab.id} value={tab.id}>{tab.title}</TabsTrigger>
+        ))}
       </TabsList>
       
-      <TabsContent value="jira">
-        <JiraSettings onConfigChange={setJiraConnected} />
-      </TabsContent>
-      
-      <TabsContent value="openai">
-        <OpenAISettings onConfigChange={setOpenAIConnected} />
-      </TabsContent>
-      
-      <TabsContent value="gsuite">
-        <GSuiteSettings onConfigChange={setGsuiteConnected} />
-      </TabsContent>
-      
-      <TabsContent value="bitbucket">
-        <BitbucketSettings onConfigChange={setBitbucketConnected} />
-      </TabsContent>
+      {settingsTabs.map(tab => (
+        <TabsContent key={tab.id} value={tab.id}>{tab.content}</TabsContent>
+      ))}
     </Tabs>
   );
-};
-
-export default SettingsTabs;
+}

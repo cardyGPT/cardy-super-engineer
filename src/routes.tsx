@@ -14,6 +14,7 @@ import SettingsPage from "@/pages/SettingsPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import DocumentProcessingPage from "@/pages/DocumentProcessingPage";
 import StoriesPage from "@/pages/StoriesPage";
+import N8nWorkflowsPage from "@/pages/N8nWorkflowsPage";
 import NotFound from "@/pages/NotFound";
 
 const AppRoutes = () => {
@@ -85,6 +86,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute>
             <StoriesPage />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/n8n-workflows" 
+        element={
+          <ProtectedRoute>
+            <N8nWorkflowsPage />
           </ProtectedRoute>
         } 
       />

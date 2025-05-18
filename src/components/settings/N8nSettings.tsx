@@ -1,0 +1,131 @@
+
+import React, { useState } from 'react';
+import { useN8n } from '@/contexts/N8nContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { InfoCircle, Loader2, Save, CheckCircle, AlertCircle } from "lucide-react";
+import { StatusIndicator } from './common/StatusIndicator';
+
+const N8nSettings: React.FC = () => {
+  const { isConfigured, configureN8n } = useN8n();
+  const [baseUrl, setBaseUrl] = useState<string>('');
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    
+    try {
+      await configureN8n(baseUrl, apiKey);
+    } catch (err: any) {
+      setError(err.message || 'Failed to configure n8n');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          n8n Agentic Workflow Integration
+          <StatusIndicator status={isConfigured ? "connected" : "disconnected"} />
+        </CardTitle>
+        <CardDescription>
+          Connect to your n8n instance to enable automated workflows with AI agents
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          <div className="space-y-2">
+            <Label htmlFor="n8n-url">n8n Base URL</Label>
+            <Input
+              id="n8n-url"
+              placeholder="https://your-n8n-instance.com"
+              value={baseUrl}
+              onChange={(e) => setBaseUrl(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              The base URL of your n8n instance (e.g., https://n8n.example.com)
+            </p>
+          </div>
+          
+          <div className="space-y-2">
+            <Label htmlFor="api-key">API Key</Label>
+            <Input
+              id="api-key"
+              type="password"
+              placeholder="Your n8n API key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              API key for authenticating with your n8n instance
+            </p>
+          </div>
+          
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Configuring...
+              </>
+            ) : isConfigured ? (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Update Configuration
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4 mr-2" />
+                Save Configuration
+              </>
+            )}
+          </Button>
+        </form>
+        
+        {isConfigured && (
+          <div className="mt-4 p-4 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-md">
+            <div className="flex items-center text-green-700 dark:text-green-300">
+              <CheckCircle className="h-5 w-5 mr-2" />
+              <span className="font-medium">Connected to n8n</span>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Your Cardy Engineer project is successfully connected to n8n
+            </p>
+          </div>
+        )}
+        
+        <Alert className="mt-4">
+          <InfoCircle className="h-4 w-4" />
+          <AlertDescription>
+            <p>To set up n8n for agentic workflows:</p>
+            <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
+              <li>Install n8n on your server or sign up for n8n cloud</li>
+              <li>Create an API key in your n8n instance settings</li>
+              <li>Configure the connection using the form above</li>
+              <li>Create workflows in n8n with HTTP triggers for Cardy Engineer to call</li>
+            </ol>
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
+};
+
+export default N8nSettings;
