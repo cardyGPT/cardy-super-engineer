@@ -172,25 +172,34 @@ export type Database = {
       }
       projects: {
         Row: {
+          bitbucket_url: string | null
           created_at: string
           details: string | null
+          google_drive_url: string | null
           id: string
+          jira_url: string | null
           name: string
           type: string
           updated_at: string
         }
         Insert: {
+          bitbucket_url?: string | null
           created_at?: string
           details?: string | null
+          google_drive_url?: string | null
           id?: string
+          jira_url?: string | null
           name: string
           type: string
           updated_at?: string
         }
         Update: {
+          bitbucket_url?: string | null
           created_at?: string
           details?: string | null
+          google_drive_url?: string | null
           id?: string
+          jira_url?: string | null
           name?: string
           type?: string
           updated_at?: string

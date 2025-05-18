@@ -11,6 +11,9 @@ export interface Project {
   details: string;
   createdAt: string;
   updatedAt: string;
+  bitbucket_url?: string;
+  google_drive_url?: string;
+  jira_url?: string;
 }
 
 export type DocumentType = 

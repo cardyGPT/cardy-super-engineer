@@ -2,7 +2,7 @@
 import { Project } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, Trash2, ExternalLink } from "lucide-react";
 import { formatDistanceToNow, isValid } from "date-fns";
 import { useProject } from "@/contexts/ProjectContext";
 import { useNavigate } from "react-router-dom";
@@ -51,6 +51,11 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
     }
   };
 
+  // Check if the project has any reference links
+  const hasReferenceLinks = Boolean(
+    project.bitbucket_url || project.google_drive_url || project.jira_url
+  );
+
   return (
     <Card className="h-full">
       <CardHeader>
@@ -65,7 +70,53 @@ const ProjectCard = ({ project, onEdit }: ProjectCardProps) => {
         </div>
       </CardHeader>
       <CardContent>
-        <p className="text-sm text-gray-500 line-clamp-3">{project.details}</p>
+        <p className="text-sm text-gray-500 line-clamp-3 mb-3">{project.details}</p>
+        
+        {hasReferenceLinks && (
+          <div className="mt-3 space-y-1">
+            <p className="text-xs font-medium text-muted-foreground">Reference links:</p>
+            <div className="flex flex-wrap gap-2">
+              {project.bitbucket_url && (
+                <a 
+                  href={project.bitbucket_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs text-blue-600 hover:underline"
+                >
+                  <Badge variant="outline" className="gap-1">
+                    Bitbucket <ExternalLink className="h-3 w-3" />
+                  </Badge>
+                </a>
+              )}
+              
+              {project.google_drive_url && (
+                <a 
+                  href={project.google_drive_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs text-blue-600 hover:underline"
+                >
+                  <Badge variant="outline" className="gap-1">
+                    Drive <ExternalLink className="h-3 w-3" />
+                  </Badge>
+                </a>
+              )}
+              
+              {project.jira_url && (
+                <a 
+                  href={project.jira_url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-xs text-blue-600 hover:underline"
+                >
+                  <Badge variant="outline" className="gap-1">
+                    Jira <ExternalLink className="h-3 w-3" />
+                  </Badge>
+                </a>
+              )}
+            </div>
+          </div>
+        )}
       </CardContent>
       <CardFooter className="flex justify-between">
         <div className="flex gap-2">

@@ -34,7 +34,10 @@ const ProjectForm = ({ initialData, onSuccess, isSubmitting = false }: ProjectFo
     initialData || {
       name: "",
       type: "Child Welfare",
-      details: ""
+      details: "",
+      bitbucket_url: "",
+      google_drive_url: "",
+      jira_url: ""
     }
   );
 
@@ -106,9 +109,48 @@ const ProjectForm = ({ initialData, onSuccess, isSubmitting = false }: ProjectFo
           value={formData.details || ""}
           onChange={handleChange}
           placeholder="Enter project details"
-          rows={5}
+          rows={3}
           disabled={isSubmitting}
         />
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="text-sm font-medium">Reference Links</h3>
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <Label htmlFor="bitbucket_url">Bitbucket URL</Label>
+            <Input
+              id="bitbucket_url"
+              name="bitbucket_url"
+              value={formData.bitbucket_url || ""}
+              onChange={handleChange}
+              placeholder="https://bitbucket.org/your-repo"
+              disabled={isSubmitting}
+            />
+          </div>
+          <div>
+            <Label htmlFor="google_drive_url">Google Drive URL</Label>
+            <Input
+              id="google_drive_url"
+              name="google_drive_url"
+              value={formData.google_drive_url || ""}
+              onChange={handleChange}
+              placeholder="https://drive.google.com/drive/folders/your-folder"
+              disabled={isSubmitting}
+            />
+          </div>
+          <div>
+            <Label htmlFor="jira_url">Jira URL</Label>
+            <Input
+              id="jira_url"
+              name="jira_url"
+              value={formData.jira_url || ""}
+              onChange={handleChange}
+              placeholder="https://your-domain.atlassian.net/projects/your-project"
+              disabled={isSubmitting}
+            />
+          </div>
+        </div>
       </div>
       
       <DialogFooter>

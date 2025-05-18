@@ -1,3 +1,4 @@
+
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { CardyLogo } from "./CardyLogo";
@@ -16,7 +17,9 @@ export function AppSidebar({
     title: "Projects",
     href: "/projects",
     icon: <FolderKanban className="h-5 w-5" />
-  }, {
+  }, 
+  /* Commented out as requested
+  {
     title: "Docs & Data model",
     href: "/documents",
     icon: <FileText className="h-5 w-5" />
@@ -28,7 +31,9 @@ export function AppSidebar({
     title: "Cardy Mind",
     href: "/cardy-mind",
     icon: <BrainCircuit className="h-5 w-5" />
-  }, {
+  },
+  */
+  {
     title: "Stories",
     href: "/stories",
     icon: <ClipboardList className="h-5 w-5" />
@@ -40,7 +45,7 @@ export function AppSidebar({
   return <>
       <Sidebar>
         <SidebarHeader className="flex h-14 items-center border-b px-4">
-          
+          <CardyLogo />
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>

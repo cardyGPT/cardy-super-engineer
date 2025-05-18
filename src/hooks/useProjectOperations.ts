@@ -10,6 +10,9 @@ interface ProjectData {
   status?: string;
   type?: string;
   details?: string;
+  bitbucket_url?: string;
+  google_drive_url?: string;
+  jira_url?: string;
 }
 
 export const useProjectOperations = () => {
@@ -54,7 +57,10 @@ export const useProjectOperations = () => {
           name: projectData.name || "Untitled Project",
           // Use optional chaining and type assertion to handle potential missing properties
           details: (projectData as ProjectData).description || projectData.details || "",
-          type: projectData.type || "Child Welfare"
+          type: projectData.type || "Child Welfare",
+          bitbucket_url: projectData.bitbucket_url || null,
+          google_drive_url: projectData.google_drive_url || null,
+          jira_url: projectData.jira_url || null
         }])
         .select()
         .single();
@@ -84,6 +90,9 @@ export const useProjectOperations = () => {
       if ((projectData as ProjectData).description) updateData.details = (projectData as ProjectData).description;
       else if (projectData.details) updateData.details = projectData.details;
       if (projectData.type) updateData.type = projectData.type;
+      if (projectData.bitbucket_url !== undefined) updateData.bitbucket_url = projectData.bitbucket_url;
+      if (projectData.google_drive_url !== undefined) updateData.google_drive_url = projectData.google_drive_url;
+      if (projectData.jira_url !== undefined) updateData.jira_url = projectData.jira_url;
       
       const { data, error } = await supabase
         .from("projects")
