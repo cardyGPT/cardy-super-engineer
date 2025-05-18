@@ -10,10 +10,12 @@ import { getContentByType } from './utils';
 import GenerateButtons from './GenerateButtons';
 import ContentTabs from './ContentTabs';
 import ContentActions from './ContentActions';
+import PromptInput from './PromptInput';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { AlertCircle, CheckCircle, Info, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle, Info, Loader2, MessageSquare } from "lucide-react";
 import { useStories } from '@/contexts/StoriesContext';
+import { Button } from "@/components/ui/button";
 
 interface ExistingArtifacts {
   lldContent: string | null;
@@ -51,6 +53,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [generatingContentType, setGeneratingContentType] = useState<ContentType | null>(null);
+  const [showPromptInput, setShowPromptInput] = useState(false);
+  const [isSubmittingPrompt, setIsSubmittingPrompt] = useState(false);
   const { toast } = useToast();
   
   const contentRef = useRef<HTMLDivElement>(null);
@@ -101,7 +105,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       case 'testcases':
         return '🧪 Writing test cases...\nWe\'re creating test cases that align with your code and business logic. These help ensure every scenario is accounted for before automation.';
       case 'tests':
-        return '🎭 Generating Playwright tests...\nNow turning your test cases into end-to-end Playwright tests. These will simulate real user interactions and validate your application from the browser.';
+        return '🎭 Generating tests...\nNow turning your test cases into automated tests. These will validate your application functionality.';
       default:
         return 'Generating content...';
     }
@@ -166,6 +170,57 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       });
     } finally {
       setGeneratingContentType(null);
+    }
+  };
+  
+  const handleSubmitPrompt = async (prompt: string) => {
+    setIsSubmittingPrompt(true);
+    try {
+      const request: JiraGenerationRequest = {
+        type: activeTab,
+        jiraTicket: ticket,
+        projectContext: projectContext || undefined,
+        selectedDocuments: selectedDocuments || [],
+        additionalContext: {
+          customPrompt: prompt
+        }
+      };
+      
+      // Add current content to provide context for refinement
+      const currentContent = getContentByType(combinedContent, activeTab);
+      if (currentContent) {
+        request.additionalContext.currentContent = currentContent;
+      }
+      
+      // Add previous artifacts for context
+      if (activeTab !== 'lld' && combinedContent.lldContent) {
+        request.additionalContext.lldContent = combinedContent.lldContent;
+      }
+      
+      if ((activeTab === 'tests' || activeTab === 'testcases') && combinedContent.codeContent) {
+        request.additionalContext.codeContent = combinedContent.codeContent;
+      }
+      
+      if (activeTab === 'tests' && combinedContent.testCasesContent) {
+        request.additionalContext.testCasesContent = combinedContent.testCasesContent;
+      }
+      
+      await onGenerate(request);
+      
+      toast({
+        title: "Content Updated",
+        description: `${activeTab.toUpperCase()} content has been updated based on your prompt.`,
+      });
+      
+      setShowPromptInput(false);
+    } catch (err: any) {
+      toast({
+        title: "Error",
+        description: err.message || `Failed to update content based on prompt.`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmittingPrompt(false);
     }
   };
   
@@ -368,7 +423,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 {generatingContentType === 'lld' ? 'Step 1: Low-Level Design (LLD)' : 
                  generatingContentType === 'code' ? 'Step 2: Code Generation' :
                  generatingContentType === 'testcases' ? 'Step 3: Test Case Generation' :
-                 generatingContentType === 'tests' ? 'Step 4: Playwright Automation Tests' :
+                 generatingContentType === 'tests' ? 'Step 4: Tests Generation' :
                  'Generating Content'}
               </AlertTitle>
               <AlertDescription className="whitespace-pre-line">
@@ -397,7 +452,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     if (nextType) {
       const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
                             nextType === 'code' ? 'Implementation Code' :
-                            nextType === 'testcases' ? 'Test Cases' : 'Unit Tests';
+                            nextType === 'testcases' ? 'Test Cases' : 'Tests';
       
       return (
         <Alert className="mb-4">
@@ -426,18 +481,42 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     <div className="space-y-4">
       {renderStatusInfo()}
       
-      <GenerateButtons 
-        onGenerate={handleGenerate}
-        onGenerateAll={handleGenerateAll}
-        isGenerating={isGenerating}
-        isGeneratingAll={isGeneratingAll}
-        activeTab={activeTab}
-        generatingContentType={generatingContentType}
-        hasLldContent={hasContentType('lld')}
-        hasCodeContent={hasContentType('code')}
-        hasTestsContent={hasContentType('tests')}
-        hasTestCasesContent={hasContentType('testcases')}
-      />
+      {showPromptInput && hasContentType(activeTab) && (
+        <PromptInput
+          contentType={activeTab}
+          onSubmitPrompt={handleSubmitPrompt}
+          isSubmitting={isSubmittingPrompt}
+          onClose={() => setShowPromptInput(false)}
+        />
+      )}
+      
+      <div className="flex justify-between mb-2">
+        <GenerateButtons 
+          onGenerate={handleGenerate}
+          onGenerateAll={handleGenerateAll}
+          isGenerating={isGenerating}
+          isGeneratingAll={isGeneratingAll}
+          activeTab={activeTab}
+          generatingContentType={generatingContentType}
+          hasLldContent={hasContentType('lld')}
+          hasCodeContent={hasContentType('code')}
+          hasTestsContent={hasContentType('tests')}
+          hasTestCasesContent={hasContentType('testcases')}
+        />
+        
+        {/* Prompt button */}
+        {hasAnyContent && hasContentType(activeTab) && (
+          <Button 
+            variant="outline" 
+            size="icon" 
+            className="border-blue-200 hover:bg-blue-50"
+            onClick={() => setShowPromptInput(!showPromptInput)}
+            disabled={isGenerating || isGeneratingAll || isSubmittingPrompt}
+          >
+            <MessageSquare className="h-4 w-4 text-blue-500" />
+          </Button>
+        )}
+      </div>
       
       {hasAnyContent && (
         <Card className="overflow-hidden">

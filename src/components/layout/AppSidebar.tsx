@@ -2,7 +2,7 @@
 import { Link, useLocation } from "react-router-dom";
 import { Sidebar, SidebarContent, SidebarFooter, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { CardyLogo } from "./CardyLogo";
-import { LayoutDashboard, FileText, Database, User, Settings, BrainCircuit, FolderKanban, ClipboardList, BookOpenCheck, Workflow } from "lucide-react";
+import { LayoutDashboard, FileText, Database, User, Settings, BrainCircuit, FolderKanban, ClipboardList, BookOpenCheck, Workflow, Code, TestTube, HelpCircle } from "lucide-react";
 
 interface AppSidebarProps {
   onLinkClick?: () => void;
@@ -27,27 +27,10 @@ export function AppSidebar({
       href: "/document-processing",
       icon: <BookOpenCheck className="h-5 w-5" />
     },
-    /* Commented out as requested
     {
-      title: "Docs & Data model",
-      href: "/documents",
-      icon: <FileText className="h-5 w-5" />
-    }, 
-    {
-      title: "Smart ER",
-      href: "/data-models",
-      icon: <Database className="h-5 w-5" />
-    }, 
-    {
-      title: "Cardy Mind",
-      href: "/cardy-mind",
-      icon: <BrainCircuit className="h-5 w-5" />
-    },
-    */
-    {
-      title: "Stories",
-      href: "/stories",
-      icon: <ClipboardList className="h-5 w-5" />
+      title: "Generate",
+      href: "/generate",
+      icon: <Code className="h-5 w-5" />
     }, 
     {
       title: "n8n Workflows",
@@ -58,6 +41,11 @@ export function AppSidebar({
       title: "Settings",
       href: "/settings",
       icon: <Settings className="h-5 w-5" />
+    },
+    {
+      title: "Help",
+      href: "/help",
+      icon: <HelpCircle className="h-5 w-5" />
     }
   ];
 

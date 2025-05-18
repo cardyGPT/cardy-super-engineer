@@ -16,15 +16,18 @@ interface StoryDetailProps {
   projectContext?: string | null;
   selectedDocuments?: string[];
   projectContextData?: ProjectContextData | null;
+  activeTab?: string;
+  setActiveTab?: (tab: string) => void;
 }
 
 const StoryDetail: React.FC<StoryDetailProps> = ({ 
   ticket, 
   projectContext, 
   selectedDocuments,
-  projectContextData 
+  projectContextData,
+  activeTab = "details",
+  setActiveTab = () => {} 
 }) => {
-  const [activeTab, setActiveTab] = useState<string>("details");
   const { 
     generatedContent, 
     generateContent, 
@@ -43,7 +46,6 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
 
   // Reset tab to details when ticket changes
   useEffect(() => {
-    setActiveTab("details");
     refreshArtifacts();
   }, [ticket.key, refreshArtifacts]);
 

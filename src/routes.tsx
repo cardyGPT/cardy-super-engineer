@@ -13,8 +13,9 @@ import ProfilePage from "@/pages/ProfilePage";
 import SettingsPage from "@/pages/SettingsPage";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import DocumentProcessingPage from "@/pages/DocumentProcessingPage";
-import StoriesPage from "@/pages/StoriesPage";
+import GeneratePage from "@/pages/GeneratePage";
 import N8nWorkflowsPage from "@/pages/N8nWorkflowsPage";
+import HelpPage from "@/pages/HelpPage";
 import NotFound from "@/pages/NotFound";
 
 const AppRoutes = () => {
@@ -24,12 +25,15 @@ const AppRoutes = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       
+      {/* Root path redirects to login if not authenticated */}
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      
       {/* Protected Routes */}
       <Route 
-        path="/" 
+        path="/help" 
         element={
           <ProtectedRoute>
-            <Index />
+            <HelpPage />
           </ProtectedRoute>
         } 
       />
@@ -82,10 +86,10 @@ const AppRoutes = () => {
         } 
       />
       <Route 
-        path="/stories" 
+        path="/generate" 
         element={
           <ProtectedRoute>
-            <StoriesPage />
+            <GeneratePage />
           </ProtectedRoute>
         } 
       />
