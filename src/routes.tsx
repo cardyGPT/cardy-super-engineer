@@ -24,8 +24,15 @@ const AppRoutes = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       
-      {/* Root path redirects to login or projects based on auth */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
+      {/* Root path redirects to projects if authenticated, otherwise to login */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute fallback={<Navigate to="/login" replace />}>
+            <Navigate to="/projects" replace />
+          </ProtectedRoute>
+        }
+      />
       
       {/* Protected Routes */}
       <Route 

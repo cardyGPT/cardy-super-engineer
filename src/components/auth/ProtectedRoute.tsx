@@ -1,13 +1,13 @@
-
 import React, { ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, fallback }) => {
   const { isAuthenticated, isLoading } = useAuth();
   const location = useLocation();
 
@@ -17,7 +17,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   }
 
   if (!isAuthenticated) {
-    // Save the location they were trying to access for redirecting after login
+    // If a fallback is provided, use it
+    if (fallback) {
+      return <>{fallback}</>;
+    }
+    
+    // Otherwise, save the location they were trying to access for redirecting after login
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
