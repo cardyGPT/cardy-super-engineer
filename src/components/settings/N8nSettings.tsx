@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { InfoCircle, Loader2, Save, CheckCircle, AlertCircle } from "lucide-react";
-import { StatusIndicator } from './common/StatusIndicator';
+import { Loader2, Save, CheckCircle, AlertCircle, Info } from "lucide-react";
+import StatusIndicator from './common/StatusIndicator';
 
 const N8nSettings: React.FC = () => {
   const { isConfigured, configureN8n } = useN8n();
@@ -112,7 +112,7 @@ const N8nSettings: React.FC = () => {
         )}
         
         <Alert className="mt-4">
-          <InfoCircle className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <AlertDescription>
             <p>To set up n8n for agentic workflows:</p>
             <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">

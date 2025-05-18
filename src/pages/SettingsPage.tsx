@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import SettingsHeader from "@/components/settings/SettingsHeader";
-import SettingsTabs from "@/components/settings/SettingsTabs";
+import { SettingsTabs } from "@/components/settings/SettingsTabs";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
