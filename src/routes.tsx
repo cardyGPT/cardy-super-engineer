@@ -2,7 +2,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 
-import Index from "@/pages/Index";
 import LoginPage from "@/pages/LoginPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ProjectDetailPage from "@/pages/ProjectDetailPage";
@@ -25,7 +24,7 @@ const AppRoutes = () => {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       
-      {/* Root path redirects to login if not authenticated */}
+      {/* Root path redirects to login or projects based on auth */}
       <Route path="/" element={<Navigate to="/login" replace />} />
       
       {/* Protected Routes */}
@@ -118,9 +117,8 @@ const AppRoutes = () => {
         } 
       />
       
-      {/* Fallback Routes */}
-      <Route path="/404" element={<NotFound />} />
-      <Route path="*" element={<Navigate to="/404" replace />} />
+      {/* Catch all route - must be at the end */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
