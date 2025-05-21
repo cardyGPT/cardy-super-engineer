@@ -39,8 +39,42 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
     contentType === 'testScripts' ? 'Playwright (Functional Testing), JMeter (Performance Testing)' :
     '';
 
+  // CSS styles for printing
+  const printStyles = `
+    @media print {
+      .page-break-after {
+        page-break-after: always;
+      }
+      
+      .export-document {
+        font-size: 12pt;
+      }
+      
+      .export-document h1 {
+        font-size: 24pt;
+      }
+      
+      .export-document h2 {
+        font-size: 18pt;
+      }
+      
+      .export-document table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      
+      .export-document th, .export-document td {
+        border: 1px solid #ddd;
+        padding: 8px;
+      }
+    }
+  `;
+
   return (
     <div className="export-document prose max-w-none p-8 bg-white">
+      {/* Add print styles using standard style tag */}
+      <style dangerouslySetInnerHTML={{ __html: printStyles }} />
+      
       {/* Title Page */}
       <div className="mb-16">
         <div className="text-center mb-24">
@@ -238,38 +272,6 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
           </tbody>
         </table>
       </div>
-      
-      <style jsx>
-        {`
-          @media print {
-            .page-break-after {
-              page-break-after: always;
-            }
-            
-            .export-document {
-              font-size: 12pt;
-            }
-            
-            .export-document h1 {
-              font-size: 24pt;
-            }
-            
-            .export-document h2 {
-              font-size: 18pt;
-            }
-            
-            .export-document table {
-              width: 100%;
-              border-collapse: collapse;
-            }
-            
-            .export-document th, .export-document td {
-              border: 1px solid #ddd;
-              padding: 8px;
-            }
-          }
-        `}
-      </style>
     </div>
   );
 };
