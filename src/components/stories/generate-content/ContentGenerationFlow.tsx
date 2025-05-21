@@ -2,14 +2,13 @@
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeft, RefreshCw } from "lucide-react";
+import { RefreshCw, FilePdf, FileWord, Save, Send, MessageSquare } from "lucide-react";
 import { ContentType } from '../ContentDisplay';
 import { Steps, Step } from "@/components/ui/steps";
 import { JiraGenerationResponse, JiraTicket } from '@/types/jira';
 import ContentDisplay from '../ContentDisplay';
 import ContentActions from './ContentActions';
 import PromptInput from './PromptInput';
-import OpenAITokenInfo from './OpenAITokenInfo';
 import DocumentExportFormatter from './DocumentExportFormatter';
 import { useToast } from '@/hooks/use-toast';
 import { downloadAsPDF } from '@/utils/exportUtils';
@@ -47,6 +46,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
 }) => {
   const [showPromptInput, setShowPromptInput] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingWord, setIsExportingWord] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
@@ -54,22 +54,6 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
   const { toast } = useToast();
   const contentRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
-  
-  // Navigate to next step in the flow
-  const handleNextStep = () => {
-    const currentIndex = GENERATION_STEPS.findIndex(step => step.id === currentStep);
-    if (currentIndex < GENERATION_STEPS.length - 1) {
-      setCurrentStep(GENERATION_STEPS[currentIndex + 1].id);
-    }
-  };
-  
-  // Navigate to previous step in the flow
-  const handlePreviousStep = () => {
-    const currentIndex = GENERATION_STEPS.findIndex(step => step.id === currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(GENERATION_STEPS[currentIndex - 1].id);
-    }
-  };
   
   // Get content for the current step from generated content
   const getContentForCurrentStep = (): string | null => {
@@ -193,6 +177,49 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
     }
   };
   
+  // Handle export to Word format
+  const handleExportWord = async () => {
+    if (!documentRef.current || !selectedTicket) return;
+    
+    setIsExportingWord(true);
+    try {
+      // Convert the HTML to a format Word can understand
+      const content = documentRef.current.innerHTML;
+      const fileName = `${selectedTicket.key}_${currentStep}.doc`;
+      
+      // Create a hidden link element
+      const link = document.createElement('a');
+      
+      // Create a Blob with the HTML content and Word mime type
+      const blob = new Blob(['<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Export HTML to Word</title></head><body>', content, '</body></html>'], {
+        type: 'application/msword'
+      });
+      
+      // Create a URL for the Blob
+      link.href = URL.createObjectURL(blob);
+      link.download = fileName;
+      
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast({
+        title: "Word Document Exported",
+        description: `${currentStep.toUpperCase()} document has been exported as Word document.`
+      });
+    } catch (error) {
+      console.error("Error exporting Word document:", error);
+      toast({
+        title: "Export Error",
+        description: "Failed to export Word document. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExportingWord(false);
+    }
+  };
+  
   // Handle custom prompt submission
   const handleSubmitPrompt = async (prompt: string) => {
     if (currentStep === 'select' || !selectedTicket) return;
@@ -220,20 +247,6 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
     }
   };
   
-  // Check if we can proceed to the next step
-  const canProceed = () => {
-    const currentIndex = GENERATION_STEPS.findIndex(step => step.id === currentStep);
-    if (currentIndex >= GENERATION_STEPS.length - 1) return false;
-    
-    // For the ticket selection step, can only proceed if a ticket is selected
-    if (currentStep === 'select') {
-      return !!selectedTicket;
-    }
-    
-    // For generation steps, we can either have generated content or proceed anyway
-    return true;
-  };
-  
   // Determine if a step is completed
   const isStepCompleted = (stepId: string): boolean => {
     if (!generatedContent) return false;
@@ -250,29 +263,37 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
   };
   
   // Get the status for each step in the flow
-  const getStepStatus = (stepId: string) => {
+  const getStepStatus = (stepId: string): { completed: boolean; active: boolean; processing: boolean } => {
     return {
       active: currentStep === stepId,
-      completed: isStepCompleted(stepId)
+      completed: isStepCompleted(stepId),
+      processing: currentStep === stepId && isGenerating
     };
   };
   
   const currentContent = getContentForCurrentStep();
+  const isCurrentStepContentView = currentStep !== 'select';
+  const hasContent = !!currentContent;
   
   return (
     <div className="space-y-6">
-      <OpenAITokenInfo />
-      
       {/* Step progress indicator */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Generation Process</CardTitle>
+          <CardTitle>Generate From Jira Stories - Generation Process</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex justify-center mb-8 overflow-x-auto py-4">
+          <div className="flex justify-center mb-6 overflow-x-auto py-2">
             <Steps className="gap-4 md:gap-6">
               {GENERATION_STEPS.map((step, idx) => {
                 const status = getStepStatus(step.id);
+                
+                // Determine the color scheme based on status
+                let colorClass = ""; // Default
+                if (status.completed) colorClass = "bg-green-500 text-white border-green-500";
+                else if (status.processing) colorClass = "bg-blue-500 text-white border-blue-500";
+                else if (!status.completed && status.active) colorClass = "bg-orange-500 text-white border-orange-500";
+                
                 return (
                   <Step 
                     key={step.id}
@@ -287,34 +308,25 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                         setCurrentStep(step.id);
                       }
                     }}
-                    className="cursor-pointer"
+                    className={`cursor-pointer ${status.active ? colorClass : ""}`}
                   />
                 );
               })}
             </Steps>
           </div>
 
-          <div className="flex justify-between mt-6">
-            <Button
-              variant="outline"
-              onClick={handlePreviousStep}
-              disabled={currentStep === 'select'}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Previous
-            </Button>
-            
-            {currentStep !== 'select' && (
+          <div className="flex justify-center mt-4">
+            {currentStep !== 'select' && selectedTicket && (
               <Button
                 variant="default"
                 onClick={() => onGenerate(currentStep as ContentType)}
-                disabled={isGenerating || isRegenerating || !selectedTicket}
+                disabled={isGenerating || isRegenerating}
                 className="mx-auto"
               >
                 {isGenerating || isRegenerating ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
+                    Generating {GENERATION_STEPS.find(s => s.id === currentStep)?.title || currentStep.toUpperCase()}...
                   </>
                 ) : (
                   <>
@@ -323,15 +335,6 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                 )}
               </Button>
             )}
-            
-            <Button
-              variant="default"
-              onClick={handleNextStep}
-              disabled={!canProceed()}
-            >
-              Next
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -351,26 +354,77 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       )}
       
       {/* Content display */}
-      {currentStep !== 'select' && selectedTicket && (
+      {isCurrentStepContentView && selectedTicket && (
         <Card>
           <CardHeader className="pb-3 flex flex-row items-center justify-between">
             <CardTitle>{GENERATION_STEPS.find(s => s.id === currentStep)?.title || currentStep.toUpperCase()} Content</CardTitle>
             
-            <ContentActions
-              activeTab={currentStep as ContentType}
-              content={currentContent || ''}
-              isExporting={isExporting}
-              isSaving={isSaving}
-              isPushingToJira={isPushingToJira}
-              isRegenerating={isRegenerating}
-              onExportPDF={handleExportPDF}
-              onSaveToDatabase={handleSave}
-              onPushToJira={handlePushToJira}
-              onRegenerateContent={handleRegenerate}
-              onShowPromptInput={() => setShowPromptInput(true)}
-              storyId={selectedTicket.id}
-              storyKey={selectedTicket.key}
-            />
+            {hasContent && (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isRegenerating}
+                  onClick={handleRegenerate}
+                >
+                  {isRegenerating ? (
+                    <RefreshCw className="h-4 w-4 animate-spin mr-1" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-1" />
+                  )}
+                  Regenerate
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isSaving}
+                  onClick={handleSave}
+                >
+                  <Save className="h-4 w-4 mr-1" />
+                  Save
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPromptInput(true)}
+                >
+                  <MessageSquare className="h-4 w-4 mr-1" />
+                  Custom Prompt
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isExporting}
+                  onClick={handleExportPDF}
+                >
+                  <FilePdf className="h-4 w-4 mr-1" />
+                  PDF
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isExportingWord}
+                  onClick={handleExportWord}
+                >
+                  <FileWord className="h-4 w-4 mr-1" />
+                  Word
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={isPushingToJira}
+                  onClick={handlePushToJira}
+                >
+                  <Send className="h-4 w-4 mr-1" />
+                  Jira
+                </Button>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             {/* Regular content display for editing */}

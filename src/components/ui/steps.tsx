@@ -19,43 +19,53 @@ const Step = React.forwardRef<
   React.HTMLAttributes<HTMLDivElement> & {
     active?: boolean
     completed?: boolean
+    processing?: boolean
     label?: string
     subtitle?: string
     index?: number
   }
->(({ className, active, completed, label, subtitle, index, ...props }, ref) => (
-  <div className="flex flex-col items-center">
-    <div
-      ref={ref}
-      className={cn(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-center",
-        active && "border-primary bg-primary text-primary-foreground",
-        completed && "border-primary bg-primary/20 text-primary",
-        !active && !completed && "border-muted-foreground/20 text-muted-foreground",
-        className
-      )}
-      {...props}
-    >
-      {index !== undefined ? index + 1 : null}
-    </div>
-    {label && (
-      <div className="mt-2 text-center">
-        <div className={cn(
-          "text-sm font-medium", 
-          active && "text-primary",
-          completed && "text-primary/80",
-        )}>
-          {label}
-        </div>
-        {subtitle && (
-          <div className="text-xs text-muted-foreground mt-0.5">
-            {subtitle}
-          </div>
+>(({ className, active, completed, processing, label, subtitle, index, ...props }, ref) => {
+  // Determine what color to apply based on state
+  const getStateClasses = () => {
+    if (completed) return "border-green-500 bg-green-500 text-white";
+    if (processing) return "border-blue-500 bg-blue-500 text-white animate-pulse";
+    if (active) return "border-primary bg-primary text-primary-foreground";
+    return "border-muted-foreground/20 text-muted-foreground";
+  };
+
+  return (
+    <div className="flex flex-col items-center">
+      <div
+        ref={ref}
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border text-center",
+          getStateClasses(),
+          className
         )}
+        {...props}
+      >
+        {index !== undefined ? index + 1 : null}
       </div>
-    )}
-  </div>
-))
+      {label && (
+        <div className="mt-2 text-center">
+          <div className={cn(
+            "text-sm font-medium", 
+            active && !completed && !processing && "text-primary",
+            completed && "text-green-600",
+            processing && "text-blue-600",
+          )}>
+            {label}
+          </div>
+          {subtitle && (
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {subtitle}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+})
 Step.displayName = "Step"
 
 export { Steps, Step }

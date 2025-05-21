@@ -78,9 +78,25 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
       {/* Title Page */}
       <div className="mb-16">
         <div className="text-center mb-24">
+          <div className="mb-8">
+            <img 
+              src="/cardinality-logo.png" 
+              alt="Cardinality.ai Logo" 
+              className="mx-auto h-16"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.style.display = 'none';
+              }}
+            />
+          </div>
           <h1 className="text-3xl font-bold mb-2">{documentTitle}</h1>
           <p className="text-xl">for</p>
           <p className="text-2xl font-semibold mt-2">{ticket.key}: {ticket.summary}</p>
+          
+          <div className="mt-16 text-center">
+            <p className="text-xl">{new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</p>
+            <p className="text-lg mt-2">Version 1.0</p>
+          </div>
         </div>
         
         <div className="mt-16">
