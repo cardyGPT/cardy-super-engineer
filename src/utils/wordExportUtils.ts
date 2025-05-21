@@ -55,7 +55,6 @@ const formatMarkdownToWordContent = async (
                   width: 100,
                   height: 50
                 },
-                // Fix: Add the required properties for ImageRun
                 type: 'png',
                 altText: {
                   title: "Company Logo",
