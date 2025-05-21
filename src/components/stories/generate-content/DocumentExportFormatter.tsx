@@ -190,12 +190,11 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
         <h2 className="text-xl font-bold" id="content">5. Content</h2>
         <div className="mt-4 markdown-content">
           <ReactMarkdown
-            children={content}
             remarkPlugins={[remarkGfm]}
             components={{
-              code({node, inline, className, children, ...props}) {
+              code({className, children, ...props}) {
                 const match = /language-(\w+)/.exec(className || '');
-                return !inline && match ? (
+                return match ? (
                   <SyntaxHighlighter
                     style={vscDarkPlus}
                     language={match[1]}
@@ -211,7 +210,9 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
                 )
               }
             }}
-          />
+          >
+            {content}
+          </ReactMarkdown>
         </div>
       </div>
       
@@ -238,35 +239,37 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
         </table>
       </div>
       
-      <style jsx global>{`
-        @media print {
-          .page-break-after {
-            page-break-after: always;
+      <style jsx>
+        {`
+          @media print {
+            .page-break-after {
+              page-break-after: always;
+            }
+            
+            .export-document {
+              font-size: 12pt;
+            }
+            
+            .export-document h1 {
+              font-size: 24pt;
+            }
+            
+            .export-document h2 {
+              font-size: 18pt;
+            }
+            
+            .export-document table {
+              width: 100%;
+              border-collapse: collapse;
+            }
+            
+            .export-document th, .export-document td {
+              border: 1px solid #ddd;
+              padding: 8px;
+            }
           }
-          
-          .export-document {
-            font-size: 12pt;
-          }
-          
-          .export-document h1 {
-            font-size: 24pt;
-          }
-          
-          .export-document h2 {
-            font-size: 18pt;
-          }
-          
-          .export-document table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          
-          .export-document th, .export-document td {
-            border: 1px solid #ddd;
-            padding: 8px;
-          }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };
