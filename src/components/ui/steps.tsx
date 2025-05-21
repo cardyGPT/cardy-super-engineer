@@ -29,7 +29,7 @@ const Step = React.forwardRef<
   const getStateClasses = () => {
     if (completed) return "border-green-500 bg-green-500 text-white";
     if (processing) return "border-blue-500 bg-blue-500 text-white animate-pulse";
-    if (active) return "border-primary bg-primary text-primary-foreground";
+    if (active) return "border-orange-500 bg-orange-500 text-white";
     return "border-muted-foreground/20 text-muted-foreground";
   };
 
@@ -50,9 +50,9 @@ const Step = React.forwardRef<
         <div className="mt-2 text-center">
           <div className={cn(
             "text-sm font-medium", 
-            active && !completed && !processing && "text-primary",
-            completed && "text-green-600",
-            processing && "text-blue-600",
+            active && !completed && !processing && "text-orange-600 font-bold",
+            completed && "text-green-600 font-bold",
+            processing && "text-blue-600 font-bold",
           )}>
             {label}
           </div>

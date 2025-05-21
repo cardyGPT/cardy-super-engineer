@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FileText, FileOutput, Save, Send, MessageSquare } from "lucide-react";
+import { RefreshCw, FileText, FileOutput, Save, Send, MessageSquare, Eye } from "lucide-react";
 import { ContentType } from '../ContentDisplay';
 import { Steps, Step } from "@/components/ui/steps";
 import { JiraGenerationResponse, JiraTicket } from '@/types/jira';
@@ -13,6 +13,7 @@ import DocumentExportFormatter from './DocumentExportFormatter';
 import { useToast } from '@/hooks/use-toast';
 import { downloadAsPDF } from '@/utils/exportUtils';
 import { exportToWord } from '@/utils/wordExportUtils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 // Define all generation steps in the flow
 const GENERATION_STEPS = [
@@ -52,6 +53,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
   const [isPushingToJira, setIsPushingToJira] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isSubmittingPrompt, setIsSubmittingPrompt] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const { toast } = useToast();
   const contentRef = useRef<HTMLDivElement>(null);
   const documentRef = useRef<HTMLDivElement>(null);
@@ -262,6 +264,11 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       processing: currentStep === stepId && isGenerating
     };
   };
+
+  // Show preview dialog with formatted document
+  const handlePreview = () => {
+    setPreviewOpen(true);
+  };
   
   const currentContent = getContentForCurrentStep();
   const isCurrentStepContentView = currentStep !== 'select';
@@ -272,7 +279,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       {/* Step progress indicator */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Generate From Jira Stories - Generation Process</CardTitle>
+          <CardTitle>Jira Story Content Generation</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex justify-center mb-6 overflow-x-auto py-2">
@@ -292,6 +299,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                     index={idx}
                     active={status.active}
                     completed={status.completed}
+                    processing={status.processing}
                     label={step.title}
                     subtitle={step.subtitle}
                     onClick={() => {
@@ -385,6 +393,15 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                   <MessageSquare className="h-4 w-4 mr-1" />
                   Custom Prompt
                 </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handlePreview}
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  Preview
+                </Button>
                 
                 <Button
                   variant="outline"
@@ -442,6 +459,22 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
           </CardContent>
         </Card>
       )}
+
+      {/* Document Preview Dialog */}
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Document Preview</DialogTitle>
+          </DialogHeader>
+          {currentContent && selectedTicket && (
+            <DocumentExportFormatter
+              content={currentContent}
+              contentType={currentStep as ContentType}
+              ticket={selectedTicket}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

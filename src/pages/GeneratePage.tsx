@@ -2,12 +2,10 @@
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
-import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
-import { Settings } from "lucide-react";
+import { JiraGenerationRequest } from "@/types/jira";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { ProjectContextData, JiraGenerationRequest } from "@/types/jira";
+import { ProjectContextData } from "@/types/jira";
 import { Card, CardContent } from "@/components/ui/card";
 import { ContentType } from "@/components/stories/ContentDisplay";
 
@@ -17,6 +15,7 @@ import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
 import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
+import ContentGenerationFlow from "@/components/stories/generate-content/ContentGenerationFlow";
 
 const GeneratePage: React.FC = () => {
   const { 
@@ -25,7 +24,9 @@ const GeneratePage: React.FC = () => {
     error, 
     selectedTicket, 
     generatedContent, 
-    generateContent 
+    generateContent,
+    saveContentToDatabase,
+    pushToJira
   } = useStories();
   
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
@@ -46,6 +47,9 @@ const GeneratePage: React.FC = () => {
   useEffect(() => {
     if (!selectedTicket) {
       setCurrentStep('select');
+    } else if (currentStep === 'select' && selectedTicket) {
+      // When a ticket is selected, automatically move to the LLD step
+      setCurrentStep('lld');
     }
   }, [selectedTicket]);
   
@@ -206,55 +210,112 @@ const GeneratePage: React.FC = () => {
     }
   };
   
-  const renderStepContent = () => {
-    if (currentStep === 'select') {
+  const handleSaveContent = async (content: string): Promise<boolean> => {
+    if (!selectedTicket || !content || currentStep === 'select') {
+      toast({
+        title: "Error",
+        description: "Cannot save: No ticket selected or no content available",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    try {
+      const success = await saveContentToDatabase(currentStep as ContentType, content);
+      return success;
+    } catch (err: any) {
+      console.error("Error saving content:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to save content",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+  
+  const handlePushToJira = async (content: string): Promise<boolean> => {
+    if (!selectedTicket || !content) {
+      toast({
+        title: "Error",
+        description: "Cannot push to Jira: No ticket selected or no content available",
+        variant: "destructive"
+      });
+      return false;
+    }
+    
+    try {
+      const success = await pushToJira(selectedTicket.id, content);
+      return success;
+    } catch (err: any) {
+      console.error("Error pushing to Jira:", err);
+      toast({
+        title: "Error",
+        description: err.message || "Failed to push content to Jira",
+        variant: "destructive"
+      });
+      return false;
+    }
+  };
+  
+  // Main render logic based on authentication and selection state
+  const renderMainContent = () => {
+    if (!isAuthenticated) {
+      return <NotConnectedCard />;
+    }
+    
+    // If we're on the selection step or no ticket is selected
+    if (currentStep === 'select' || !selectedTicket) {
       return (
         <div className="space-y-4">
-          <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
-          <StoryList />
+          <Card>
+            <CardContent className="pt-6">
+              <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
+              <StoryList />
+            </CardContent>
+          </Card>
+          
+          {selectedTicket && (
+            <ContentGenerationFlow
+              selectedTicket={selectedTicket}
+              generatedContent={generatedContent}
+              currentStep={currentStep}
+              setCurrentStep={setCurrentStep}
+              onGenerate={handleGenerateContent}
+              onSaveContent={handleSaveContent}
+              onPushToJira={handlePushToJira}
+              isGenerating={isGenerating}
+            />
+          )}
         </div>
       );
     }
     
+    // If a ticket is selected and we're past the selection step
     return (
-      <StoryDetailWrapper 
-        projectContext={selectedProjectContext} 
-        selectedDocuments={selectedDocuments}
-        projectContextData={projectContextData}
-        activeTab={currentStep as ContentType}
-        setActiveTab={(tab) => setCurrentStep(tab)}
-      />
+      <div className="space-y-6">
+        <ContentGenerationFlow
+          selectedTicket={selectedTicket}
+          generatedContent={generatedContent}
+          currentStep={currentStep}
+          setCurrentStep={setCurrentStep}
+          onGenerate={handleGenerateContent}
+          onSaveContent={handleSaveContent}
+          onPushToJira={handlePushToJira}
+          isGenerating={isGenerating}
+        />
+      </div>
     );
   };
   
   return (
     <AppLayout>
       <div className="container mx-auto pb-8">
-        <div className="mb-6 flex justify-between items-center">
+        <div className="mb-6">
           <h1 className="text-3xl font-bold">Generate From Jira Stories</h1>
-          
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Link>
-            </Button>
-          </div>
         </div>
 
-        {!isAuthenticated ? (
-          <NotConnectedCard />
-        ) : (
-          <div className="space-y-6">
-            {/* Current step content */}
-            <Card>
-              <CardContent className="pt-6">
-                {renderStepContent()}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {renderMainContent()}
       </div>
       
       <ContextDialog 
