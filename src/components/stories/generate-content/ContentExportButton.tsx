@@ -1,11 +1,12 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { JiraTicket } from '@/types/jira';
 import { ContentType } from '../ContentDisplay';
 import WordExportButton from './WordExportButton';
 import { Button } from '@/components/ui/button';
-import { FileDown } from 'lucide-react';
+import { FileDown, Loader2 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContentExportButtonProps {
   content: string;
@@ -20,6 +21,13 @@ const ContentExportButton: React.FC<ContentExportButtonProps> = ({
   ticket,
   disabled = false
 }) => {
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const { toast } = useToast();
+
+  // Add additional debugging
+  console.log('ContentExportButton - content type:', contentType);
+  console.log('ContentExportButton - has content:', !!content);
+  
   if (!content) {
     return (
       <Button
@@ -34,7 +42,7 @@ const ContentExportButton: React.FC<ContentExportButtonProps> = ({
   }
 
   return (
-    <Popover>
+    <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
       <PopoverTrigger asChild>
         <Button variant="outline" size="sm" disabled={disabled}>
           <FileDown className="h-4 w-4 mr-1" />
@@ -46,8 +54,6 @@ const ContentExportButton: React.FC<ContentExportButtonProps> = ({
           <h4 className="text-sm font-medium">Export as:</h4>
           
           <div className="flex flex-col gap-2">
-            {/* PDF export button would go here */}
-            
             <WordExportButton
               content={content}
               contentType={contentType}

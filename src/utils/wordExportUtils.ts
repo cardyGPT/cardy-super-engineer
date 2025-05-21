@@ -4,24 +4,30 @@ import {
   Document, 
   Packer, 
   Paragraph, 
-  HeadingLevel, 
   TextRun, 
+  HeadingLevel, 
   AlignmentType,
   ImageRun
 } from 'docx';
 
+/**
+ * Export content to a Word document
+ */
 export const exportToWord = async (
   content: string, 
   fileName: string,
   logoUrl?: string
 ): Promise<void> => {
   try {
+    // Create document sections
+    const children = await formatMarkdownToWordContent(content, logoUrl);
+    
     // Create document
     const doc = new Document({
       sections: [
         {
           properties: {},
-          children: await formatMarkdownToWordContent(content, logoUrl)
+          children: children
         }
       ]
     });
@@ -62,11 +68,6 @@ const formatMarkdownToWordContent = async (
                 transformation: {
                   width: 100,
                   height: 50
-                },
-                altText: {
-                  title: "Company Logo",
-                  description: "Company Logo Image",
-                  name: "Logo"
                 }
               })
             ]
@@ -87,17 +88,51 @@ const formatMarkdownToWordContent = async (
     })
   );
   
-  // Format markdown content - basic implementation
+  // Format markdown content
   const lines = markdown.split('\n');
+  let inCodeBlock = false;
   let currentParagraphText = '';
+  let codeBlockContent = '';
   
   for (const line of lines) {
-    if (line.trim() === '') {
-      // End of paragraph
-      if (currentParagraphText) {
-        children.push(new Paragraph({ text: currentParagraphText }));
-        currentParagraphText = '';
+    // Handle code blocks
+    if (line.startsWith('```')) {
+      if (inCodeBlock) {
+        // End of code block
+        if (codeBlockContent) {
+          children.push(
+            new Paragraph({
+              children: [
+                new TextRun({
+                  text: codeBlockContent,
+                  font: 'Courier New',
+                  size: 20
+                })
+              ],
+              shading: {
+                type: 'solid',
+                color: 'F5F5F5',
+                fill: 'F5F5F5'
+              },
+              spacing: { before: 200, after: 200 }
+            })
+          );
+          codeBlockContent = '';
+        }
+        inCodeBlock = false;
+      } else {
+        // Start of code block
+        if (currentParagraphText) {
+          children.push(new Paragraph({ text: currentParagraphText }));
+          currentParagraphText = '';
+        }
+        inCodeBlock = true;
       }
+      continue;
+    }
+    
+    if (inCodeBlock) {
+      codeBlockContent += line + '\n';
       continue;
     }
     
@@ -129,6 +164,12 @@ const formatMarkdownToWordContent = async (
         text: line.substring(4),
         heading: HeadingLevel.HEADING_3
       }));
+    } else if (line.trim() === '') {
+      // End of paragraph
+      if (currentParagraphText) {
+        children.push(new Paragraph({ text: currentParagraphText }));
+        currentParagraphText = '';
+      }
     } else {
       // Regular text
       currentParagraphText += (currentParagraphText ? ' ' : '') + line;

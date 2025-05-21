@@ -8,7 +8,7 @@ interface DocumentExportFormatterProps {
   content: string;
   contentType: ContentType;
   ticket: JiraTicket;
-  userName?: string; // Added userName as an optional prop
+  userName?: string;
 }
 
 const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
@@ -27,7 +27,6 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
     }
   };
 
-  // Fix the type issue by explicitly defining the contentTypeLabel
   const getContentTypeLabel = (type: ContentType): string => {
     switch(type) {
       case 'lld': return 'Low-Level Design';
