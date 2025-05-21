@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, systemPrompt, maxTokens = 4000, temperature = 0.7 } = await req.json();
+    const body = await req.json();
+    const { prompt, systemPrompt, maxTokens = 4000, temperature = 0.7 } = body;
     
     // Validate request
     if (!prompt) {

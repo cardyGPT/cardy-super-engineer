@@ -11,7 +11,6 @@ import { ContentType } from "@/components/stories/ContentDisplay";
 
 // Components
 import StoryList from "@/components/stories/StoryList";
-import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
 import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
@@ -51,7 +50,7 @@ const GeneratePage: React.FC = () => {
       // When a ticket is selected, automatically move to the LLD step
       setCurrentStep('lld');
     }
-  }, [selectedTicket]);
+  }, [selectedTicket, currentStep]);
   
   // Show toast for any errors
   useEffect(() => {

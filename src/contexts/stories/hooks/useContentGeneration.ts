@@ -32,7 +32,13 @@ export const useContentGeneration = (
 
     try {
       const responseData = await generateJiraContent(selectedTicket, request);
-      setGeneratedContent(responseData);
+      setGeneratedContent(prevContent => {
+        // Merge the new content with any existing content
+        return {
+          ...prevContent,
+          ...responseData
+        };
+      });
       
       toast({
         title: "Content Generated",

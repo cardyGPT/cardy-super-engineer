@@ -192,16 +192,12 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       const fileName = `${selectedTicket.key}_${currentStep}`;
       const logoUrl = '/cardinality-logo.png';
       
-      const success = await exportToWord(content, fileName, logoUrl);
+      await exportToWord(content, fileName, logoUrl);
       
-      if (success) {
-        toast({
-          title: "Word Document Exported",
-          description: `${currentStep.toUpperCase()} document has been exported as Word document.`
-        });
-      } else {
-        throw new Error("Failed to export Word document");
-      }
+      toast({
+        title: "Word Document Exported",
+        description: `${currentStep.toUpperCase()} document has been exported as Word document.`
+      });
     } catch (error) {
       console.error("Error exporting Word document:", error);
       toast({
@@ -279,20 +275,13 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       {/* Step progress indicator */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Jira Story Content Generation</CardTitle>
+          <CardTitle>Generation Process</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex justify-center mb-6 overflow-x-auto py-2">
             <Steps className="gap-4 md:gap-6">
               {GENERATION_STEPS.map((step, idx) => {
                 const status = getStepStatus(step.id);
-                
-                // Determine the color scheme based on status
-                let colorClass = ""; // Default
-                if (status.completed) colorClass = "bg-green-500 text-white border-green-500";
-                else if (status.processing) colorClass = "bg-blue-500 text-white border-blue-500";
-                else if (!status.completed && status.active) colorClass = "bg-orange-500 text-white border-orange-500";
-                
                 return (
                   <Step 
                     key={step.id}
@@ -308,7 +297,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                         setCurrentStep(step.id);
                       }
                     }}
-                    className={`cursor-pointer ${status.active ? colorClass : ""}`}
+                    className={`cursor-pointer`}
                   />
                 );
               })}
