@@ -48,11 +48,14 @@ const WordExportButton: React.FC<WordExportButtonProps> = ({
     
     setIsExporting(true);
     try {
-      const fileName = `${ticket.key}_${contentType}_${new Date().toISOString().split('T')[0]}`;
+      // Format filename properly
+      const formattedDate = new Date().toISOString().split('T')[0];
+      const fileName = `${ticket.key}_${contentType}_${formattedDate}`;
       
-      // Logo URL (optional)
+      // Get the company logo URL
       const logoUrl = '/cardinality-logo.png';
       
+      // Call the exportToWord utility function
       await exportToWord(content, fileName, logoUrl);
       
       toast({
