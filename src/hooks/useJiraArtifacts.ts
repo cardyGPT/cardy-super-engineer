@@ -10,10 +10,12 @@ export interface JiraArtifacts {
   codeContent: string | null;
   testContent: string | null;
   testCasesContent: string | null;
+  testScriptsContent: string | null;
   isLldGenerated: boolean;
   isCodeGenerated: boolean;
   isTestsGenerated: boolean;
   isTestCasesGenerated: boolean;
+  isTestScriptsGenerated: boolean;
 }
 
 export const useJiraArtifacts = (ticket: JiraTicket | null) => {
@@ -22,10 +24,12 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
     codeContent: null,
     testContent: null,
     testCasesContent: null,
+    testScriptsContent: null,
     isLldGenerated: false,
     isCodeGenerated: false,
     isTestsGenerated: false,
-    isTestCasesGenerated: false
+    isTestCasesGenerated: false,
+    isTestScriptsGenerated: false
   });
   
   const [loading, setLoading] = useState(false);
@@ -63,10 +67,12 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
           codeContent: data.code_content || null,
           testContent: data.test_content || null,
           testCasesContent: data.testcases_content || null,
+          testScriptsContent: data.testscripts_content || null,
           isLldGenerated: Boolean(data.lld_content),
           isCodeGenerated: Boolean(data.code_content),
           isTestsGenerated: Boolean(data.test_content),
-          isTestCasesGenerated: Boolean(data.testcases_content)
+          isTestCasesGenerated: Boolean(data.testcases_content),
+          isTestScriptsGenerated: Boolean(data.testscripts_content)
         });
       } else {
         console.log('No artifacts found for this ticket');
@@ -76,10 +82,12 @@ export const useJiraArtifacts = (ticket: JiraTicket | null) => {
           codeContent: null,
           testContent: null,
           testCasesContent: null,
+          testScriptsContent: null,
           isLldGenerated: false,
           isCodeGenerated: false,
           isTestsGenerated: false,
-          isTestCasesGenerated: false
+          isTestCasesGenerated: false,
+          isTestScriptsGenerated: false
         });
       }
     } catch (err) {

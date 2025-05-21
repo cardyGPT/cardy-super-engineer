@@ -1,10 +1,11 @@
 
 import React from 'react';
+import ContentExportManager from './ContentExportManager';
 import { ContentType } from '../ContentDisplay';
-import { Button } from "@/components/ui/button";
-import { Loader2, FileDown, Send, Github, Save } from "lucide-react";
-import ExportToGSuite from '../ExportToGSuite';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { useStories } from '@/contexts/StoriesContext';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { MoreVertical } from 'lucide-react';
 
 interface ContentActionsProps {
   activeTab: ContentType;
@@ -12,9 +13,9 @@ interface ContentActionsProps {
   isExporting: boolean;
   isSaving: boolean;
   isPushingToJira: boolean;
-  onExportPDF: () => void;
-  onSaveToDatabase: () => void;
-  onPushToJira: () => void;
+  onExportPDF: () => Promise<void>;
+  onSaveToDatabase: () => Promise<void>;
+  onPushToJira: () => Promise<void>;
   storyId: string;
   storyKey: string;
 }
@@ -31,93 +32,58 @@ const ContentActions: React.FC<ContentActionsProps> = ({
   storyId,
   storyKey
 }) => {
+  const { selectedTicket } = useStories();
+  
+  if (!selectedTicket) {
+    return null;
+  }
+
   return (
-    <TooltipProvider>
-      <div className="flex space-x-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onSaveToDatabase}
-              disabled={isSaving || !content}
-            >
-              {isSaving ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Save to Database</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onExportPDF}
-              disabled={isExporting || !content}
-            >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileDown className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Export PDF</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <ExportToGSuite
-          storyId={storyId}
-          storyKey={storyKey}
+    <div className="flex items-center gap-2">
+      <div className="hidden md:flex">
+        <ContentExportManager 
           content={content}
           contentType={activeTab}
-          iconOnly={true}
+          ticket={selectedTicket}
+          onPushToJira={(content) => {
+            onPushToJira();
+            return Promise.resolve(true);
+          }}
+          onSaveContent={(content) => {
+            onSaveToDatabase();
+            return Promise.resolve(true);
+          }}
+          onRegenerateContent={() => {
+            return Promise.resolve();
+          }}
+          isExporting={isExporting}
+          isSaving={isSaving}
+          isPushingToJira={isPushingToJira}
         />
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={onPushToJira}
-              disabled={isPushingToJira || !content}
-            >
-              {isPushingToJira ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Push to Jira</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="icon"
-              disabled={true}
-            >
-              <Github className="h-4 w-4" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>Push to Bitbucket (Coming Soon)</p>
-          </TooltipContent>
-        </Tooltip>
       </div>
-    </TooltipProvider>
+      
+      {/* Mobile dropdown menu */}
+      <div className="md:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={onExportPDF}>
+              Export PDF
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onSaveToDatabase}>
+              Save
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onPushToJira}>
+              Push to Jira
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
   );
 };
 

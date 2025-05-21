@@ -201,7 +201,7 @@ const GeneratePage: React.FC = () => {
     setIsGenerating(true);
     try {
       const request: JiraGenerationRequest = {
-        type: type as 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts',
+        type: type,
         jiraTicket: selectedTicket,
         projectContext: selectedProjectContext || undefined,
         selectedDocuments: selectedDocuments || [],
@@ -295,8 +295,8 @@ const GeneratePage: React.FC = () => {
         projectContext={selectedProjectContext} 
         selectedDocuments={selectedDocuments}
         projectContextData={projectContextData}
-        activeTab={currentStep}
-        setActiveTab={setCurrentStep}
+        activeTab={currentStep as ContentType}
+        setActiveTab={(tab) => setCurrentStep(tab)}
       />
     );
   };
@@ -412,7 +412,7 @@ const GeneratePage: React.FC = () => {
                   {currentStep !== 'select' && (
                     <Button
                       variant="default"
-                      onClick={() => handleGenerateContent(currentStep as any)}
+                      onClick={() => handleGenerateContent(currentStep as ContentType)}
                       disabled={isGenerating || !selectedTicket}
                       className="mx-auto"
                     >
