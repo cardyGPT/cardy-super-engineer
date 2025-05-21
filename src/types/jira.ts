@@ -1,3 +1,4 @@
+
 export interface JiraTicket {
   id: string;
   key: string;
@@ -50,7 +51,7 @@ export interface JiraCredentials {
 }
 
 export interface JiraGenerationRequest {
-  type: 'lld' | 'code' | 'tests' | 'testcases';
+  type: 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts';
   jiraTicket: JiraTicket;
   projectContext?: string;
   selectedDocuments?: string[];
