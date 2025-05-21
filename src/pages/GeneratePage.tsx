@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -14,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ProjectContextData, JiraGenerationRequest, JiraTicket } from "@/types/jira";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ContentType } from "@/components/stories/ContentDisplay";
 
 // Components
 import StoryList from "@/components/stories/StoryList";

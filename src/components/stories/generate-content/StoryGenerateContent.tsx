@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -106,7 +105,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       setGeneratingContentType(type);
       
       const request: JiraGenerationRequest = {
-        type,
+        type: type as 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts',
         jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
@@ -166,7 +165,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     setIsSubmittingPrompt(true);
     try {
       const request: JiraGenerationRequest = {
-        type: activeTab,
+        type: activeTab as 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts',
         jiraTicket: ticket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
@@ -227,7 +226,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         setGeneratingContentType(type);
         
         const request: JiraGenerationRequest = {
-          type,
+          type: type as 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts',
           jiraTicket: ticket,
           projectContext: projectContext || undefined,
           selectedDocuments: selectedDocuments || [],

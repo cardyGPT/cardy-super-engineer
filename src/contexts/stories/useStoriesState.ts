@@ -318,25 +318,19 @@ export const useStoriesState = (): StoriesContextState => {
   }, [credentials, selectedTicket, toast]);
 
   // Save Content to Database
-  const saveContentToDatabase = useCallback(async (contentType: ContentType, content: string): Promise<boolean> => {
+  const saveContentToDatabase = async (contentType: ContentType, content: string): Promise<boolean> => {
     if (!selectedTicket) {
-      setError('No ticket selected');
-      toast({
-        title: "Error",
-        description: "No ticket selected to save content for",
-        variant: "destructive",
-      });
       return false;
     }
-
+    
     try {
       // Prepare the data for saving
       const columnMapping: Record<ContentType, string> = {
-        lld: 'lld',
-        code: 'code',
-        tests: 'tests',
-        testcases: 'testcases',
-        testScripts: 'testScripts'  // Add this missing mapping
+        lld: 'lld_content',
+        code: 'code_content',
+        tests: 'test_content',
+        testcases: 'testcases_content',
+        testScripts: 'testscripts_content'  // Fixed mapping
       };
       
       const column = columnMapping[contentType];
@@ -390,7 +384,7 @@ export const useStoriesState = (): StoriesContextState => {
       });
       
       return true;
-    } catch (err: any) {
+    } catch (err) {
       console.error('Error saving content to database:', err);
       setError(err.message || 'Failed to save content to database');
       toast({
@@ -400,7 +394,7 @@ export const useStoriesState = (): StoriesContextState => {
       });
       return false;
     }
-  }, [selectedTicket, toast]);
+  };
 
   // Push to Jira
   const pushToJira = useCallback(async (ticketId: string, content: string): Promise<boolean> => {
