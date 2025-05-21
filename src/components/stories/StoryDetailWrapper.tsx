@@ -132,22 +132,25 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
   }
   
   return (
-    <div>
-      <ContentGenerationFlow
-        selectedTicket={selectedTicket}
-        generatedContent={generatedContent}
-        isGenerating={isGenerating}
-        currentStep={currentStep}
-        setCurrentStep={setCurrentStep}
-        onGenerate={handleGenerate}
-        onPushToJira={handlePushToJira}
-        onSaveContent={handleSaveContent}
-      />
-      
-      {/* Ticket details card - moved to bottom to focus on content generation */}
-      <Card className="mt-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* Ticket details card - moved to the side */}
+      <div className="md:col-span-1">
         <StoryDetail ticket={selectedTicket} />
-      </Card>
+      </div>
+      
+      {/* Content generation flow - main area */}
+      <div className="md:col-span-2">
+        <ContentGenerationFlow
+          selectedTicket={selectedTicket}
+          generatedContent={generatedContent}
+          isGenerating={isGenerating}
+          currentStep={currentStep}
+          setCurrentStep={setCurrentStep}
+          onGenerate={handleGenerate}
+          onPushToJira={handlePushToJira}
+          onSaveContent={handleSaveContent}
+        />
+      </div>
     </div>
   );
 };

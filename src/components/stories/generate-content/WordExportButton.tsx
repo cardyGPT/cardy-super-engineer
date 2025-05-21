@@ -1,9 +1,8 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, FileText } from 'lucide-react';
+import { FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { exportToWord } from '@/utils/wordExportUtils';
 import { JiraTicket } from '@/types/jira';
 import { ContentType } from '../ContentDisplay';
 
@@ -48,6 +47,15 @@ const WordExportButton: React.FC<WordExportButtonProps> = ({
     
     setIsExporting(true);
     try {
+      console.log('Word export functionality temporarily disabled due to issues');
+      
+      // Notify the user that the export functionality is temporarily disabled
+      toast({
+        title: "Export Notice",
+        description: "Word export is temporarily disabled. Feature will be available soon.",
+      });
+      
+      /* Original export code commented out due to issues
       console.log('Starting Word export for', contentType);
       
       // Format filename properly
@@ -63,16 +71,13 @@ const WordExportButton: React.FC<WordExportButtonProps> = ({
       await exportToWord(content, fileName, logoUrl);
       
       console.log('Word export completed successfully');
+      */
       
-      toast({
-        title: "Export Successful",
-        description: `${getContentTypeLabel(contentType)} exported as Word document.`,
-      });
     } catch (error) {
-      console.error('Error exporting to Word:', error);
+      console.error('Error with export functionality:', error);
       toast({
-        title: "Export Failed",
-        description: "Failed to export content as Word document.",
+        title: "Export Feature Notice",
+        description: "Export functionality is currently being revised.",
         variant: "destructive",
       });
     } finally {
@@ -88,11 +93,7 @@ const WordExportButton: React.FC<WordExportButtonProps> = ({
       disabled={isExporting || disabled || !content}
       className={className}
     >
-      {isExporting ? (
-        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-      ) : (
-        <FileText className="h-4 w-4 mr-1" />
-      )}
+      <FileText className="h-4 w-4 mr-1" />
       Word
     </Button>
   );

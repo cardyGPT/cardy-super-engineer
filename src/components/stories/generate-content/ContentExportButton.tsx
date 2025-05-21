@@ -4,9 +4,8 @@ import { JiraTicket } from '@/types/jira';
 import { ContentType } from '../ContentDisplay';
 import WordExportButton from './WordExportButton';
 import { Button } from '@/components/ui/button';
-import { FileDown, Loader2 } from 'lucide-react';
+import { FileDown } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useToast } from '@/hooks/use-toast';
 
 interface ContentExportButtonProps {
   content: string;
@@ -22,11 +21,6 @@ const ContentExportButton: React.FC<ContentExportButtonProps> = ({
   disabled = false
 }) => {
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { toast } = useToast();
-
-  // Add additional debugging
-  console.log('ContentExportButton - content type:', contentType);
-  console.log('ContentExportButton - has content:', !!content);
   
   if (!content) {
     return (

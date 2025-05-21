@@ -1,13 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
 import { useStories } from '@/contexts/StoriesContext';
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ExternalLink, Calendar } from "lucide-react";
-import StoryGenerateContent from './generate-content/StoryGenerateContent';
 import { format } from 'date-fns';
 
 interface StoryDetailProps {
@@ -29,16 +28,10 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
 }) => {
   const { 
     generatedContent, 
-    generateContent, 
-    pushToJira, 
     contentLoading 
   } = useStories();
   
   const { 
-    lldContent, 
-    codeContent, 
-    testContent, 
-    testCasesContent, 
     refreshArtifacts,
     loading: artifactsLoading
   } = useJiraArtifacts(ticket);
@@ -97,52 +90,10 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
     return 'bg-gray-200 text-gray-700';
   };
 
-  // Create a function to handle content generation with context
-  const handleContentGeneration = async (request: any) => {
-    // Add previously generated content as context if available
-    const enhancedRequest = { ...request };
-    
-    // Add previously generated LLD content as context for code generation
-    if (request.type === 'code' && lldContent) {
-      enhancedRequest.additionalContext = { 
-        ...enhancedRequest.additionalContext,
-        lldContent
-      };
-    }
-    
-    // Add previously generated LLD and code content as context for tests generation
-    if (request.type === 'tests' && (lldContent || codeContent)) {
-      enhancedRequest.additionalContext = { 
-        ...enhancedRequest.additionalContext,
-        lldContent,
-        codeContent
-      };
-    }
-    
-    // Add all previous content as context for test cases generation
-    if (request.type === 'testcases' && (lldContent || codeContent || testContent)) {
-      enhancedRequest.additionalContext = { 
-        ...enhancedRequest.additionalContext,
-        lldContent,
-        codeContent,
-        testContent
-      };
-    }
-    
-    const result = await generateContent(enhancedRequest);
-    
-    // Refresh the artifacts to get the latest content
-    if (result) {
-      refreshArtifacts();
-    }
-    
-    return result;
-  };
-
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader className="pb-3 border-b">
+    <Card>
+      <CardContent className="pt-4">
+        <div className="space-y-4">
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center gap-2 mb-1">
@@ -162,7 +113,7 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                   </a>
                 </Button>
               </div>
-              <CardTitle className="text-lg font-semibold">{ticket.summary}</CardTitle>
+              <h3 className="text-lg font-semibold">{ticket.summary}</h3>
             </div>
           </div>
           
@@ -198,62 +149,25 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
               </div>
             )}
           </div>
-        </CardHeader>
-        
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="px-4 pt-2">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="details">Story Details</TabsTrigger>
-              <TabsTrigger value="generate">Generate Content</TabsTrigger>
-            </TabsList>
+          
+          <div>
+            <h3 className="font-medium mb-2">Description</h3>
+            <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
+              {ticket.description || 'No description available'}
+            </div>
           </div>
-          
-          <TabsContent value="details" className="p-0">
-            <CardContent className="pt-4">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="font-medium mb-2">Description</h3>
-                  <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
-                    {ticket.description || 'No description available'}
-                  </div>
-                </div>
 
-                {ticket.acceptance_criteria && (
-                  <div>
-                    <h3 className="font-medium mb-2">Acceptance Criteria</h3>
-                    <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
-                      {ticket.acceptance_criteria}
-                    </div>
-                  </div>
-                )}
+          {ticket.acceptance_criteria && (
+            <div>
+              <h3 className="font-medium mb-2">Acceptance Criteria</h3>
+              <div className="text-sm bg-gray-50 p-3 rounded border whitespace-pre-wrap">
+                {ticket.acceptance_criteria}
               </div>
-            </CardContent>
-          </TabsContent>
-          
-          <TabsContent value="generate" className="p-0">
-            <CardContent className="pt-4">
-              <StoryGenerateContent
-                ticket={ticket}
-                projectContext={projectContext}
-                selectedDocuments={selectedDocuments}
-                projectContextData={projectContextData}
-                onGenerate={handleContentGeneration}
-                onPushToJira={pushToJira}
-                generatedContent={generatedContent}
-                isGenerating={contentLoading}
-                existingArtifacts={{
-                  lldContent,
-                  codeContent,
-                  testContent,
-                  testCasesContent,
-                  testScriptsContent: null // Add this missing property
-                }}
-              />
-            </CardContent>
-          </TabsContent>
-        </Tabs>
-      </Card>
-    </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 
