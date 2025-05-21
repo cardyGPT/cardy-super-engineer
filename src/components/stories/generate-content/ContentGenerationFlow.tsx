@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, FileText, FileOutput, Save, Send, MessageSquare, Eye } from "lucide-react";
@@ -275,13 +275,19 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
       {/* Step progress indicator */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle>Generation Process</CardTitle>
+          <CardTitle>Generate from Jira Tickets</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex justify-center mb-6 overflow-x-auto py-2">
             <Steps className="gap-4 md:gap-6">
               {GENERATION_STEPS.map((step, idx) => {
                 const status = getStepStatus(step.id);
+                // Determine the color scheme based on status
+                let colorClass = ""; // Default
+                if (status.completed) colorClass = "bg-green-500 text-white border-green-500";
+                else if (status.processing) colorClass = "bg-blue-500 text-white border-blue-500";
+                else if (!status.completed && status.active) colorClass = "bg-orange-500 text-white border-orange-500";
+                
                 return (
                   <Step 
                     key={step.id}
@@ -297,7 +303,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                         setCurrentStep(step.id);
                       }
                     }}
-                    className={`cursor-pointer`}
+                    className={`cursor-pointer ${status.active ? colorClass : ""}`}
                   />
                 );
               })}

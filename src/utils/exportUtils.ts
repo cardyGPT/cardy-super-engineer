@@ -23,7 +23,14 @@ export const downloadAsPDF = async (
       scale: 1.5, // Higher scale for better quality
       useCORS: true,
       logging: false,
-      allowTaint: true
+      allowTaint: true,
+      onclone: (clonedDoc) => {
+        // Make sure all styles are applied to the clone
+        const clonedElement = clonedDoc.querySelector('[ref="documentRef"]');
+        if (clonedElement) {
+          clonedElement.setAttribute('style', 'padding: 20px; background: white;');
+        }
+      }
     });
     
     // Calculate dimensions

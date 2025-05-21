@@ -7,7 +7,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ProjectContextData } from "@/types/jira";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContentType } from "@/components/stories/ContentDisplay";
+import StoryDetail from "@/components/stories/StoryDetail";
 
 // Components
 import StoryList from "@/components/stories/StoryList";
@@ -35,6 +37,7 @@ const GeneratePage: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [currentStep, setCurrentStep] = useState<string>(selectedTicket ? 'lld' : 'select');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [activeTab, setActiveTab] = useState<string>("selection");
   const { toast } = useToast();
   
   // Load saved context on initial page load
@@ -263,46 +266,52 @@ const GeneratePage: React.FC = () => {
       return <NotConnectedCard />;
     }
     
-    // If we're on the selection step or no ticket is selected
-    if (currentStep === 'select' || !selectedTicket) {
-      return (
-        <div className="space-y-4">
-          <Card>
-            <CardContent className="pt-6">
-              <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
-              <StoryList />
-            </CardContent>
-          </Card>
-          
-          {selectedTicket && (
-            <ContentGenerationFlow
-              selectedTicket={selectedTicket}
-              generatedContent={generatedContent}
-              currentStep={currentStep}
-              setCurrentStep={setCurrentStep}
-              onGenerate={handleGenerateContent}
-              onSaveContent={handleSaveContent}
-              onPushToJira={handlePushToJira}
-              isGenerating={isGenerating}
-            />
-          )}
-        </div>
-      );
-    }
-    
-    // If a ticket is selected and we're past the selection step
     return (
-      <div className="space-y-6">
-        <ContentGenerationFlow
-          selectedTicket={selectedTicket}
-          generatedContent={generatedContent}
-          currentStep={currentStep}
-          setCurrentStep={setCurrentStep}
-          onGenerate={handleGenerateContent}
-          onSaveContent={handleSaveContent}
-          onPushToJira={handlePushToJira}
-          isGenerating={isGenerating}
-        />
+      <div className="space-y-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="selection">Jira Ticket Selection</TabsTrigger>
+            <TabsTrigger value="generation" disabled={!selectedTicket}>Content Generation</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="selection" className="mt-4 space-y-4">
+            <Card>
+              <CardContent className="pt-6">
+                <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
+                <StoryList />
+              </CardContent>
+            </Card>
+            
+            {selectedTicket && (
+              <Card>
+                <CardContent className="pt-6">
+                  <StoryDetail ticket={selectedTicket} />
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="generation" className="mt-4">
+            {selectedTicket ? (
+              <ContentGenerationFlow
+                selectedTicket={selectedTicket}
+                generatedContent={generatedContent}
+                currentStep={currentStep}
+                setCurrentStep={setCurrentStep}
+                onGenerate={handleGenerateContent}
+                onSaveContent={handleSaveContent}
+                onPushToJira={handlePushToJira}
+                isGenerating={isGenerating}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center">
+                  <p>Please select a ticket first from the "Jira Ticket Selection" tab.</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
@@ -311,7 +320,7 @@ const GeneratePage: React.FC = () => {
     <AppLayout>
       <div className="container mx-auto pb-8">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold">Generate From Jira Stories</h1>
+          <h1 className="text-3xl font-bold">Generate from Jira Tickets</h1>
         </div>
 
         {renderMainContent()}

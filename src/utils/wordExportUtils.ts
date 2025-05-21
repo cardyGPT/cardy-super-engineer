@@ -1,71 +1,131 @@
 
-/**
- * Utilities for exporting content to Word format
- */
+import { saveAs } from 'file-saver';
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, ImageRun, AlignmentType } from 'docx';
 
-// Function to format content for Word export
 export const exportToWord = async (
-  content: string,
+  content: string, 
   fileName: string,
   logoUrl?: string
-): Promise<boolean> => {
+): Promise<void> => {
   try {
-    // Start building the Word document HTML
-    let wordDocument = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" 
-            xmlns:w="urn:schemas-microsoft-com:office:word" 
-            xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8">
-        <title>${fileName}</title>
-        <style>
-          /* Word document styles */
-          body { font-family: Arial, sans-serif; line-height: 1.5; }
-          h1 { font-size: 24pt; text-align: center; }
-          h2 { font-size: 18pt; margin-top: 20pt; }
-          h3 { font-size: 14pt; }
-          table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid #ddd; padding: 8px; }
-          .page-break { page-break-before: always; }
-          .logo { text-align: center; margin-bottom: 20px; }
-          .title-page { text-align: center; margin-top: 100px; }
-          .header-content { text-align: center; margin-top: 50px; margin-bottom: 100px; }
-          .footer { text-align: center; font-size: 10pt; margin-top: 50px; }
-        </style>
-      </head>
-      <body>
-        <div class="title-page">
-          ${logoUrl ? `<div class="logo"><img src="${logoUrl}" alt="Logo" width="200" /></div>` : ''}
-          <div class="header-content">
-            ${content}
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
+    // Create document
+    const doc = new Document({
+      sections: [
+        {
+          properties: {},
+          children: await formatMarkdownToWordContent(content, logoUrl)
+        }
+      ]
+    });
 
-    // Create a Blob with the HTML content
-    const blob = new Blob([wordDocument], { type: 'application/msword' });
+    // Generate and save document
+    const buffer = await Packer.toBuffer(doc);
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    saveAs(blob, `${fileName}.docx`);
     
-    // Create a URL for the Blob
-    const url = URL.createObjectURL(blob);
-    
-    // Create a link element to trigger the download
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${fileName}.doc`;
-    
-    // Trigger the download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    // Clean up
-    URL.revokeObjectURL(url);
-    
-    return true;
+    return Promise.resolve();
   } catch (error) {
     console.error('Error exporting to Word:', error);
-    return false;
+    return Promise.reject(error);
   }
+};
+
+// Convert markdown to Word document format
+const formatMarkdownToWordContent = async (
+  markdown: string,
+  logoUrl?: string
+): Promise<(Paragraph | ImageRun)[]> => {
+  const children: Paragraph[] = [];
+  
+  // Add logo if provided
+  if (logoUrl) {
+    try {
+      const response = await fetch(logoUrl);
+      if (response.ok) {
+        const blob = await response.blob();
+        const arrayBuffer = await blob.arrayBuffer();
+        
+        children.push(
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            children: [
+              new ImageRun({
+                data: new Uint8Array(arrayBuffer),
+                transformation: {
+                  width: 100,
+                  height: 50
+                }
+              })
+            ]
+          })
+        );
+      }
+    } catch (error) {
+      console.error('Error adding logo:', error);
+    }
+  }
+  
+  // Add title
+  children.push(
+    new Paragraph({
+      text: "Generated Document",
+      heading: HeadingLevel.HEADING_1,
+      spacing: { after: 200 }
+    })
+  );
+  
+  // Format markdown content - basic implementation
+  const lines = markdown.split('\n');
+  let currentParagraphText = '';
+  
+  for (const line of lines) {
+    if (line.trim() === '') {
+      // End of paragraph
+      if (currentParagraphText) {
+        children.push(new Paragraph({ text: currentParagraphText }));
+        currentParagraphText = '';
+      }
+      continue;
+    }
+    
+    // Handle headings
+    if (line.startsWith('# ')) {
+      if (currentParagraphText) {
+        children.push(new Paragraph({ text: currentParagraphText }));
+        currentParagraphText = '';
+      }
+      children.push(new Paragraph({ 
+        text: line.substring(2),
+        heading: HeadingLevel.HEADING_1
+      }));
+    } else if (line.startsWith('## ')) {
+      if (currentParagraphText) {
+        children.push(new Paragraph({ text: currentParagraphText }));
+        currentParagraphText = '';
+      }
+      children.push(new Paragraph({ 
+        text: line.substring(3),
+        heading: HeadingLevel.HEADING_2
+      }));
+    } else if (line.startsWith('### ')) {
+      if (currentParagraphText) {
+        children.push(new Paragraph({ text: currentParagraphText }));
+        currentParagraphText = '';
+      }
+      children.push(new Paragraph({ 
+        text: line.substring(4),
+        heading: HeadingLevel.HEADING_3
+      }));
+    } else {
+      // Regular text
+      currentParagraphText += (currentParagraphText ? ' ' : '') + line;
+    }
+  }
+  
+  // Add any remaining paragraph text
+  if (currentParagraphText) {
+    children.push(new Paragraph({ text: currentParagraphText }));
+  }
+  
+  return children;
 };
