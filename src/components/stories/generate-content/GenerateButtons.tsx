@@ -2,8 +2,9 @@
 import React from 'react';
 import { ContentType } from '../ContentDisplay';
 import { Button } from "@/components/ui/button";
-import { Loader2, FileText, Code, TestTube, FileCode, CheckSquare } from "lucide-react";
+import { Loader2, FileText, Code, TestTube, FileCode, ActivitySquare, CheckSquare } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { GENERATION_STEPS } from './utils';
 
 interface GenerateButtonsProps {
   onGenerate: (type: ContentType) => void;
@@ -16,6 +17,7 @@ interface GenerateButtonsProps {
   hasCodeContent?: boolean;
   hasTestsContent?: boolean;
   hasTestCasesContent?: boolean;
+  hasTestScriptsContent?: boolean;
 }
 
 const GenerateButtons: React.FC<GenerateButtonsProps> = ({
@@ -28,7 +30,8 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
   hasLldContent = false,
   hasCodeContent = false,
   hasTestsContent = false,
-  hasTestCasesContent = false
+  hasTestCasesContent = false,
+  hasTestScriptsContent = false
 }) => {
   // Determine if a button should be disabled based on the generation sequence
   const isDisabled = (type: ContentType) => {
@@ -38,7 +41,7 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
     // If we're generating all, disable all buttons
     if (isGeneratingAll) return true;
     
-    // Enforce the generation sequence: LLD → Code → Test Cases → Tests
+    // Enforce the generation sequence: LLD → Code → Tests → Test Cases → Test Scripts
     // Only one button should be enabled at a time based on the current state
     
     if (type === 'lld') {
@@ -51,13 +54,18 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
       return !hasLldContent;
     }
     
-    if (type === 'testcases') {
-      // Test cases can only be generated after Code
+    if (type === 'tests') {
+      // Tests can only be generated after Code
       return !hasCodeContent;
     }
     
-    if (type === 'tests') {
-      // Tests can only be generated after Test Cases
+    if (type === 'testcases') {
+      // Test cases can only be generated after Tests
+      return !hasTestsContent;
+    }
+    
+    if (type === 'testScripts') {
+      // Test scripts can only be generated after Test Cases
       return !hasTestCasesContent;
     }
     
@@ -69,6 +77,7 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
     if (type === 'code' && hasCodeContent) return 'outline';
     if (type === 'tests' && hasTestsContent) return 'outline';
     if (type === 'testcases' && hasTestCasesContent) return 'outline';
+    if (type === 'testScripts' && hasTestScriptsContent) return 'outline';
     return 'default';
   };
   
@@ -82,14 +91,51 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
       return 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100';
     if (type === 'testcases' && hasTestCasesContent) 
       return 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100';
+    if (type === 'testScripts' && hasTestScriptsContent) 
+      return 'bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100';
     
     // Default colors for generate buttons
     if (type === 'lld') return 'bg-blue-500 text-white hover:bg-blue-600';
     if (type === 'code') return 'bg-green-500 text-white hover:bg-green-600';
     if (type === 'tests') return 'bg-purple-500 text-white hover:bg-purple-600';
     if (type === 'testcases') return 'bg-orange-500 text-white hover:bg-orange-600';
+    if (type === 'testScripts') return 'bg-teal-500 text-white hover:bg-teal-600';
     
     return '';
+  };
+
+  const getButtonIcon = (type: ContentType) => {
+    if (isGenerating && generatingContentType === type) {
+      return <Loader2 className="h-4 w-4 animate-spin" />;
+    }
+    
+    switch (type) {
+      case 'lld': return <FileText className="h-4 w-4" />;
+      case 'code': return <Code className="h-4 w-4" />;
+      case 'tests': return <TestTube className="h-4 w-4" />;
+      case 'testcases': return <FileCode className="h-4 w-4" />;
+      case 'testScripts': return <ActivitySquare className="h-4 w-4" />;
+      default: return null;
+    }
+  };
+
+  const stepLabels = {
+    lld: 'Step 1: Low-Level Design',
+    code: 'Step 2: Implementation Code',
+    tests: 'Step 3: Unit Tests (Jest/Jasmine)',
+    testcases: 'Step 4: Test Cases',
+    testScripts: 'Step 5: Test Scripts (Playwright/JMeter)'
+  };
+
+  const hasContent = (type: ContentType) => {
+    switch (type) {
+      case 'lld': return hasLldContent;
+      case 'code': return hasCodeContent;
+      case 'tests': return hasTestsContent;
+      case 'testcases': return hasTestCasesContent;
+      case 'testScripts': return hasTestScriptsContent;
+      default: return false;
+    }
   };
 
   return (
@@ -104,16 +150,12 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
               disabled={isDisabled('lld')}
               className={getButtonColor('lld')}
             >
-              {isGenerating && generatingContentType === 'lld' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )}
+              {getButtonIcon('lld')}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
             <p>{hasLldContent ? 'Regenerate LLD' : 'Generate LLD'}</p>
-            <p className="text-xs text-muted-foreground">Step 1: Low-Level Design</p>
+            <p className="text-xs text-muted-foreground">{stepLabels.lld}</p>
           </TooltipContent>
         </Tooltip>
         
@@ -126,38 +168,12 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
               disabled={isDisabled('code')}
               className={getButtonColor('code')}
             >
-              {isGenerating && generatingContentType === 'code' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Code className="h-4 w-4" />
-              )}
+              {getButtonIcon('code')}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
             <p>{hasCodeContent ? 'Regenerate Code' : 'Generate Code'}</p>
-            <p className="text-xs text-muted-foreground">Step 2: Implementation Code</p>
-          </TooltipContent>
-        </Tooltip>
-        
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={getButtonVariant('testcases')}
-              size="icon"
-              onClick={() => onGenerate('testcases')}
-              disabled={isDisabled('testcases')}
-              className={getButtonColor('testcases')}
-            >
-              {isGenerating && generatingContentType === 'testcases' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileCode className="h-4 w-4" />
-              )}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p>{hasTestCasesContent ? 'Regenerate Test Cases' : 'Generate Test Cases'}</p>
-            <p className="text-xs text-muted-foreground">Step 3: Test Cases</p>
+            <p className="text-xs text-muted-foreground">{stepLabels.code}</p>
           </TooltipContent>
         </Tooltip>
         
@@ -170,16 +186,48 @@ const GenerateButtons: React.FC<GenerateButtonsProps> = ({
               disabled={isDisabled('tests')}
               className={getButtonColor('tests')}
             >
-              {isGenerating && generatingContentType === 'tests' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <TestTube className="h-4 w-4" />
-              )}
+              {getButtonIcon('tests')}
             </Button>
           </TooltipTrigger>
           <TooltipContent>
-            <p>{hasTestsContent ? 'Regenerate Tests' : 'Generate Tests'}</p>
-            <p className="text-xs text-muted-foreground">Step 4: Unit Tests</p>
+            <p>{hasTestsContent ? 'Regenerate Unit Tests' : 'Generate Unit Tests'}</p>
+            <p className="text-xs text-muted-foreground">{stepLabels.tests}</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={getButtonVariant('testcases')}
+              size="icon"
+              onClick={() => onGenerate('testcases')}
+              disabled={isDisabled('testcases')}
+              className={getButtonColor('testcases')}
+            >
+              {getButtonIcon('testcases')}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{hasTestCasesContent ? 'Regenerate Test Cases' : 'Generate Test Cases'}</p>
+            <p className="text-xs text-muted-foreground">{stepLabels.testcases}</p>
+          </TooltipContent>
+        </Tooltip>
+        
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant={getButtonVariant('testScripts')}
+              size="icon"
+              onClick={() => onGenerate('testScripts')}
+              disabled={isDisabled('testScripts')}
+              className={getButtonColor('testScripts')}
+            >
+              {getButtonIcon('testScripts')}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>{hasTestScriptsContent ? 'Regenerate Test Scripts' : 'Generate Test Scripts'}</p>
+            <p className="text-xs text-muted-foreground">{stepLabels.testScripts}</p>
           </TooltipContent>
         </Tooltip>
         

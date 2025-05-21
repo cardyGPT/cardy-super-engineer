@@ -4,12 +4,16 @@ import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import { RefreshCw, Settings, Database, ChevronRight, StepForward, ArrowRight } from "lucide-react";
+import { 
+  RefreshCw, 
+  Settings, 
+  Database, 
+  ArrowRight, 
+  ArrowLeft
+} from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ProjectContextData, JiraGenerationRequest, JiraTicket } from "@/types/jira";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Steps, Step } from "@/components/ui/steps";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Components
@@ -20,17 +24,21 @@ import ContextBanner from "@/components/stories/ContextBanner";
 import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
 
-// Generation steps
-const STEPS = [
-  { id: 'select', title: 'Select Story' },
-  { id: 'lld', title: 'Low-Level Design' },
-  { id: 'code', title: 'Implementation Code' },
-  { id: 'testcases', title: 'Test Cases' },
-  { id: 'tests', title: 'Unit Tests' }
-];
+// Generation steps and utilities
+import { Steps, Step } from "@/components/ui/steps";
+import { GENERATION_STEPS, getNextStepId, getPreviousStepId, isStepCompleted } from "@/components/stories/generate-content/utils";
 
 const GeneratePage: React.FC = () => {
-  const { isAuthenticated, loading, refreshAll, error, selectedTicket, generatedContent, generateContent } = useStories();
+  const { 
+    isAuthenticated, 
+    loading, 
+    refreshAll, 
+    error, 
+    selectedTicket, 
+    generatedContent, 
+    generateContent 
+  } = useStories();
+  
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
   const [selectedProjectContext, setSelectedProjectContext] = useState<string | null>(null);
@@ -46,12 +54,10 @@ const GeneratePage: React.FC = () => {
     loadSavedContext();
   }, []);
 
-  // Set step to 'select' if no ticket is selected, otherwise set to 'lld'
+  // Set step to 'select' if no ticket is selected, otherwise maintain current step
   useEffect(() => {
     if (!selectedTicket) {
       setCurrentStep('select');
-    } else if (currentStep === 'select') {
-      setCurrentStep('lld');
     }
   }, [selectedTicket]);
   
@@ -189,7 +195,7 @@ const GeneratePage: React.FC = () => {
     }
   };
 
-  const handleGenerateContent = async (type: 'lld' | 'code' | 'tests' | 'testcases') => {
+  const handleGenerateContent = async (type: 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts') => {
     if (!selectedTicket) return;
 
     setIsGenerating(true);
@@ -207,20 +213,26 @@ const GeneratePage: React.FC = () => {
         request.additionalContext.lldContent = generatedContent.lldContent;
       }
       
-      if ((type === 'tests' || type === 'testcases') && generatedContent?.codeContent) {
+      if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && generatedContent?.codeContent) {
         request.additionalContext.codeContent = generatedContent.codeContent;
       }
       
-      if (type === 'tests' && generatedContent?.testCasesContent) {
+      if ((type === 'testcases' || type === 'testScripts') && generatedContent?.testContent) {
+        request.additionalContext.testContent = generatedContent.testContent;
+      }
+      
+      if (type === 'testScripts' && generatedContent?.testCasesContent) {
         request.additionalContext.testCasesContent = generatedContent.testCasesContent;
       }
 
       await generateContent(request);
       
-      // Move to next step after successful generation
-      const currentIndex = STEPS.findIndex(step => step.id === currentStep);
-      if (currentIndex < STEPS.length - 1) {
-        setCurrentStep(STEPS[currentIndex + 1].id);
+      // Move to next step after successful generation if we're on the step we just generated
+      if (currentStep === type) {
+        const nextStep = getNextStepId(currentStep);
+        if (nextStep) {
+          setCurrentStep(nextStep);
+        }
       }
 
       toast({
@@ -239,17 +251,33 @@ const GeneratePage: React.FC = () => {
   };
 
   const handleNextStep = () => {
-    const currentIndex = STEPS.findIndex(step => step.id === currentStep);
-    if (currentIndex < STEPS.length - 1) {
-      setCurrentStep(STEPS[currentIndex + 1].id);
+    const nextStep = getNextStepId(currentStep);
+    if (nextStep) {
+      setCurrentStep(nextStep);
     }
   };
 
   const handlePreviousStep = () => {
-    const currentIndex = STEPS.findIndex(step => step.id === currentStep);
-    if (currentIndex > 0) {
-      setCurrentStep(STEPS[currentIndex - 1].id);
+    const prevStep = getPreviousStepId(currentStep);
+    if (prevStep) {
+      setCurrentStep(prevStep);
     }
+  };
+
+  // Check if we can proceed to the next step
+  const canProceed = () => {
+    // Can always go to the next step if there's one available
+    const nextStep = getNextStepId(currentStep);
+    if (!nextStep) return false;
+
+    // For the ticket selection step, can only proceed if a ticket is selected
+    if (currentStep === 'select') {
+      return !!selectedTicket;
+    }
+
+    // For generation steps, we can either have generated content or proceed anyway
+    // This allows users to skip steps if they want
+    return true;
   };
   
   const renderStepContent = () => {
@@ -272,24 +300,24 @@ const GeneratePage: React.FC = () => {
       />
     );
   };
-
-  const canProceed = () => {
-    if (currentStep === 'select') {
-      return !!selectedTicket;
+  
+  const getStepStatus = (stepId: string) => {
+    if (currentStep === stepId) {
+      return { active: true, completed: false };
     }
-
-    // Check if the current step has been generated
-    if (currentStep === 'lld') {
-      return !!generatedContent?.lldContent;
-    } else if (currentStep === 'code') {
-      return !!generatedContent?.codeContent;
-    } else if (currentStep === 'testcases') {
-      return !!generatedContent?.testCasesContent;
-    } else if (currentStep === 'tests') {
-      return !!generatedContent?.testContent;
+    
+    // Special case for the select step - it's completed if a ticket is selected
+    if (stepId === 'select') {
+      return { active: false, completed: !!selectedTicket };
     }
-
-    return true;
+    
+    // For generation steps, check if we have generated content
+    if (stepId === 'lld' || stepId === 'code' || stepId === 'tests' || stepId === 'testcases' || stepId === 'testScripts') {
+      const completed = isStepCompleted(generatedContent, stepId);
+      return { active: false, completed };
+    }
+    
+    return { active: false, completed: false };
   };
   
   return (
@@ -346,33 +374,38 @@ const GeneratePage: React.FC = () => {
                 <CardTitle>Generation Process</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="flex flex-col sm:flex-row gap-2 items-center mb-4">
-                  {STEPS.map((step, idx) => (
-                    <React.Fragment key={step.id}>
-                      <Button 
-                        variant={currentStep === step.id ? "default" : "outline"}
-                        size="sm"
-                        disabled={!selectedTicket && step.id !== 'select'}
-                        onClick={() => setCurrentStep(step.id)}
-                        className={`flex-1 ${currentStep === step.id ? 'bg-blue-600' : ''}`}
-                      >
-                        <span className="mr-2">{idx + 1}</span>
-                        {step.title}
-                      </Button>
-                      
-                      {idx < STEPS.length - 1 && (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground hidden sm:block" />
-                      )}
-                    </React.Fragment>
-                  ))}
+                <div className="flex justify-center mb-8 overflow-x-auto py-4">
+                  <Steps className="gap-4 md:gap-8">
+                    {GENERATION_STEPS.map((step, idx) => {
+                      const status = getStepStatus(step.id);
+                      return (
+                        <Step 
+                          key={step.id}
+                          index={idx}
+                          active={status.active}
+                          completed={status.completed}
+                          label={step.title}
+                          subtitle={step.subtitle}
+                          onClick={() => {
+                            // Only allow navigation to steps that are available
+                            if (step.id === 'select' || selectedTicket) {
+                              setCurrentStep(step.id);
+                            }
+                          }}
+                          className="cursor-pointer"
+                        />
+                      );
+                    })}
+                  </Steps>
                 </div>
 
-                <div className="flex justify-between mt-4">
+                <div className="flex justify-between mt-6">
                   <Button
                     variant="outline"
                     onClick={handlePreviousStep}
-                    disabled={currentStep === 'select'}
+                    disabled={!getPreviousStepId(currentStep)}
                   >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
                     Previous
                   </Button>
                   
@@ -380,8 +413,8 @@ const GeneratePage: React.FC = () => {
                     <Button
                       variant="default"
                       onClick={() => handleGenerateContent(currentStep as any)}
-                      disabled={isGenerating}
-                      className="ml-auto mr-2"
+                      disabled={isGenerating || !selectedTicket}
+                      className="mx-auto"
                     >
                       {isGenerating ? (
                         <>
@@ -390,7 +423,7 @@ const GeneratePage: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          Generate {currentStep.toUpperCase()}
+                          Generate {GENERATION_STEPS.find(s => s.id === currentStep)?.title || currentStep.toUpperCase()}
                         </>
                       )}
                     </Button>
@@ -399,7 +432,7 @@ const GeneratePage: React.FC = () => {
                   <Button
                     variant="default"
                     onClick={handleNextStep}
-                    disabled={!canProceed() || currentStep === STEPS[STEPS.length - 1].id}
+                    disabled={!canProceed()}
                   >
                     Next
                     <ArrowRight className="ml-2 h-4 w-4" />

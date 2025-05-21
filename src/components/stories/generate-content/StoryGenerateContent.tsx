@@ -6,7 +6,7 @@ import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; 
 import { useToast } from "@/hooks/use-toast";
 import ContentDisplay, { ContentType } from '../ContentDisplay';
-import { getContentByType } from './utils';
+import { getContentByType, getStatusMessage } from './utils';
 import GenerateButtons from './GenerateButtons';
 import ContentTabs from './ContentTabs';
 import ContentActions from './ContentActions';
@@ -22,6 +22,7 @@ interface ExistingArtifacts {
   codeContent: string | null;
   testContent: string | null;
   testCasesContent: string | null;
+  testScriptsContent: string | null;
 }
 
 interface StoryGenerateContentProps {
@@ -67,7 +68,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         (existingArtifacts.lldContent || 
          existingArtifacts.codeContent || 
          existingArtifacts.testContent || 
-         existingArtifacts.testCasesContent)) {
+         existingArtifacts.testCasesContent ||
+         existingArtifacts.testScriptsContent)) {
       // If we have stored content, set the active tab to the first available content
       if (existingArtifacts.lldContent) {
         setActiveTab('lld');
@@ -77,6 +79,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         setActiveTab('tests');
       } else if (existingArtifacts.testCasesContent) {
         setActiveTab('testcases');
+      } else if (existingArtifacts.testScriptsContent) {
+        setActiveTab('testScripts');
       }
     }
   }, [ticket.key, existingArtifacts]);
@@ -92,24 +96,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     combinedContent.lldContent || 
     combinedContent.codeContent || 
     combinedContent.testContent || 
-    combinedContent.testCasesContent
+    combinedContent.testCasesContent ||
+    combinedContent.testScriptsContent
   );
-  
-  // Get the status message based on the content type being generated
-  const getStatusMessage = (type: ContentType): string => {
-    switch (type) {
-      case 'lld':
-        return '🛠️ Low-Level Design in progress...\nWe\'re generating the LLD based on your story, project context, and existing artifacts. This will guide the next steps in your development flow.';
-      case 'code':
-        return '💻 Code is being generated...\nWe\'re translating your LLD into clean, production-ready code. All best practices and relevant patterns from the project context are being applied.';
-      case 'testcases':
-        return '🧪 Writing test cases...\nWe\'re creating test cases that align with your code and business logic. These help ensure every scenario is accounted for before automation.';
-      case 'tests':
-        return '🎭 Generating tests...\nNow turning your test cases into automated tests. These will validate your application functionality.';
-      default:
-        return 'Generating content...';
-    }
-  };
   
   const handleGenerate = async (type: ContentType) => {
     try {
@@ -133,21 +122,21 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           };
         }
         
-        if (type === 'tests' && combinedContent.codeContent) {
+        if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && combinedContent.codeContent) {
           request.additionalContext = {
             ...request.additionalContext,
             codeContent: combinedContent.codeContent
           };
         }
         
-        if (type === 'testcases' && combinedContent.codeContent) {
+        if ((type === 'testcases' || type === 'testScripts') && combinedContent.testContent) {
           request.additionalContext = {
             ...request.additionalContext,
-            codeContent: combinedContent.codeContent
+            testContent: combinedContent.testContent
           };
         }
         
-        if (type === 'tests' && combinedContent.testCasesContent) {
+        if (type === 'testScripts' && combinedContent.testCasesContent) {
           request.additionalContext = {
             ...request.additionalContext,
             testCasesContent: combinedContent.testCasesContent
@@ -197,11 +186,15 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
         request.additionalContext.lldContent = combinedContent.lldContent;
       }
       
-      if ((activeTab === 'tests' || activeTab === 'testcases') && combinedContent.codeContent) {
+      if ((activeTab === 'tests' || activeTab === 'testcases' || activeTab === 'testScripts') && combinedContent.codeContent) {
         request.additionalContext.codeContent = combinedContent.codeContent;
       }
       
-      if (activeTab === 'tests' && combinedContent.testCasesContent) {
+      if ((activeTab === 'testcases' || activeTab === 'testScripts') && combinedContent.testContent) {
+        request.additionalContext.testContent = combinedContent.testContent;
+      }
+      
+      if (activeTab === 'testScripts' && combinedContent.testCasesContent) {
         request.additionalContext.testCasesContent = combinedContent.testCasesContent;
       }
       
@@ -227,8 +220,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const handleGenerateAll = async () => {
     setIsGeneratingAll(true);
     try {
-      // Generate in specific sequence: LLD -> Code -> TestCases -> Tests
-      const types: ContentType[] = ['lld', 'code', 'testcases', 'tests'];
+      // Generate in specific sequence: LLD -> Code -> Tests -> TestCases -> TestScripts
+      const types: ContentType[] = ['lld', 'code', 'tests', 'testcases', 'testScripts'];
       
       for (const type of types) {
         setGeneratingContentType(type);
@@ -250,7 +243,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             };
           }
           
-          if ((type === 'testcases' || type === 'tests') && 
+          if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && 
               (combinedContent.codeContent || generatedContent?.codeContent)) {
             request.additionalContext = {
               ...request.additionalContext,
@@ -258,7 +251,15 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
             };
           }
           
-          if (type === 'tests' && 
+          if ((type === 'testcases' || type === 'testScripts') && 
+              (combinedContent.testContent || generatedContent?.testContent)) {
+            request.additionalContext = {
+              ...request.additionalContext,
+              testContent: combinedContent.testContent || generatedContent?.testContent
+            };
+          }
+          
+          if (type === 'testScripts' && 
               (combinedContent.testCasesContent || generatedContent?.testCasesContent)) {
             request.additionalContext = {
               ...request.additionalContext,
@@ -274,7 +275,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       
       toast({
         title: "All Content Generated",
-        description: "LLD, Code, Test Cases, and Tests content has been generated successfully.",
+        description: "LLD, Code, Unit Tests, Test Cases, and Test Scripts content has been generated successfully.",
         variant: "success",
       });
     } catch (err: any) {
@@ -406,8 +407,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   const getNextContentType = (): ContentType | null => {
     if (!hasContentType('lld')) return 'lld';
     if (!hasContentType('code')) return 'code';
-    if (!hasContentType('testcases')) return 'testcases';
     if (!hasContentType('tests')) return 'tests';
+    if (!hasContentType('testcases')) return 'testcases';
+    if (!hasContentType('testScripts')) return 'testScripts';
     return null;
   };
 
@@ -422,8 +424,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
               <AlertTitle>
                 {generatingContentType === 'lld' ? 'Step 1: Low-Level Design (LLD)' : 
                  generatingContentType === 'code' ? 'Step 2: Code Generation' :
-                 generatingContentType === 'testcases' ? 'Step 3: Test Case Generation' :
-                 generatingContentType === 'tests' ? 'Step 4: Tests Generation' :
+                 generatingContentType === 'tests' ? 'Step 3: Unit Tests (Jest/Jasmine)' :
+                 generatingContentType === 'testcases' ? 'Step 4: Test Cases' :
+                 generatingContentType === 'testScripts' ? 'Step 5: Test Scripts (Playwright/JMeter)' :
                  'Generating Content'}
               </AlertTitle>
               <AlertDescription className="whitespace-pre-line">
@@ -442,7 +445,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           <AlertTitle>Getting Started</AlertTitle>
           <AlertDescription>
             Start by generating the Low-Level Design (LLD) for this ticket. Once the LLD is created, you can proceed 
-            to generate implementation code, test cases, and tests in sequence.
+            to generate implementation code, unit tests, test cases, and test scripts in sequence.
           </AlertDescription>
         </Alert>
       );
@@ -452,7 +455,8 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     if (nextType) {
       const nextTypeLabel = nextType === 'lld' ? 'Low-Level Design' :
                             nextType === 'code' ? 'Implementation Code' :
-                            nextType === 'testcases' ? 'Test Cases' : 'Tests';
+                            nextType === 'tests' ? 'Unit Tests' :
+                            nextType === 'testcases' ? 'Test Cases' : 'Test Scripts';
       
       return (
         <Alert className="mb-4">
@@ -502,6 +506,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           hasCodeContent={hasContentType('code')}
           hasTestsContent={hasContentType('tests')}
           hasTestCasesContent={hasContentType('testcases')}
+          hasTestScriptsContent={hasContentType('testScripts')}
         />
         
         {/* Prompt button */}
@@ -529,6 +534,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 hasCodeContent={hasContentType('code')}
                 hasTestsContent={hasContentType('tests')}
                 hasTestCasesContent={hasContentType('testcases')}
+                hasTestScriptsContent={hasContentType('testScripts')}
               />
               
               <ContentActions 
@@ -568,6 +574,12 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
                 <ContentDisplay 
                   content={getContentByType(combinedContent, 'testcases')} 
                   contentType="testcases" 
+                />
+              </TabsContent>
+              <TabsContent value="testScripts" className="mt-0">
+                <ContentDisplay 
+                  content={getContentByType(combinedContent, 'testScripts')} 
+                  contentType="testScripts" 
                 />
               </TabsContent>
             </div>

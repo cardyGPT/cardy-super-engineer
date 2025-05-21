@@ -71,7 +71,8 @@ export const useContentGeneration = (
         lld: 'lld_content',
         code: 'code_content',
         tests: 'test_content',
-        testcases: 'testcases_content'
+        testcases: 'testcases_content',
+        testScripts: 'testscripts_content'
       };
       
       const column = columnMapping[contentType];

@@ -90,16 +90,30 @@ Type: ${safeStringify(jiraTicket.issuetype?.name) || 'Unknown'}
     }
     
     // Add previously generated content as context
-    if (additionalContext?.lldContent && (type === 'code' || type === 'tests' || type === 'testcases')) {
+    if (additionalContext?.lldContent && (type === 'code' || type === 'tests' || type === 'testcases' || type === 'testScripts')) {
       ticketContext += `\n\nPreviously Generated LLD:\n${safeStringify(additionalContext.lldContent)}`;
     }
     
-    if (additionalContext?.codeContent && (type === 'tests' || type === 'testcases')) {
+    if (additionalContext?.codeContent && (type === 'tests' || type === 'testcases' || type === 'testScripts')) {
       ticketContext += `\n\nPreviously Generated Code:\n${safeStringify(additionalContext.codeContent)}`;
     }
     
-    if (additionalContext?.testCasesContent && type === 'tests') {
+    if (additionalContext?.testContent && (type === 'testcases' || type === 'testScripts')) {
+      ticketContext += `\n\nPreviously Generated Unit Tests:\n${safeStringify(additionalContext.testContent)}`;
+    }
+    
+    if (additionalContext?.testCasesContent && type === 'testScripts') {
       ticketContext += `\n\nPreviously Generated Test Cases:\n${safeStringify(additionalContext.testCasesContent)}`;
+    }
+
+    // If there's a custom prompt from the user, include it
+    if (additionalContext?.customPrompt) {
+      ticketContext += `\n\nUser's Custom Instructions:\n${safeStringify(additionalContext.customPrompt)}`;
+    }
+
+    // If there's current content to refine, include it
+    if (additionalContext?.currentContent) {
+      ticketContext += `\n\nCurrent Content to Refine:\n${safeStringify(additionalContext.currentContent)}`;
     }
 
     // If projectContext is provided, fetch the project and documents info
@@ -175,19 +189,20 @@ Format your response with these sections:
 6. Integration Points`;
     } 
     else if (type === 'tests') {
-      systemPrompt = `You are an expert in software testing with experience in unit tests, integration tests, and end-to-end tests.
-Based on the Jira ticket information, previously generated Low-Level Design, and implementation code, create comprehensive test code using Playwright.
-Include unit tests, integration tests, end-to-end tests, edge cases, and performance test considerations.
+      systemPrompt = `You are an expert in software testing with experience in writing unit tests.
+Based on the Jira ticket information, previously generated Low-Level Design, and implementation code, create comprehensive unit tests.
+Use Jest for backend testing and Jasmine for frontend testing.
+Include setup, mocking, edge cases, and coverage considerations.
 Format everything properly in markdown with clear test scenarios and expected results.
-Your tests should be thorough, covering all aspects of the functionality described in the ticket and implementation.
+Your tests should be thorough, covering all aspects of the functionality described in the implementation.
 
 Format your response with these sections:
 1. Testing Strategy
-2. Unit Tests
-3. Integration Tests
-4. End-to-End Tests
-5. Edge Cases
-6. Performance Tests`;
+2. Backend Tests (Jest)
+3. Frontend Tests (Jasmine)
+4. Edge Cases
+5. Mocks and Test Doubles
+6. Test Coverage Analysis`;
     } 
     else if (type === 'testcases') {
       systemPrompt = `You are an expert in software testing with experience in quality assurance and test case design.
@@ -201,13 +216,45 @@ Format your response with these sections:
 2. Positive Test Cases
 3. Negative Test Cases
 4. Edge Cases
-5. User Experience Test Cases`;
+5. User Experience Test Cases
+6. Traceability Matrix`;
+    }
+    else if (type === 'testScripts') {
+      systemPrompt = `You are an expert in test automation and performance testing.
+Based on the Jira ticket information, implementation code, unit tests, and test cases, create comprehensive test scripts.
+Part 1: Create functional test scripts using Playwright for automated end-to-end testing.
+Part 2: Create performance test scripts using JMeter for load and performance testing.
+Format everything properly in markdown with clear code blocks and comments.
+Your scripts should be ready to run with minimal modification.
+
+Format your response with these sections:
+1. Testing Approach Overview
+2. Functional Test Scripts (Playwright)
+   - Test Setup
+   - Page Objects
+   - Test Scenarios
+   - Assertions
+3. Performance Test Scripts (JMeter)
+   - Test Plan
+   - Thread Groups
+   - Samplers
+   - Assertions
+   - Reporting Configuration
+4. Integration with CI/CD
+5. Notes and Considerations`;
     }
     else {
       systemPrompt = `You are an expert software development assistant.
 Analyze the Jira ticket information and provide a comprehensive response addressing the requirements.
 Format your response cleanly and professionally in markdown.
 Your response should be detailed, structured and directly usable by the development team.`;
+    }
+
+    // If there's a custom prompt, adjust the system prompt to focus on refinement
+    if (additionalContext?.customPrompt && additionalContext?.currentContent) {
+      systemPrompt += `\n\nYou are being asked to refine some previously generated content according to specific user instructions. 
+Focus on addressing the user's feedback while maintaining the quality and structure of the existing content.
+Don't repeat everything if only specific parts need changes - be precise with your improvements.`;
     }
 
     // Call OpenAI API
@@ -232,11 +279,14 @@ Your response should be detailed, structured and directly usable by the developm
               content: `${ticketContext}\n\nPlease generate a detailed, well-formatted ${
                 type === 'lld' ? 'low-level design document' : 
                 type === 'code' ? 'implementation code' : 
-                type === 'tests' ? 'test code using Playwright' : 
+                type === 'tests' ? 'unit tests (Jest for backend, Jasmine for frontend)' : 
                 type === 'testcases' ? 'manual test cases' : 
+                type === 'testScripts' ? 'test scripts (Playwright for functional, JMeter for performance)' : 
                 'response'
               } based on this Jira ticket information.${
                 type !== 'lld' ? ' Make sure to utilize the previously generated artifacts in your response.' : ''
+              }${
+                additionalContext?.customPrompt ? ' Please follow the custom instructions carefully.' : ''
               }\n\nEnsure your response is well-structured with clear headings, proper code formatting, and follows the requested format structure.`
             }
           ],
@@ -279,6 +329,8 @@ Your response should be detailed, structured and directly usable by the developm
             updateData.test_content = responseContent;
           } else if (type === 'testcases') {
             updateData.testcases_content = responseContent;
+          } else if (type === 'testScripts') {
+            updateData.testscripts_content = responseContent;
           }
           
           if (existingData) {

@@ -10,6 +10,7 @@ interface ContentTabsProps {
   hasCodeContent: boolean;
   hasTestsContent: boolean;
   hasTestCasesContent: boolean;
+  hasTestScriptsContent: boolean;
 }
 
 const ContentTabs: React.FC<ContentTabsProps> = ({
@@ -18,10 +19,11 @@ const ContentTabs: React.FC<ContentTabsProps> = ({
   hasLldContent,
   hasCodeContent,
   hasTestsContent,
-  hasTestCasesContent
+  hasTestCasesContent,
+  hasTestScriptsContent
 }) => {
   return (
-    <TabsList className="grid grid-cols-4 w-auto">
+    <TabsList className="grid grid-cols-5 w-auto">
       <TabsTrigger 
         value="lld" 
         disabled={!hasLldContent}
@@ -37,6 +39,13 @@ const ContentTabs: React.FC<ContentTabsProps> = ({
         Code
       </TabsTrigger>
       <TabsTrigger 
+        value="tests" 
+        disabled={!hasTestsContent}
+        onClick={() => onChange('tests')}
+      >
+        Unit Tests
+      </TabsTrigger>
+      <TabsTrigger 
         value="testcases" 
         disabled={!hasTestCasesContent}
         onClick={() => onChange('testcases')}
@@ -44,11 +53,11 @@ const ContentTabs: React.FC<ContentTabsProps> = ({
         Test Cases
       </TabsTrigger>
       <TabsTrigger 
-        value="tests" 
-        disabled={!hasTestsContent}
-        onClick={() => onChange('tests')}
+        value="testScripts" 
+        disabled={!hasTestScriptsContent}
+        onClick={() => onChange('testScripts')}
       >
-        Tests
+        Test Scripts
       </TabsTrigger>
     </TabsList>
   );

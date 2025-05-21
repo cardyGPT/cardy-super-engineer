@@ -53,6 +53,8 @@ export const generateJiraContent = async (
       response.testContent = responseContent;
     } else if (request.type === 'testcases') {
       response.testCasesContent = responseContent;
+    } else if (request.type === 'testScripts') {
+      response.testScriptsContent = responseContent;
     }
     
     // Save the generated content to the database
