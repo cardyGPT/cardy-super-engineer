@@ -1,6 +1,14 @@
 
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, ImageRun } from 'docx';
+import { 
+  Document, 
+  Packer, 
+  Paragraph, 
+  HeadingLevel, 
+  TextRun, 
+  AlignmentType,
+  ImageRun
+} from 'docx';
 
 export const exportToWord = async (
   content: string, 
@@ -55,7 +63,6 @@ const formatMarkdownToWordContent = async (
                   width: 100,
                   height: 50
                 },
-                type: 'png',
                 altText: {
                   title: "Company Logo",
                   description: "Company Logo Image",

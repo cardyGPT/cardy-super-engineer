@@ -35,7 +35,7 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
       case 'tests': return 'Unit Tests';
       case 'testcases': return 'Test Cases';
       case 'testScripts': return 'Test Scripts';
-      default: return type as string;
+      default: return type;
     }
   };
   
