@@ -6,17 +6,14 @@ import { JiraGenerationRequest } from "@/types/jira";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ProjectContextData } from "@/types/jira";
-import { Card, CardContent } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContentType } from "@/components/stories/ContentDisplay";
-import StoryDetail from "@/components/stories/StoryDetail";
+import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 
 // Components
 import StoryList from "@/components/stories/StoryList";
 import JiraProjectSelector from "@/components/stories/JiraProjectSelector";
 import ContextDialog from "@/components/stories/ContextDialog";
 import NotConnectedCard from "@/components/stories/NotConnectedCard";
-import ContentGenerationFlow from "@/components/stories/generate-content/ContentGenerationFlow";
 
 const GeneratePage: React.FC = () => {
   const { 
@@ -37,7 +34,7 @@ const GeneratePage: React.FC = () => {
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
   const [currentStep, setCurrentStep] = useState<string>(selectedTicket ? 'lld' : 'select');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<string>("selection");
+  const [activeTab, setActiveTab] = useState<ContentType>('lld');
   const { toast } = useToast();
   
   // Load saved context on initial page load
@@ -165,153 +162,32 @@ const GeneratePage: React.FC = () => {
     }
   };
   
-  const handleGenerateContent = async (type: ContentType) => {
-    if (!selectedTicket) return;
-
-    setIsGenerating(true);
-    try {
-      const request: JiraGenerationRequest = {
-        type: type,
-        jiraTicket: selectedTicket,
-        projectContext: selectedProjectContext || undefined,
-        selectedDocuments: selectedDocuments || [],
-        additionalContext: {}
-      };
-
-      // Add previous artifacts to context for subsequent generations
-      if (type !== 'lld' && generatedContent?.lldContent) {
-        request.additionalContext.lldContent = generatedContent.lldContent;
-      }
-      
-      if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && generatedContent?.codeContent) {
-        request.additionalContext.codeContent = generatedContent.codeContent;
-      }
-      
-      if ((type === 'testcases' || type === 'testScripts') && generatedContent?.testContent) {
-        request.additionalContext.testContent = generatedContent.testContent;
-      }
-      
-      if (type === 'testScripts' && generatedContent?.testCasesContent) {
-        request.additionalContext.testCasesContent = generatedContent.testCasesContent;
-      }
-
-      await generateContent(request);
-
-      toast({
-        title: "Content Generated",
-        description: `${type.toUpperCase()} content has been generated successfully.`
-      });
-    } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || `Failed to generate ${type.toUpperCase()} content.`,
-        variant: "destructive"
-      });
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-  
-  const handleSaveContent = async (content: string): Promise<boolean> => {
-    if (!selectedTicket || !content || currentStep === 'select') {
-      toast({
-        title: "Error",
-        description: "Cannot save: No ticket selected or no content available",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    try {
-      const success = await saveContentToDatabase(currentStep as ContentType, content);
-      return success;
-    } catch (err: any) {
-      console.error("Error saving content:", err);
-      toast({
-        title: "Error",
-        description: err.message || "Failed to save content",
-        variant: "destructive"
-      });
-      return false;
-    }
-  };
-  
-  const handlePushToJira = async (content: string): Promise<boolean> => {
-    if (!selectedTicket || !content) {
-      toast({
-        title: "Error",
-        description: "Cannot push to Jira: No ticket selected or no content available",
-        variant: "destructive"
-      });
-      return false;
-    }
-    
-    try {
-      const success = await pushToJira(selectedTicket.id, content);
-      return success;
-    } catch (err: any) {
-      console.error("Error pushing to Jira:", err);
-      toast({
-        title: "Error",
-        description: err.message || "Failed to push content to Jira",
-        variant: "destructive"
-      });
-      return false;
-    }
-  };
-  
-  // Main render logic based on authentication and selection state
+  // Main render logic based on authentication state
   const renderMainContent = () => {
     if (!isAuthenticated) {
       return <NotConnectedCard />;
     }
     
     return (
-      <div className="space-y-4">
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="selection">Jira Ticket Selection</TabsTrigger>
-            <TabsTrigger value="generation" disabled={!selectedTicket}>Content Generation</TabsTrigger>
-          </TabsList>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Left sidebar - Project and ticket selection */}
+          <div className="md:col-span-1 space-y-6">
+            <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
+            <StoryList />
+          </div>
           
-          <TabsContent value="selection" className="mt-4 space-y-4">
-            <Card>
-              <CardContent className="pt-6">
-                <JiraProjectSelector lastRefreshTime={lastRefreshTime} />
-                <StoryList />
-              </CardContent>
-            </Card>
-            
-            {selectedTicket && (
-              <Card>
-                <CardContent className="pt-6">
-                  <StoryDetail ticket={selectedTicket} />
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-          
-          <TabsContent value="generation" className="mt-4">
-            {selectedTicket ? (
-              <ContentGenerationFlow
-                selectedTicket={selectedTicket}
-                generatedContent={generatedContent}
-                currentStep={currentStep}
-                setCurrentStep={setCurrentStep}
-                onGenerate={handleGenerateContent}
-                onSaveContent={handleSaveContent}
-                onPushToJira={handlePushToJira}
-                isGenerating={isGenerating}
-              />
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p>Please select a ticket first from the "Jira Ticket Selection" tab.</p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        </Tabs>
+          {/* Main content area - Right side */}
+          <div className="md:col-span-3">
+            <StoryDetailWrapper 
+              projectContext={selectedProjectContext}
+              selectedDocuments={selectedDocuments}
+              projectContextData={projectContextData}
+              activeTab={activeTab}
+              setActiveTab={setActiveTab}
+            />
+          </div>
+        </div>
       </div>
     );
   };
