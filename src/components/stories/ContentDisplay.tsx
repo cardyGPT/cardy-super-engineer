@@ -1,41 +1,54 @@
 
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeHighlight from 'rehype-highlight';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import remarkGfm from 'remark-gfm';
-import '@/styles/markdown.css';
 
-// Define allowed content types
 export type ContentType = 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts';
 
 interface ContentDisplayProps {
-  content: string | null;
+  content: string | null | undefined;
   contentType: ContentType;
 }
 
 const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType }) => {
   if (!content) {
     return (
-      <div className="text-gray-500 italic">
-        No {contentType === 'lld' ? 'Low-Level Design' : 
-           contentType === 'code' ? 'Code' :
-           contentType === 'tests' ? 'Unit Tests' :
-           contentType === 'testcases' ? 'Test Cases' :
-           contentType === 'testScripts' ? 'Test Scripts' : 
-           contentType} content available.
+      <div className="p-6 text-center text-gray-500 italic">
+        {contentType === 'lld' ? 'No Low-Level Design content generated yet.' : 
+         contentType === 'code' ? 'No implementation code generated yet.' : 
+         contentType === 'tests' ? 'No unit test content generated yet.' :
+         contentType === 'testcases' ? 'No test case content generated yet.' :
+         'No test script content generated yet.'}
       </div>
     );
   }
 
   return (
-    <div className="prose prose-sm max-w-none dark:prose-invert markdown-body">
-      <ReactMarkdown 
-        rehypePlugins={[rehypeRaw, rehypeHighlight]}
+    <div className="markdown-content">
+      <ReactMarkdown
+        children={content}
         remarkPlugins={[remarkGfm]}
-      >
-        {content}
-      </ReactMarkdown>
+        components={{
+          code({node, inline, className, children, ...props}) {
+            const match = /language-(\w+)/.exec(className || '');
+            return !inline && match ? (
+              <SyntaxHighlighter
+                children={String(children).replace(/\n$/, '')}
+                style={vscDarkPlus}
+                language={match[1]}
+                PreTag="div"
+                {...props}
+              />
+            ) : (
+              <code className={className} {...props}>
+                {children}
+              </code>
+            )
+          }
+        }}
+      />
     </div>
   );
 };

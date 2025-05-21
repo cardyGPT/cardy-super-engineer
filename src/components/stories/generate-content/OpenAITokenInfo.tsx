@@ -41,7 +41,8 @@ const OpenAITokenInfo = () => {
             <ul className="mt-2 text-sm space-y-1.5">
               <li><strong>Sequential Generation:</strong> Each step builds on previous content (LLD → Code → Tests → Test Cases → Test Scripts)</li>
               <li><strong>Document Export:</strong> Generated content includes proper formatting with title page, TOC, and metadata</li>
-              <li><strong>Token Consideration:</strong> For very large projects, content may need to be generated in sections</li>
+              <li><strong>Custom Refinement:</strong> Use custom prompts to refine content at each generation step</li>
+              <li><strong>Persistence:</strong> Save generated artifacts to reuse them later</li>
             </ul>
           </AlertDescription>
         </div>

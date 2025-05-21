@@ -6,7 +6,8 @@ import { ContentType } from './ContentDisplay';
 import { Card } from '@/components/ui/card';
 import StoryDetail from './StoryDetail';
 import StoryDetailEmpty from './StoryDetailEmpty';
-import SimplifiedGenerateInterface from './generate-content/SimplifiedGenerateInterface';
+import ContentGenerationFlow from './generate-content/ContentGenerationFlow';
+import { useToast } from '@/hooks/use-toast';
 
 interface StoryDetailWrapperProps {
   projectContext?: string | null;
@@ -25,7 +26,8 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
 }) => {
   const { selectedTicket, generateContent, pushToJira, generatedContent, saveContentToDatabase } = useStories();
   const [isGenerating, setIsGenerating] = useState(false);
-  const [currentStep, setCurrentStep] = useState<string>(activeTab || 'lld');
+  const [currentStep, setCurrentStep] = useState<string>(selectedTicket ? activeTab || 'lld' : 'select');
+  const { toast } = useToast();
   
   // Sync currentStep with activeTab from parent
   React.useEffect(() => {
@@ -50,16 +52,49 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
   }, [currentStep]);
   
   const handleGenerate = async (type: ContentType) => {
-    if (!selectedTicket) return;
+    if (!selectedTicket) {
+      toast({
+        title: "Error",
+        description: "No ticket selected",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsGenerating(true);
     try {
+      // Build context from previous steps for chaining
+      const additionalContext: Record<string, any> = {};
+      
+      // Add previous artifacts to context for subsequent generations
+      if (type !== 'lld' && generatedContent?.lldContent) {
+        additionalContext.lldContent = generatedContent.lldContent;
+      }
+      
+      if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && generatedContent?.codeContent) {
+        additionalContext.codeContent = generatedContent.codeContent;
+      }
+      
+      if ((type === 'testcases' || type === 'testScripts') && generatedContent?.testContent) {
+        additionalContext.testContent = generatedContent.testContent;
+      }
+      
+      if (type === 'testScripts' && generatedContent?.testCasesContent) {
+        additionalContext.testCasesContent = generatedContent.testCasesContent;
+      }
+      
       await generateContent({
         type,
         jiraTicket: selectedTicket,
         projectContext: projectContext || undefined,
         selectedDocuments: selectedDocuments || [],
-        additionalContext: {}
+        additionalContext
+      });
+    } catch (err: any) {
+      toast({
+        title: "Generation Error",
+        description: err.message || `Failed to generate ${type} content`,
+        variant: "destructive"
       });
     } finally {
       setIsGenerating(false);
@@ -98,7 +133,7 @@ const StoryDetailWrapper: React.FC<StoryDetailWrapperProps> = ({
   
   return (
     <div>
-      <SimplifiedGenerateInterface
+      <ContentGenerationFlow
         selectedTicket={selectedTicket}
         generatedContent={generatedContent}
         isGenerating={isGenerating}
