@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
@@ -195,13 +194,13 @@ const GeneratePage: React.FC = () => {
     }
   };
 
-  const handleGenerateContent = async (type: 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts') => {
+  const handleGenerateContent = async (type: ContentType) => {
     if (!selectedTicket) return;
 
     setIsGenerating(true);
     try {
       const request: JiraGenerationRequest = {
-        type,
+        type: type as 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts',
         jiraTicket: selectedTicket,
         projectContext: selectedProjectContext || undefined,
         selectedDocuments: selectedDocuments || [],

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { JiraTicket, ProjectContextData } from '@/types/jira';
 import { useJiraArtifacts } from '@/hooks/useJiraArtifacts';
@@ -246,7 +245,8 @@ const StoryDetail: React.FC<StoryDetailProps> = ({
                   lldContent,
                   codeContent,
                   testContent,
-                  testCasesContent
+                  testCasesContent,
+                  testScriptsContent: null // Add this missing property
                 }}
               />
             </CardContent>

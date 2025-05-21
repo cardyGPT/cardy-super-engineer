@@ -8,10 +8,12 @@ export interface StoryArtifacts {
   codeContent: string | null;
   testContent: string | null;
   testCasesContent: string | null;
+  testScriptsContent: string | null;
   lldGsuiteId?: string | null;
   codeGsuiteId?: string | null;
   testGsuiteId?: string | null;
   testCasesGsuiteId?: string | null;
+  testScriptsGsuiteId?: string | null;
 }
 
 export const useArtifacts = (storyId: string | null) => {
@@ -19,7 +21,8 @@ export const useArtifacts = (storyId: string | null) => {
     lldContent: null,
     codeContent: null,
     testContent: null,
-    testCasesContent: null
+    testCasesContent: null,
+    testScriptsContent: null
   });
   
   const [loading, setLoading] = useState(false);
@@ -46,10 +49,12 @@ export const useArtifacts = (storyId: string | null) => {
             codeContent: data.code_content,
             testContent: data.test_content,
             testCasesContent: data.testcases_content,
+            testScriptsContent: data.testscripts_content,
             lldGsuiteId: data.lld_gsuite_id,
             codeGsuiteId: data.code_gsuite_id,
             testGsuiteId: data.test_gsuite_id,
-            testCasesGsuiteId: data.testcases_gsuite_id
+            testCasesGsuiteId: data.testcases_gsuite_id,
+            testScriptsGsuiteId: data.testscripts_gsuite_id
           });
         }
       } catch (err) {

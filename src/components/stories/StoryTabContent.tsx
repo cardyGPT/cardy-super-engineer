@@ -146,6 +146,7 @@ const StoryTabContent: React.FC<StoryTabContentProps> = ({
             hasCodeContent={!!getContentByType(generatedContent, 'code')}
             hasTestsContent={!!getContentByType(generatedContent, 'tests')}
             hasTestCasesContent={!!getContentByType(generatedContent, 'testcases')}
+            hasTestScriptsContent={!!getContentByType(generatedContent, 'testScripts')}
           />
         </Tabs>
         

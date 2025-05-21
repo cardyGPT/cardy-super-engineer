@@ -332,10 +332,11 @@ export const useStoriesState = (): StoriesContextState => {
     try {
       // Prepare the data for saving
       const columnMapping: Record<ContentType, string> = {
-        lld: 'lld_content',
-        code: 'code_content',
-        tests: 'test_content',
-        testcases: 'testcases_content'
+        lld: 'lld',
+        code: 'code',
+        tests: 'tests',
+        testcases: 'testcases',
+        testScripts: 'testScripts'  // Add this missing mapping
       };
       
       const column = columnMapping[contentType];
