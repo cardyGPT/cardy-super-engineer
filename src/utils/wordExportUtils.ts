@@ -1,6 +1,6 @@
 
 import { saveAs } from 'file-saver';
-import { Document, Packer, Paragraph, HeadingLevel, TextRun, ImageRun, AlignmentType } from 'docx';
+import { Document, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, ImageRun } from 'docx';
 
 export const exportToWord = async (
   content: string, 
@@ -34,7 +34,7 @@ export const exportToWord = async (
 const formatMarkdownToWordContent = async (
   markdown: string,
   logoUrl?: string
-): Promise<(Paragraph | ImageRun)[]> => {
+): Promise<Paragraph[]> => {
   const children: Paragraph[] = [];
   
   // Add logo if provided
@@ -54,6 +54,13 @@ const formatMarkdownToWordContent = async (
                 transformation: {
                   width: 100,
                   height: 50
+                },
+                // Fix: Add the required properties for ImageRun
+                type: 'png',
+                altText: {
+                  title: "Company Logo",
+                  description: "Company Logo Image",
+                  name: "Logo"
                 }
               })
             ]

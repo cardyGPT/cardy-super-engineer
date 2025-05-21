@@ -8,12 +8,14 @@ interface DocumentExportFormatterProps {
   content: string;
   contentType: ContentType;
   ticket: JiraTicket;
+  userName?: string; // Added userName as an optional prop
 }
 
 const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
   content,
   contentType,
-  ticket
+  ticket,
+  userName = 'AI Assistant'
 }) => {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'N/A';
@@ -25,13 +27,19 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
     }
   };
 
-  const contentTypeLabel = 
-    contentType === 'lld' ? 'Low-Level Design' :
-    contentType === 'code' ? 'Implementation Code' :
-    contentType === 'tests' ? 'Unit Tests' :
-    contentType === 'testcases' ? 'Test Cases' :
-    contentType === 'testScripts' ? 'Test Scripts' :
-    contentType.toUpperCase();
+  // Fix the type issue by explicitly defining the contentTypeLabel
+  const getContentTypeLabel = (type: ContentType): string => {
+    switch(type) {
+      case 'lld': return 'Low-Level Design';
+      case 'code': return 'Implementation Code';
+      case 'tests': return 'Unit Tests';
+      case 'testcases': return 'Test Cases';
+      case 'testScripts': return 'Test Scripts';
+      default: return type.toString().toUpperCase();
+    }
+  };
+  
+  const contentTypeLabel = getContentTypeLabel(contentType);
   
   return (
     <div className="pdf-document p-8 bg-white text-black">
@@ -92,6 +100,7 @@ const DocumentExportFormatter: React.FC<DocumentExportFormatterProps> = ({
       <div className="document-footer mt-8 pt-4 border-t text-sm text-gray-500">
         <p>Auto-generated {contentTypeLabel} document for ticket {ticket.key}</p>
         <p className="mt-1">Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
+        {userName && <p className="mt-1">Created by: {userName}</p>}
       </div>
     </div>
   );
