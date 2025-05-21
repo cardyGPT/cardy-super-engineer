@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FilePdf, FileWord, Save, Send, MessageSquare } from "lucide-react";
+import { RefreshCw, FileText, FileOutput, Save, Send, MessageSquare } from "lucide-react";
 import { ContentType } from '../ContentDisplay';
 import { Steps, Step } from "@/components/ui/steps";
 import { JiraGenerationResponse, JiraTicket } from '@/types/jira';
@@ -12,6 +12,7 @@ import PromptInput from './PromptInput';
 import DocumentExportFormatter from './DocumentExportFormatter';
 import { useToast } from '@/hooks/use-toast';
 import { downloadAsPDF } from '@/utils/exportUtils';
+import { exportToWord } from '@/utils/wordExportUtils';
 
 // Define all generation steps in the flow
 const GENERATION_STEPS = [
@@ -183,31 +184,22 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
     
     setIsExportingWord(true);
     try {
-      // Convert the HTML to a format Word can understand
-      const content = documentRef.current.innerHTML;
-      const fileName = `${selectedTicket.key}_${currentStep}.doc`;
+      const content = getContentForCurrentStep();
+      if (!content) throw new Error("No content to export");
       
-      // Create a hidden link element
-      const link = document.createElement('a');
+      const fileName = `${selectedTicket.key}_${currentStep}`;
+      const logoUrl = '/cardinality-logo.png';
       
-      // Create a Blob with the HTML content and Word mime type
-      const blob = new Blob(['<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>Export HTML to Word</title></head><body>', content, '</body></html>'], {
-        type: 'application/msword'
-      });
+      const success = await exportToWord(content, fileName, logoUrl);
       
-      // Create a URL for the Blob
-      link.href = URL.createObjectURL(blob);
-      link.download = fileName;
-      
-      // Trigger the download
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      toast({
-        title: "Word Document Exported",
-        description: `${currentStep.toUpperCase()} document has been exported as Word document.`
-      });
+      if (success) {
+        toast({
+          title: "Word Document Exported",
+          description: `${currentStep.toUpperCase()} document has been exported as Word document.`
+        });
+      } else {
+        throw new Error("Failed to export Word document");
+      }
     } catch (error) {
       console.error("Error exporting Word document:", error);
       toast({
@@ -400,7 +392,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                   disabled={isExporting}
                   onClick={handleExportPDF}
                 >
-                  <FilePdf className="h-4 w-4 mr-1" />
+                  <FileText className="h-4 w-4 mr-1" />
                   PDF
                 </Button>
                 
@@ -410,7 +402,7 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
                   disabled={isExportingWord}
                   onClick={handleExportWord}
                 >
-                  <FileWord className="h-4 w-4 mr-1" />
+                  <FileOutput className="h-4 w-4 mr-1" />
                   Word
                 </Button>
                 
