@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
-import { JiraGenerationRequest } from "@/types/jira";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { ProjectContextData } from "@/types/jira";
@@ -19,12 +18,7 @@ const GeneratePage: React.FC = () => {
   const { 
     isAuthenticated, 
     loading,
-    error, 
-    selectedTicket, 
-    generatedContent, 
-    generateContent,
-    saveContentToDatabase,
-    pushToJira
+    error
   } = useStories();
   
   const [isContextDialogOpen, setIsContextDialogOpen] = useState(false);
@@ -32,8 +26,6 @@ const GeneratePage: React.FC = () => {
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([]);
   const [projectContextData, setProjectContextData] = useState<ProjectContextData | null>(null);
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(null);
-  const [currentStep, setCurrentStep] = useState<string>(selectedTicket ? 'lld' : 'select');
-  const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<ContentType>('lld');
   const { toast } = useToast();
   
@@ -41,16 +33,6 @@ const GeneratePage: React.FC = () => {
   useEffect(() => {
     loadSavedContext();
   }, []);
-
-  // Set step to 'select' if no ticket is selected, otherwise maintain current step
-  useEffect(() => {
-    if (!selectedTicket) {
-      setCurrentStep('select');
-    } else if (currentStep === 'select' && selectedTicket) {
-      // When a ticket is selected, automatically move to the LLD step
-      setCurrentStep('lld');
-    }
-  }, [selectedTicket, currentStep]);
   
   // Show toast for any errors
   useEffect(() => {

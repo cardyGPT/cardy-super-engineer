@@ -45,14 +45,16 @@ const ContentExportButton: React.FC<ContentExportButtonProps> = ({
       </PopoverTrigger>
       <PopoverContent className="w-48 p-2">
         <div className="space-y-2">
-          <h4 className="text-sm font-medium">Export as:</h4>
+          <h4 className="text-sm font-medium">Export options:</h4>
           
           <div className="flex flex-col gap-2">
+            {/* We've left the button but it's completely disabled */}
             <WordExportButton
               content={content}
               contentType={contentType}
               ticket={ticket}
               className="w-full justify-start"
+              disabled={true}
             />
           </div>
         </div>
