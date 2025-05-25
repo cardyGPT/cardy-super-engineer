@@ -7,7 +7,7 @@ const ExportTest: React.FC = () => {
     const testExport = async () => {
       try {
         console.log('Testing Word export...');
-        await exportToWord('# Test Content\n\nThis is a test document.', 'test', undefined);
+        await exportToWord();
         console.log('Word export test successful');
       } catch (error) {
         console.error('Word export test failed:', error);
