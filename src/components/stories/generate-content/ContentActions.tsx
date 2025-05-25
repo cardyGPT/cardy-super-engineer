@@ -1,179 +1,156 @@
 
-import React from 'react';
-import ContentExportManager from './ContentExportManager';
-import { ContentType } from '../ContentDisplay';
-import { useStories } from '@/contexts/StoriesContext';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreVertical, RefreshCw, Save, FileDown, Send } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { FileDown, Send, Save, Loader2 } from 'lucide-react';
+import { ContentType } from '../ContentDisplay';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContentActionsProps {
-  activeTab: ContentType;
   content: string;
-  isExporting: boolean;
-  isSaving: boolean;
-  isPushingToJira: boolean;
-  isRegenerating?: boolean;
-  onExportPDF: () => Promise<void>;
-  onSaveToDatabase: () => Promise<void>;
-  onPushToJira: () => Promise<void>;
-  onRegenerateContent?: () => Promise<void>;
-  onShowPromptInput?: () => void;
-  storyId: string;
-  storyKey: string;
+  contentType: ContentType;
+  onPushToJira: (content: string) => Promise<boolean>;
+  onSaveContent: (content: string) => Promise<boolean>;
 }
 
 const ContentActions: React.FC<ContentActionsProps> = ({
-  activeTab,
   content,
-  isExporting,
-  isSaving,
-  isPushingToJira,
-  isRegenerating = false,
-  onExportPDF,
-  onSaveToDatabase,
+  contentType,
   onPushToJira,
-  onRegenerateContent,
-  onShowPromptInput,
-  storyId,
-  storyKey
+  onSaveContent
 }) => {
-  const { selectedTicket } = useStories();
-  
-  if (!selectedTicket) {
-    return null;
-  }
+  const [isPushing, setIsPushing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
+
+  const handlePushToJira = async () => {
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to push to Jira",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsPushing(true);
+    try {
+      const success = await onPushToJira(content);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Content pushed to Jira successfully"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to push content to Jira",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const handleSaveContent = async () => {
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to save",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      const success = await onSaveContent(content);
+      if (success) {
+        toast({
+          title: "Success",
+          description: "Content saved successfully"
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to save content",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleExport = () => {
+    if (!content) {
+      toast({
+        title: "Error",
+        description: "No content to export",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${contentType}-content.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+
+    toast({
+      title: "Success",
+      description: "Content exported successfully"
+    });
+  };
+
+  if (!content) return null;
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="hidden md:flex gap-2">
-        <TooltipProvider>
-          {onRegenerateContent && (
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={onRegenerateContent}
-                  disabled={isRegenerating}
-                  className="flex items-center gap-1"
-                >
-                  {isRegenerating ? (
-                    <RefreshCw className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <RefreshCw className="h-4 w-4" />
-                  )}
-                  <span className="hidden sm:inline">Regenerate</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Regenerate this content</p>
-              </TooltipContent>
-            </Tooltip>
-          )}
-        </TooltipProvider>
-        
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={onSaveToDatabase}
-                disabled={isSaving || !content}
-                className="flex items-center gap-1"
-              >
-                <Save className="h-4 w-4" />
-                <span className="hidden sm:inline">Save</span>
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Save content to database</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+    <div className="flex gap-2">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleExport}
+        className="flex items-center gap-2"
+      >
+        <FileDown className="h-4 w-4" />
+        Export
+      </Button>
 
-        {onShowPromptInput && (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={onShowPromptInput}
-                  className="flex items-center gap-1"
-                >
-                  <span className="hidden sm:inline">Custom Prompt</span>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>Customize with a prompt</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handleSaveContent}
+        disabled={isSaving}
+        className="flex items-center gap-2"
+      >
+        {isSaving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
         )}
-        
-        <ContentExportManager 
-          content={content}
-          contentType={activeTab}
-          ticket={selectedTicket}
-          onPushToJira={(content) => {
-            onPushToJira();
-            return Promise.resolve(true);
-          }}
-          onSaveContent={(content) => {
-            onSaveToDatabase();
-            return Promise.resolve(true);
-          }}
-          onRegenerateContent={() => {
-            if (onRegenerateContent) {
-              onRegenerateContent();
-            }
-            return Promise.resolve();
-          }}
-          isExporting={isExporting}
-          isSaving={isSaving}
-          isPushingToJira={isPushingToJira}
-          isRegenerating={isRegenerating}
-        />
-      </div>
-      
-      {/* Mobile dropdown menu */}
-      <div className="md:hidden">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            {onRegenerateContent && (
-              <DropdownMenuItem onClick={() => onRegenerateContent()}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerate
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={onSaveToDatabase}>
-              <Save className="h-4 w-4 mr-2" />
-              Save
-            </DropdownMenuItem>
-            {onShowPromptInput && (
-              <DropdownMenuItem onClick={onShowPromptInput}>
-                Custom Prompt
-              </DropdownMenuItem>
-            )}
-            <DropdownMenuItem onClick={onExportPDF}>
-              <FileDown className="h-4 w-4 mr-2" />
-              Export PDF
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={onPushToJira}>
-              <Send className="h-4 w-4 mr-2" />
-              Push to Jira
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+        Save
+      </Button>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={handlePushToJira}
+        disabled={isPushing}
+        className="flex items-center gap-2"
+      >
+        {isPushing ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Send className="h-4 w-4" />
+        )}
+        Push to Jira
+      </Button>
     </div>
   );
 };
