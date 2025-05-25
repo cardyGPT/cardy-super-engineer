@@ -14,21 +14,16 @@ interface WordExportButtonProps {
   disabled?: boolean;
 }
 
-// This component completely disables Word export functionality to prevent errors
+// This component is completely disabled to prevent errors
 const WordExportButton: React.FC<WordExportButtonProps> = ({
-  content,
-  contentType,
-  ticket,
   className = '',
-  disabled = false
 }) => {
   const { toast } = useToast();
 
-  // Completely disabled handleExport function with message
   const handleExport = () => {
     toast({
-      title: "Export Feature Disabled",
-      description: "Word export has been temporarily disabled. Please use PDF or Google Drive export instead.",
+      title: "Feature Temporarily Disabled",
+      description: "Word export has been temporarily disabled. Please use PDF export instead.",
       variant: "default",
     });
   };
@@ -38,11 +33,11 @@ const WordExportButton: React.FC<WordExportButtonProps> = ({
       variant="outline"
       size="sm"
       onClick={handleExport}
-      disabled={true} // Always disabled
+      disabled={true}
       className={className}
     >
       <FileText className="h-4 w-4 mr-1" />
-      Word
+      Word (Disabled)
     </Button>
   );
 };
