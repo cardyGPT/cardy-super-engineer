@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
 import { Card } from "@/components/ui/card";
@@ -102,7 +101,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   
   const handleGenerate = async (type: ContentType) => {
     try {
-      // Set which content type is being generated
       setGeneratingContentType(type);
       
       const request: JiraGenerationRequest = {
@@ -304,7 +302,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
     
     setIsSaving(true);
     try {
-      // Save the content to the database
       const success = await saveContentToDatabase(activeTab, content);
       
       if (success) {
@@ -509,7 +506,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
           hasTestScriptsContent={hasContentType('testScripts')}
         />
         
-        {/* Prompt button */}
         {hasAnyContent && hasContentType(activeTab) && (
           <Button 
             variant="outline" 

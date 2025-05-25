@@ -3,27 +3,17 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { JiraTicket } from '@/types/jira';
-import { ContentType } from '../ContentDisplay';
 
-interface WordExportButtonProps {
-  content: string;
-  contentType: ContentType;
-  ticket: JiraTicket;
-  className?: string;
-  disabled?: boolean;
-}
-
-// This component is completely disabled to prevent errors
-const WordExportButton: React.FC<WordExportButtonProps> = ({
+// This component is permanently disabled to prevent errors
+const WordExportButton: React.FC<{ className?: string }> = ({
   className = '',
 }) => {
   const { toast } = useToast();
 
   const handleExport = () => {
     toast({
-      title: "Feature Temporarily Disabled",
-      description: "Word export has been temporarily disabled. Please use PDF export instead.",
+      title: "Feature Disabled",
+      description: "Word export is permanently disabled. Please use PDF export instead.",
       variant: "default",
     });
   };

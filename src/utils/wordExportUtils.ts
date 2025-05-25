@@ -1,33 +1,13 @@
 
-// Word export functionality has been completely disabled to prevent errors
-// This file is kept for compatibility but all functions are no-ops
-
-import { saveAs } from 'file-saver';
+// All Word export functionality has been completely removed to prevent errors
+// This file is kept for compatibility but contains no functional code
 
 /**
- * Export content to a Word document - COMPLETELY DISABLED
- * This function has been disabled due to compatibility issues
+ * Placeholder function - Word export is disabled
  */
-export const exportToWord = async (
-  content: string, 
-  fileName: string,
-  logoUrl?: string
-): Promise<void> => {
-  console.log('Word export functionality is completely disabled');
-  throw new Error('Word export is temporarily disabled. Please use PDF export instead.');
+export const exportToWord = async (): Promise<void> => {
+  throw new Error('Word export is permanently disabled');
 };
 
-// All helper functions are also disabled
-const formatMarkdownToWordContent = async (
-  markdown: string,
-  logoUrl?: string
-): Promise<any[]> => {
-  throw new Error('Word export is disabled');
-};
-
-// Prevent any accidental usage
-export default {
-  exportToWord: () => {
-    throw new Error('Word export is disabled');
-  }
-};
+// Prevent any usage
+export default {};
