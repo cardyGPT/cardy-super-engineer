@@ -27,9 +27,9 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   generatedContent,
   isGenerating
 }) => {
-  const [currentStep, setCurrentStep] = React.useState<string>('select');
+  const [currentStep, setCurrentStep] = React.useState<string>('lld');
 
-  const handleGenerate = async (type: 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts') => {
+  const handleGenerate = async (type: 'lld') => {
     setCurrentStep(type);
     
     const request: JiraGenerationRequest = {
@@ -40,23 +40,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
       additionalContext: {}
     };
 
-    // Add context from previous generations
-    if (type !== 'lld' && generatedContent?.lldContent) {
-      request.additionalContext.lldContent = generatedContent.lldContent;
-    }
-    
-    if ((type === 'tests' || type === 'testcases' || type === 'testScripts') && generatedContent?.codeContent) {
-      request.additionalContext.codeContent = generatedContent.codeContent;
-    }
-    
-    if ((type === 'testcases' || type === 'testScripts') && generatedContent?.testContent) {
-      request.additionalContext.testContent = generatedContent.testContent;
-    }
-    
-    if (type === 'testScripts' && generatedContent?.testCasesContent) {
-      request.additionalContext.testCasesContent = generatedContent.testCasesContent;
-    }
-
     await onGenerate(request);
   };
 
@@ -65,7 +48,6 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
   };
 
   const handleSaveContent = async (content: string): Promise<boolean> => {
-    // This would integrate with the database save functionality
     console.log('Saving content:', content);
     return true;
   };
