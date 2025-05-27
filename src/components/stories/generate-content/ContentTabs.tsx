@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileText, Code, TestTube, ClipboardList, Play } from 'lucide-react';
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 
 interface ContentTabsProps {
   activeTab: ContentType;

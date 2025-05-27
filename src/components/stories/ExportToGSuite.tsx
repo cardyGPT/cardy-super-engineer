@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Loader2, FileText } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { ContentType } from './ContentDisplay';
+import { ContentType } from '@/types/jira';
 import { exportToGoogleDocs } from '@/contexts/stories/api/gsuite';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 

@@ -1,11 +1,9 @@
-
 import React, { useState, useEffect } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { useStories } from "@/contexts/StoriesContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { ProjectContextData } from "@/types/jira";
-import { ContentType } from "@/components/stories/ContentDisplay";
+import { ProjectContextData, ContentType } from "@/types/jira";
 import StoryDetailWrapper from "@/components/stories/StoryDetailWrapper";
 
 // Components

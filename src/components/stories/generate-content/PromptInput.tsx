@@ -1,10 +1,9 @@
-
 import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Edit, Send, X } from "lucide-react";
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 
 interface PromptInputProps {
   contentType: ContentType;

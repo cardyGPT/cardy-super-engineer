@@ -1,6 +1,5 @@
-
 import { supabase } from '@/lib/supabase';
-import { ContentType } from '@/components/stories/ContentDisplay';
+import { ContentType } from '@/types/jira';
 
 /**
  * Exports content to Google Docs using the Supabase Edge Function

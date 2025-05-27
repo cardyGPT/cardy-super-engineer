@@ -1,8 +1,6 @@
-
 import React, { useState } from 'react';
 import { useStories } from '@/contexts/StoriesContext';
-import { ProjectContextData } from '@/types/jira';
-import { ContentType } from './ContentDisplay';
+import { ProjectContextData, ContentType } from '@/types/jira';
 import { Card } from '@/components/ui/card';
 import StoryDetail from './StoryDetail';
 import StoryDetailEmpty from './StoryDetailEmpty';

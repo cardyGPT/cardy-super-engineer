@@ -1,15 +1,14 @@
-
 import { useState } from 'react';
 import { useToast } from "@/hooks/use-toast";
 import { 
   JiraCredentials, 
   JiraTicket, 
   JiraGenerationRequest, 
-  JiraGenerationResponse
+  JiraGenerationResponse,
+  ContentType
 } from '@/types/jira';
 import { generateJiraContent, pushContentToJira } from '../api';
 import { supabase } from '@/lib/supabase';
-import { ContentType } from '@/components/stories/ContentDisplay';
 
 export const useContentGeneration = (
   credentials: JiraCredentials | null, 

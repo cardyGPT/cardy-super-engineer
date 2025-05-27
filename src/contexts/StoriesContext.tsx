@@ -1,8 +1,6 @@
-
 import React, { createContext, useContext, ReactNode } from 'react';
 import { useStoriesState } from './stories/useStoriesState';
-import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse } from '@/types/jira';
-import { ContentType } from '@/components/stories/ContentDisplay';
+import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ContentType } from '@/types/jira';
 
 // Type definitions for the context
 export interface StoriesContextState {

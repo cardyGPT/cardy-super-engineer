@@ -1,8 +1,6 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { JiraCredentials, JiraProject, JiraSprint, JiraTicket } from '@/types/jira';
+import { JiraCredentials, JiraProject, JiraSprint, JiraTicket, ContentType } from '@/types/jira';
 import { fetchJiraProjects, fetchJiraSprints, fetchJiraTickets } from '@/contexts/stories/api';
-import { ContentType } from './ContentDisplay';
 
 export interface JiraContextData {
   credentials: JiraCredentials | null;

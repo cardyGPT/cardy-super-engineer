@@ -55,3 +55,4 @@ const ContentDisplay: React.FC<ContentDisplayProps> = ({ content, contentType })
 };
 
 export default ContentDisplay;
+export type { ContentType };

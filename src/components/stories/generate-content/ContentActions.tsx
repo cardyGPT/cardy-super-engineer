@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FileDown, Send, Save, Loader2 } from 'lucide-react';
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 import { useToast } from '@/hooks/use-toast';
 
 interface ContentActionsProps {

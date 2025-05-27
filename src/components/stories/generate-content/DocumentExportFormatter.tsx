@@ -1,7 +1,6 @@
-
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 import { JiraTicket } from '@/types/jira';
 
 interface DocumentExportFormatterProps {

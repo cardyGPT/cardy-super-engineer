@@ -1,7 +1,6 @@
-
 import React, { useState } from 'react';
 import { JiraTicket } from '@/types/jira';
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 import { Button } from '@/components/ui/button';
 import { FileDown } from 'lucide-react';
 

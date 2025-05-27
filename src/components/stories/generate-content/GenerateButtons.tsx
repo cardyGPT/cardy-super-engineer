@@ -1,8 +1,7 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { FileText, Code, TestTube, ClipboardList, Play, Loader2 } from 'lucide-react';
-import { ContentType } from '../ContentDisplay';
+import { ContentType } from '@/types/jira';
 
 interface GenerateButtonsProps {
   onGenerate: (type: ContentType) => Promise<void>;

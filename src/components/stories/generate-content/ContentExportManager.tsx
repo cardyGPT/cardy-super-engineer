@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { 
@@ -13,7 +12,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { ContentType } from '@/components/stories/ContentDisplay';
+import { ContentType } from '@/types/jira';
 import { JiraTicket } from '@/types/jira';
 import { formatTimestampForFilename } from '@/utils/exportUtils';
 import DocumentExportFormatter from './DocumentExportFormatter';
