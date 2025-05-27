@@ -50,8 +50,10 @@ export interface JiraCredentials {
   apiToken: string;
 }
 
+export type ContentType = 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts';
+
 export interface JiraGenerationRequest {
-  type: 'lld' | 'code' | 'tests' | 'testcases' | 'testScripts';
+  type: ContentType;
   jiraTicket: JiraTicket;
   projectContext?: string;
   selectedDocuments?: string[];

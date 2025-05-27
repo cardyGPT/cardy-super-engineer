@@ -1,6 +1,5 @@
 
-import { JiraGenerationResponse } from '@/types/jira';
-import { ContentType } from '../ContentDisplay';
+import { JiraGenerationResponse, ContentType } from '@/types/jira';
 
 export const getContentByType = (content: JiraGenerationResponse | null, type: ContentType): string => {
   if (!content) return '';

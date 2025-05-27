@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { JiraTicket, JiraGenerationResponse } from '@/types/jira';
+import { JiraTicket, JiraGenerationResponse, ContentType } from '@/types/jira';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Loader2 } from 'lucide-react';
 import ContentDisplay from '../ContentDisplay';
+import { getContentByType } from './utils';
 
 interface ContentGenerationFlowProps {
   selectedTicket: JiraTicket;
@@ -12,7 +13,7 @@ interface ContentGenerationFlowProps {
   isGenerating: boolean;
   currentStep: string;
   setCurrentStep: (step: string) => void;
-  onGenerate: (type: 'lld') => Promise<void>;
+  onGenerate: (type: ContentType) => Promise<void>;
   onPushToJira: (content: string) => Promise<boolean>;
   onSaveContent: (content: string) => Promise<boolean>;
 }
@@ -23,15 +24,19 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
   isGenerating,
   onGenerate
 }) => {
+  const [activeType, setActiveType] = useState<ContentType>('lld');
+
   const handleGenerateLLD = async () => {
     try {
+      setActiveType('lld');
       await onGenerate('lld');
     } catch (error) {
       console.error('Error generating LLD:', error);
     }
   };
 
-  const hasLLDContent = Boolean(generatedContent?.lldContent || generatedContent?.lld);
+  const hasLLDContent = Boolean(getContentByType(generatedContent, 'lld'));
+  const currentContent = getContentByType(generatedContent, activeType);
 
   return (
     <div className="space-y-6">
@@ -67,8 +72,8 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
         <Card>
           <CardContent className="p-6">
             <ContentDisplay 
-              content={generatedContent?.lldContent || generatedContent?.lld || ''} 
-              contentType="lld" 
+              content={currentContent} 
+              contentType={activeType} 
             />
           </CardContent>
         </Card>

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData } from '@/types/jira';
+import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, ProjectContextData, ContentType } from '@/types/jira';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Info } from 'lucide-react';
@@ -29,7 +29,7 @@ const StoryGenerateContent: React.FC<StoryGenerateContentProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = React.useState<string>('lld');
 
-  const handleGenerate = async (type: 'lld') => {
+  const handleGenerate = async (type: ContentType) => {
     setCurrentStep(type);
     
     const request: JiraGenerationRequest = {

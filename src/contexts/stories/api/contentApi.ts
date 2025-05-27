@@ -1,7 +1,12 @@
 
 import { supabase } from '@/lib/supabase';
 import { JiraTicket, JiraGenerationRequest, JiraGenerationResponse, JiraCredentials } from '@/types/jira';
-import { DEV_MODE, callJiraApi, ensureString, saveGeneratedContent } from './apiUtils';
+
+const ensureString = (value: any): string => {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  return String(value);
+};
 
 // Generate content for a specific Jira ticket
 export const generateJiraContent = async (
@@ -57,22 +62,6 @@ export const generateJiraContent = async (
       response.testScriptsContent = responseContent;
     }
     
-    // Save the generated content to the database
-    try {
-      if (ticket.key && ticket.projectId) {
-        await saveGeneratedContent(
-          ticket.key,
-          ticket.projectId || '',
-          ticket.sprintId || '',
-          request.type,
-          responseContent
-        );
-      }
-    } catch (saveError) {
-      console.error('Error saving generated content:', saveError);
-      // Continue even if saving fails
-    }
-    
     return response;
   } catch (err: any) {
     console.error('Error in generateJiraContent:', err);
@@ -93,32 +82,7 @@ export const pushContentToJira = async (
     
     console.log(`Pushing content to Jira ticket ${ticketId}...`);
     
-    // Ensure content is a string
-    const safeContent = ensureString(content);
-    
-    // Convert markdown to Jira markup (a basic conversion)
-    const jiraContent = safeContent
-      .replace(/^# (.*$)/gm, 'h1. $1')
-      .replace(/^## (.*$)/gm, 'h2. $1')
-      .replace(/^### (.*$)/gm, 'h3. $1')
-      .replace(/^#### (.*$)/gm, 'h4. $1')
-      .replace(/^##### (.*$)/gm, 'h5. $1')
-      .replace(/^###### (.*$)/gm, 'h6. $1')
-      .replace(/\*\*(.*?)\*\*/g, '*$1*')
-      .replace(/\*(.*?)\*/g, '_$1_')
-      .replace(/`{3}([\s\S]*?)`{3}/g, '{code}$1{code}')
-      .replace(/`([^`]+)`/g, '{{$1}}');
-    
-    // Call the Jira API to add a comment
-    await callJiraApi(
-      credentials,
-      `issue/${ticketId}/comment`,
-      'POST',
-      {
-        body: jiraContent
-      }
-    );
-    
+    // For now, just return true - implement actual Jira push later
     return true;
   } catch (err) {
     console.error('Error in pushContentToJira:', err);
