@@ -4,7 +4,7 @@ import { JiraTicket, JiraGenerationResponse } from '@/types/jira';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Loader2 } from 'lucide-react';
-import ContentDisplay, { ContentType } from '../ContentDisplay';
+import ContentDisplay from '../ContentDisplay';
 
 interface ContentGenerationFlowProps {
   selectedTicket: JiraTicket;
@@ -12,7 +12,7 @@ interface ContentGenerationFlowProps {
   isGenerating: boolean;
   currentStep: string;
   setCurrentStep: (step: string) => void;
-  onGenerate: (type: ContentType) => Promise<void>;
+  onGenerate: (type: 'lld') => Promise<void>;
   onPushToJira: (content: string) => Promise<boolean>;
   onSaveContent: (content: string) => Promise<boolean>;
 }
@@ -23,12 +23,9 @@ const ContentGenerationFlow: React.FC<ContentGenerationFlowProps> = ({
   isGenerating,
   onGenerate
 }) => {
-  const [activeTab, setActiveTab] = useState<ContentType>('lld');
-
   const handleGenerateLLD = async () => {
     try {
       await onGenerate('lld');
-      setActiveTab('lld');
     } catch (error) {
       console.error('Error generating LLD:', error);
     }
